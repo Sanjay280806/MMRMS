@@ -40,7 +40,7 @@ export function WatchList({ section, title, subtitle, mentees, onOpen, metric, d
           },
           {
             key: 'metric',
-            header: metric({ ...mentees[0] }).label,
+            header: mentees.length && mentees[0] ? metric(mentees[0]).label : 'Metric',
             align: 'right',
             render: (m) => {
               const value = metric(m);
