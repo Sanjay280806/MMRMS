@@ -188,6 +188,9 @@ export function addMentorMeeting(menteeId, entry) {
 /** Section 6 — Participation Record. */
 export function addParticipation(studentId, group, entry) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.participation ??= { technical: [], coCurricular: [], extraCurricular: [] };
+  student.participation[group] ??= [];
   const record = { id: nextId(group === 'technical' ? 'tech' : group === 'coCurricular' ? 'co' : 'ec'), ...entry };
   student.participation[group].unshift(record);
   return record;
@@ -196,6 +199,8 @@ export function addParticipation(studentId, group, entry) {
 /** Section 7 — Certification Tracker. */
 export function addCertification(studentId, entry) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.certifications ??= [];
   const record = {
     id: nextId('cert'),
     progress: entry.status === 'Completed' ? 100 : entry.status === 'In Progress' ? 50 : 0,
@@ -209,6 +214,8 @@ export function addCertification(studentId, entry) {
 /** Section 8 — Placement Readiness. */
 export function updateReadiness(studentId, item, status, note) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.placementReadiness ??= [];
   const row = student.placementReadiness.find((r) => r.item === item);
   if (!row) return null;
   row.status = status;
@@ -219,6 +226,8 @@ export function updateReadiness(studentId, item, status, note) {
 /** Section 1E — Student Self Assessment. */
 export function updateSelfAssessment(studentId, patch) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.selfAssessment ??= {};
   Object.assign(student.selfAssessment, patch);
   return student.selfAssessment;
 }
@@ -226,6 +235,8 @@ export function updateSelfAssessment(studentId, patch) {
 /** Section 1C — the student's own 1–5 skill ratings. */
 export function updateSkillRating(studentId, skill, rating) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.skillAssessment ??= [];
   const row = student.skillAssessment.find((s) => s.skill === skill);
   if (!row) return null;
   row.rating = rating;
@@ -235,7 +246,8 @@ export function updateSkillRating(studentId, skill, rating) {
 /** Section 12 — a student marking their own action item done. */
 export function updateActionItem(studentId, actionId, status) {
   const student = students.get(studentId);
-  for (const meeting of student.meetings) {
+  if (!student) return null;
+  for (const meeting of student.meetings ?? []) {
     const item = (meeting.actionItems ?? []).find((a) => a.id === actionId);
     if (item) {
       item.status = status;
@@ -248,6 +260,8 @@ export function updateActionItem(studentId, actionId, status) {
 /** SMART goal acknowledgement. */
 export function acknowledgeGoal(studentId, goalId) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.goals ??= [];
   const goal = student.goals.find((g) => g.id === goalId);
   if (!goal) return null;
   goal.acknowledged = true;
@@ -257,6 +271,8 @@ export function acknowledgeGoal(studentId, goalId) {
 /** Support request raised between meetings. */
 export function addSupportRequest(studentId, { subject, category, priority }) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.supportRequests ??= [];
   const request = {
     id: `SR-${103 + student.supportRequests.length}`,
     subject,
@@ -271,6 +287,8 @@ export function addSupportRequest(studentId, { subject, category, priority }) {
 
 export function addMessage(studentId, text) {
   const student = students.get(studentId);
+  if (!student) return null;
+  student.messages ??= [];
   const message = { id: nextId('msg'), from: 'student', text, time: 'Just now' };
   student.messages.push(message);
   return message;
