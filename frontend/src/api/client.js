@@ -32,10 +32,18 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
   });
 
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = text && contentType.includes('application/json') ? JSON.parse(text) : null;
 
   if (!response.ok) {
     throw new ApiError(response.status, payload?.error ?? response.statusText, payload);
   }
+
+  if (text && !payload) {
+    throw new ApiError(502, 'API returned an unexpected response. Check the Vercel API deployment.', {
+      contentType,
+    });
+  }
+
   return payload;
 }
