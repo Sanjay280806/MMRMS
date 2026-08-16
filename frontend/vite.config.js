@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base:'/',
   server: {
     port: 5173,
     // Keeps the client on one origin: /api is proxied to the Express server.
