@@ -1,0 +1,13 @@
+{
+  "name": "mmrms",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "npm --workspace frontend run build"
+  }
+}
