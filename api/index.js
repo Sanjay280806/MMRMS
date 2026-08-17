@@ -1,1 +1,3 @@
-export { default } from '../backend/server.js';
+import { withApiPrefix } from './_express.js';
+
+export default withApiPrefix('/api');
