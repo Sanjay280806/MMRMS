@@ -79,7 +79,7 @@ export const MENTORS = [
     department: 'Computer Science and Engineering',
     designation: 'Mentor',
     cabin: 'CSE Block · Room 214',
-    batches: ['2024–28'],
+    batches: ['2024-28 Batch'],
     menteeCount: 33,
     yearCoordinator: 'Anitha P',
   },
@@ -92,7 +92,7 @@ export const MENTORS = [
     department: 'Computer Science and Engineering',
     designation: 'Mentor',
     cabin: 'CSE Block · Room 216',
-    batches: ['2024–28'],
+    batches: ['2024-28 Batch'],
     menteeCount: 7,
     yearCoordinator: 'Anitha P',
   },
@@ -139,14 +139,14 @@ export const GRIEVANCES = [
 ];
 
 export const COORDINATOR_EVENTS = [
-  { id: 'ev-1', type: 'PTM', title: 'Parent–Teacher Meeting', date: '22 Aug 2026', owner: 'Aarthi', status: 'Planned', notes: 'Attendance recovery and semester goals will be reviewed.' },
-  { id: 'ev-2', type: 'Review', title: 'Monthly mentor review', date: '05 Aug 2026', owner: 'Aarthi', status: 'Scheduled', notes: 'Mentor compliance, at-risk learners, and action closures.' },
-  { id: 'ev-3', type: 'Orientation', title: 'Career readiness orientation', date: '30 Jul 2026', owner: 'Aarthi', status: 'Completed', notes: 'Placement cell introduced the readiness plan for 2024 BCS.' },
+  { id: 'ev-1', type: 'PTM', title: 'Parent–Teacher Meeting', date: '22 Aug 2026', owner: 'Anitha P', status: 'Planned', notes: 'Attendance recovery and semester goals will be reviewed.' },
+  { id: 'ev-2', type: 'Review', title: 'Monthly mentor review', date: '05 Aug 2026', owner: 'Anitha P', status: 'Scheduled', notes: 'Mentor compliance, at-risk learners, and action closures.' },
+  { id: 'ev-3', type: 'Orientation', title: 'Career readiness orientation', date: '30 Jul 2026', owner: 'Anitha P', status: 'Completed', notes: 'Placement cell introduced the readiness plan for 2024 BCS.' },
 ];
 
 export const OD_REQUESTS = [
   { id: 'od-1', studentId: 's-103', event: 'Inter-collegiate Hackathon', from: '08 Aug 2026', to: '09 Aug 2026', status: 'Pending', submittedOn: '28 Jul 2026', approvedBy: null },
-  { id: 'od-2', studentId: 's-124', event: 'Paper presentation – National symposium', from: '02 Aug 2026', to: '02 Aug 2026', status: 'Approved', submittedOn: '20 Jul 2026', approvedBy: 'Aarthi' },
+  { id: 'od-2', studentId: 's-124', event: 'Paper presentation – National symposium', from: '02 Aug 2026', to: '02 Aug 2026', status: 'Approved', submittedOn: '20 Jul 2026', approvedBy: 'Anitha P' },
 ];
 
 /* ────────────────────────────── shared vocabularies ───────────────────── */
@@ -200,6 +200,8 @@ export const MEETING_AGENDA_ITEMS = [
   'Other',
 ];
 
+export const MEETING_TOPIC_CATEGORIES = ['Attendance', 'Academic', 'Profile Upgradation', 'Career', 'Others'];
+export const SEMESTER_START_DATE = '2026-07-01';
 export const MEETING_MODES = ['Offline', 'Online'];
 export const ACTION_STATUSES = ['Pending', 'In Progress', 'Completed'];
 export const ARREAR_STATUSES = ['Pending', 'Registered', 'Cleared'];
@@ -219,11 +221,11 @@ export const MARK_SCALE = 100;
  * Each is computed from record-book fields — see ../services/health.js.
  */
 export const HEALTH_DIMENSIONS = [
-  { key: 'academic', name: 'Academic', weight: 0.25, source: 'Section 2 — CGPA and arrears' },
-  { key: 'attendance', name: 'Attendance', weight: 0.2, source: 'Section 3 — latest review' },
-  { key: 'interaction', name: 'Interaction', weight: 0.2, source: 'Section 12 — meetings and action items' },
-  { key: 'career', name: 'Career', weight: 0.15, source: 'Sections 7 & 8 — certifications and readiness' },
-  { key: 'wellbeing', name: 'Well-being', weight: 0.2, source: 'Section 10 — well-being review' },
+  { key: 'academic', name: 'Academic', weight: 0.25, source: 'CGPA and arrears' },
+  { key: 'attendance', name: 'Attendance', weight: 0.2, source: 'Latest attendance review' },
+  { key: 'interaction', name: 'Interaction', weight: 0.2, source: 'Meetings and action items' },
+  { key: 'career', name: 'Career', weight: 0.15, source: 'Certifications and readiness' },
+  { key: 'wellbeing', name: 'Well-being', weight: 0.2, source: 'Well-being review' },
 ];
 
 /* ──────────────────────────── the signed-in student ───────────────────── */
@@ -241,7 +243,7 @@ export const STUDENT_PROFILE = {
     programme: 'B.E. Computer Science and Engineering',
     year: 'III Year',
     semester: 5,
-    batch: '2024–28',
+    batch: '2024-28 Batch',
     section: '2024 BCS',
     dateOfBirth: '14 Mar 2006',
     mobile: '+91 98407 21884',
@@ -249,7 +251,7 @@ export const STUDENT_PROFILE = {
     parentName: 'Dinesh',
     parentContact: '+91 94432 55810',
     address: '17/4, Gandhi Nagar, Peelamedu, Coimbatore – 641004',
-    yearCoordinator: 'Aarthi',
+    yearCoordinator: 'Anitha P',
     mentorSince: 'Aug 2024',
     bloodGroup: 'O+',
     hostelOrDayScholar: 'Day Scholar',

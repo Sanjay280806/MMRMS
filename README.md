@@ -40,7 +40,7 @@ Password for all of them: `mmrms@2026`
 | Mentor | `bharathi.priya@kct.ac.in` | Mentor console + every mentee's record book |
 | Mentor | `asmitha.shree@kct.ac.in` | Mentor console for the KCT01765 group |
 | Class Advisor | `suganthi@kct.ac.in` | Class advisor console |
-| Year Coordinator | `aarthi@kct.ac.in` | Year coordinator console |
+| Year Coordinator | `anitha.p@kct.ac.in` | Year coordinator console |
 
 Five consecutive failed sign-ins lock an email for 15 minutes, with a live
 countdown from the API.
@@ -173,7 +173,7 @@ can't disagree about what "at risk" means.
 `backend/src/data/seed.js` holds every fixture in record-book shape, including
 the provided 40-student 2024 BCS roster: KCT01763 is assigned to **Bharathi
 Priya** and KCT01765 to **Asmitha Shree**. **Suganthi** is the class advisor and
-**Aarthi** is the year coordinator.
+**Anitha P** is the year coordinator.
 `store.js` clones it into memory at boot; writes persist for the life of the
 process. A mentee's record book is *derived* from a dozen roster facts by
 `services/mentee.js`, then passed through the **same builder** the signed-in

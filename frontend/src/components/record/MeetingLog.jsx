@@ -80,15 +80,18 @@ function MeetingEntry({ meeting, open, onToggle, onUpdateAction, savingAction })
           <div className="flex flex-wrap items-center gap-2">
             <span className="tnum text-[13px] font-semibold text-ink">{meeting.date}</span>
             <Badge tone={meeting.modeTone}>{meeting.mode}</Badge>
+            {meeting.category && <Badge tone="indigo">{meeting.category}</Badge>}
             <span className="text-[11.5px] text-muted">{meeting.duration}</span>
           </div>
           <p className="mt-0.5 truncate text-[11.5px] text-muted">{meeting.agenda.join(' · ')}</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge tone={meeting.actionSummary.closed === meeting.actionSummary.total ? 'green' : 'amber'}>
-            {meeting.actionSummary.closed}/{meeting.actionSummary.total} actions
-          </Badge>
+          {meeting.actionSummary.total > 0 && (
+            <Badge tone={meeting.actionSummary.closed === meeting.actionSummary.total ? 'green' : 'amber'}>
+              {meeting.actionSummary.closed}/{meeting.actionSummary.total} actions
+            </Badge>
+          )}
           {meeting.signed && <Badge tone="green">Signed</Badge>}
           <span aria-hidden="true" className={cx('text-[10px] text-muted-soft transition', open && 'rotate-180')}>
             ▼
@@ -109,6 +112,8 @@ function MeetingEntry({ meeting, open, onToggle, onUpdateAction, savingAction })
               { key: 'Support Required', value: meeting.supportRequired },
             ]}
           />
+
+          <MeetingEvidence photoProofs={meeting.photoProofs} geotag={meeting.geotag} />
 
           <ActionItems
             items={meeting.actionItems}
@@ -207,6 +212,43 @@ function AgendaChecklist({ agenda }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function MeetingEvidence({ photoProofs = [], geotag }) {
+  if (!photoProofs.length && !geotag) return null;
+
+  const locationUrl = geotag
+    ? `https://www.google.com/maps?q=${geotag.latitude},${geotag.longitude}`
+    : null;
+
+  return (
+    <div className="rounded-xl border border-line bg-white p-4">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting Evidence</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {photoProofs.map((photo, index) => (
+          <a
+            key={`${photo.name}-${index}`}
+            href={photo.dataUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="focus-ring rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-[11.5px] font-semibold text-ink hover:border-muted-soft"
+          >
+            View photo: {photo.name}
+          </a>
+        ))}
+        {locationUrl && (
+          <a
+            href={locationUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="focus-ring rounded-lg border border-line-strong bg-canvas px-3 py-1.5 text-[11.5px] font-semibold text-ink hover:border-muted-soft"
+          >
+            View captured location
+          </a>
+        )}
+      </div>
     </div>
   );
 }

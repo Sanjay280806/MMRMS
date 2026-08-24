@@ -5,8 +5,7 @@ import { Button } from '../../components/ui/Button.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { ErrorBoundary } from '../../components/ui/ErrorBoundary.jsx';
-import { HealthDial, ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import { HealthPanel } from '../../components/record/HealthPanel.jsx';
+import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import {
   AcademicBackground,
   Aspirations,
@@ -31,6 +30,7 @@ import {
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
 import { GoalPanel } from '../../components/record/Goals.jsx';
+import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { AddParticipation, AddCertification } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { useResource } from '../../hooks/useResource.js';
@@ -140,7 +140,7 @@ export default function StudentRecordBook() {
     );
   }
 
-  const { identity, health } = data;
+  const { identity } = data;
   const openActions = data.meetings.openActionItems.length;
   const awaitingGoals = data.goals.filter((g) => g.needsAcknowledgement).length;
 
@@ -186,11 +186,10 @@ export default function StudentRecordBook() {
           initials={identity.initials}
           name={identity.name}
           subtitle={`${identity.programme} · ${identity.year} · ${identity.section}`}
-          meta={`${identity.rollNumber} · Register No. ${identity.registerNumber} · Batch ${identity.batch}`}
+          meta={`${identity.rollNumber} · Register No. ${identity.registerNumber} · ${identity.batch}`}
           seed={identity.name.length}
           // Expanded on the profile page, folded away while working in a section.
           defaultOpen={section === 'profile'}
-          aside={<HealthDial index={health.index} tone={health.tone} label={health.label} />}
           stats={[
             { label: 'CGPA ', value: data.performance.cgpa, tone: 'indigo' },
             { label: 'Attendance ', value: `${data.attendance.current}%`, tone: data.attendance.tone },
@@ -225,12 +224,11 @@ export default function StudentRecordBook() {
         <div className="animate-fadeRise space-y-5">
           {section === 'profile' && (
             <>
-              <div className="grid gap-5 lg:grid-cols-3">
-                <div className="space-y-5 lg:col-span-2">
+              <div className="space-y-5">
+                <div>
                   <AcademicBackground background={data.sectionOne.academicBackground} />
                   <Aspirations aspirations={data.sectionOne.aspirations} />
                 </div>
-                <HealthPanel health={health} />
               </div>
             </>
           )}
@@ -286,6 +284,17 @@ export default function StudentRecordBook() {
                 }
                 saving={saving === 'participation'}
               />
+              <EvidencePanel
+                title="Participation Evidence"
+                description="Upload certificates, photos, or participation proof for your mentor to review."
+                evidence={data.evidence.participation}
+                saving={saving === 'evidence-participation'}
+                onUpload={(entry) =>
+                  mutate('evidence-participation', () =>
+                    api('/student/me/evidence/participation', { method: 'POST', body: entry }),
+                  )
+                }
+              />
               <ParticipationRecord participation={data.participation} />
             </>
           )}
@@ -301,26 +310,65 @@ export default function StudentRecordBook() {
                 }
                 saving={saving === 'certification'}
               />
+              <EvidencePanel
+                title="Certification Evidence"
+                description="Upload the completed certificate or a related proof from your device."
+                evidence={data.evidence.certifications}
+                saving={saving === 'evidence-certifications'}
+                onUpload={(entry) =>
+                  mutate('evidence-certifications', () =>
+                    api('/student/me/evidence/certifications', { method: 'POST', body: entry }),
+                  )
+                }
+              />
               <CertificationTracker certifications={data.certifications} />
             </>
           )}
 
           {section === 'placement' && (
-            <PlacementReadiness
-              placementReadiness={data.placementReadiness}
-              saving={saving}
-              onUpdate={(item, status) =>
-                mutate(item, () =>
-                  api(`/student/me/placement-readiness/${encodeURIComponent(item)}`, {
-                    method: 'PATCH',
-                    body: { status },
-                  }),
-                )
-              }
-            />
+            <>
+              <EvidencePanel
+                title="Placement Evidence"
+                description="Upload your resume, profile proof, offer-related document, or another readiness record."
+                evidence={data.evidence.placement}
+                saving={saving === 'evidence-placement'}
+                onUpload={(entry) =>
+                  mutate('evidence-placement', () =>
+                    api('/student/me/evidence/placement', { method: 'POST', body: entry }),
+                  )
+                }
+              />
+              <PlacementReadiness
+                placementReadiness={data.placementReadiness}
+                saving={saving}
+                onUpdate={(item, status) =>
+                  mutate(item, () =>
+                    api(`/student/me/placement-readiness/${encodeURIComponent(item)}`, {
+                      method: 'PATCH',
+                      body: { status },
+                    }),
+                  )
+                }
+              />
+            </>
           )}
 
-          {section === 'internship' && <InternshipAndProject record={data.internshipAndProject} />}
+          {section === 'internship' && (
+            <>
+              <EvidencePanel
+                title="Internship & Project Evidence"
+                description="Upload internship certificates, project letters, or progress proof for your mentor."
+                evidence={data.evidence.internship}
+                saving={saving === 'evidence-internship'}
+                onUpload={(entry) =>
+                  mutate('evidence-internship', () =>
+                    api('/student/me/evidence/internship', { method: 'POST', body: entry }),
+                  )
+                }
+              />
+              <InternshipAndProject record={data.internshipAndProject} />
+            </>
+          )}
           {section === 'wellbeing' && <WellbeingReview wellbeing={data.wellbeing} />}
           {section === 'parents' && <ParentInteractionLog parentInteractions={data.parentInteractions} />}
 
