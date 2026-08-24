@@ -50,6 +50,11 @@ export function initials(name) {
     .toUpperCase();
 }
 
+export function formatBatch(batch) {
+  const value = String(batch ?? '').replace(/[–—]/g, '-').replace(/\s+Batch$/i, '').trim();
+  return value ? `${value} Batch` : 'Batch not assigned';
+}
+
 /** Count of arrears not yet cleared — Section 5. */
 export function standingArrearCount(arrears = []) {
   return arrears.filter((a) => a.status !== 'Cleared').length;
@@ -226,6 +231,8 @@ export function buildStudentRecordBook(student) {
     /* Record-book cover page. */
     identity: {
       ...student.identity,
+      batch: formatBatch(student.identity.batch),
+      yearCoordinator: 'Anitha P',
       id: student.id,
       initials: initials(student.identity.name),
       mentor: mentor && {
@@ -314,6 +321,13 @@ export function buildStudentRecordBook(student) {
 
     /* Section 9 */
     internshipAndProject: student.internshipAndProject,
+
+    evidence: {
+      participation: student.evidence?.participation ?? [],
+      certifications: student.evidence?.certifications ?? [],
+      placement: student.evidence?.placement ?? [],
+      internship: student.evidence?.internship ?? [],
+    },
 
     /* Section 10 */
     wellbeing: {

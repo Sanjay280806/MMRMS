@@ -27,6 +27,13 @@ const users = USERS.map(({ password, ...rest }) => ({
 const mentors = clone(MENTORS);
 const mentees = clone(MENTEES);
 const students = new Map([[STUDENT_PROFILE.id, clone(STUDENT_PROFILE)]]);
+const signedInMentee = mentees.find((mentee) => mentee.rollNumber === STUDENT_PROFILE.identity.rollNumber);
+if (signedInMentee) {
+  signedInMentee.recordBook = students.get(STUDENT_PROFILE.id);
+  signedInMentee.recordBook.meetingsDue = signedInMentee.meetingsDue;
+  signedInMentee.meetingsHeld = signedInMentee.recordBook.meetings?.length ?? 0;
+  signedInMentee.lastMeeting = signedInMentee.recordBook.meetings?.[0]?.date ?? null;
+}
 const classAdvisors = clone(CLASS_ADVISORS);
 const yearCoordinators = clone(YEAR_COORDINATORS);
 const classMeetings = clone(CLASS_MEETINGS);
@@ -119,7 +126,7 @@ export function listCoordinatorEvents() {
 }
 
 export function addCoordinatorEvent(entry) {
-  const record = { id: nextId('ev'), status: 'Planned', owner: 'Aarthi', notes: '', ...entry };
+  const record = { id: nextId('ev'), status: 'Planned', owner: 'Anitha P', notes: '', ...entry };
   coordinatorEvents.unshift(record);
   return record;
 }
@@ -174,6 +181,10 @@ export function addMentorMeeting(menteeId, entry) {
 
   mentee.meetingLogs ??= [];
   mentee.meetingLogs.unshift(record);
+  if (mentee.recordBook) {
+    mentee.recordBook.meetings ??= [];
+    mentee.recordBook.meetings.unshift(record);
+  }
   mentee.meetingsHeld = number;
   mentee.lastMeeting = record.date;
   if (mentee.flagReason === 'Overdue Meeting' && mentee.meetingsHeld >= mentee.meetingsDue) {
@@ -208,6 +219,22 @@ export function addCertification(studentId, entry) {
     ...entry,
   };
   student.certifications.unshift(record);
+  return record;
+}
+
+/** Evidence uploaded by a student for a growth and career record. */
+export function addEvidence(studentId, area, entry) {
+  const student = students.get(studentId);
+  if (!student) return null;
+  student.evidence ??= {
+    participation: [],
+    certifications: [],
+    placement: [],
+    internship: [],
+  };
+  student.evidence[area] ??= [];
+  const record = { id: nextId('evidence'), uploadedOn: new Date().toISOString(), ...entry };
+  student.evidence[area].unshift(record);
   return record;
 }
 

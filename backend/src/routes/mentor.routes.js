@@ -12,6 +12,7 @@ import {
   summariseMentee,
 } from '../services/mentor.js';
 import { buildMenteeRecordBook } from '../services/mentee.js';
+import { MEETING_TOPIC_CATEGORIES } from '../data/seed.js';
 
 const router = Router();
 
@@ -79,22 +80,45 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
     return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
   }
 
-  const { date, topicsDiscussed, agenda, actionItem, actionOwner, actionDate, nextReviewDate, mentorRemarks } = req.body ?? {};
+  const { date, topicsDiscussed, agenda, category, actionItem, actionOwner, mentorRemarks, photoProofs, geotag } = req.body ?? {};
   if (!date?.trim() || !topicsDiscussed?.trim()) {
     return next(new HttpError(400, 'Meeting date and topics discussed are required'));
   }
-  if (agenda && (!Array.isArray(agenda) || agenda.some((item) => typeof item !== 'string' || !item.trim()))) {
-    return next(new HttpError(400, 'Agenda must be a list of non-empty topics'));
+  if (!agenda?.trim()) {
+    return next(new HttpError(400, 'Meeting agenda is required'));
+  }
+  if (!MEETING_TOPIC_CATEGORIES.includes(category)) {
+    return next(new HttpError(400, `Category must be one of: ${MEETING_TOPIC_CATEGORIES.join(', ')}`));
+  }
+  if (photoProofs && (!Array.isArray(photoProofs) || photoProofs.length > 4 || photoProofs.some((photo) =>
+    !photo?.name || !['image/jpeg', 'image/png', 'image/webp'].includes(photo.contentType) ||
+    typeof photo.dataUrl !== 'string' || !photo.dataUrl.startsWith(`data:${photo.contentType};base64,`) || photo.dataUrl.length > 4 * 1024 * 1024,
+  ))) {
+    return next(new HttpError(400, 'Upload up to four JPG, PNG, or WEBP photo proofs under 3 MB each'));
+  }
+  if (geotag && (!Number.isFinite(geotag.latitude) || !Number.isFinite(geotag.longitude))) {
+    return next(new HttpError(400, 'The meeting location is invalid'));
   }
 
   const meeting = addMentorMeeting(mentee.id, {
     date: date.trim(),
     topicsDiscussed: topicsDiscussed.trim(),
-    agenda: agenda?.map((item) => item.trim()) ?? ['Academic Review'],
+    category,
+    agenda: [agenda.trim()],
     mentorRemarks: mentorRemarks?.trim() ?? '',
-    nextReviewDate: nextReviewDate?.trim() ?? '',
+    photoProofs: (photoProofs ?? []).map((photo) => ({
+      name: String(photo.name).trim().slice(0, 160),
+      contentType: photo.contentType,
+      dataUrl: photo.dataUrl,
+    })),
+    geotag: geotag ? {
+      latitude: Number(geotag.latitude.toFixed(6)),
+      longitude: Number(geotag.longitude.toFixed(6)),
+      accuracy: Number.isFinite(geotag.accuracy) ? Math.round(geotag.accuracy) : null,
+      capturedAt: geotag.capturedAt ?? new Date().toISOString(),
+    } : null,
     actionItems: actionItem?.trim()
-      ? [{ task: actionItem.trim(), responsible: actionOwner === 'Mentor' ? 'Mentor' : 'Student', targetDate: actionDate?.trim() || 'To be scheduled' }]
+      ? [{ task: actionItem.trim(), responsible: actionOwner === 'Mentor' ? 'Mentor' : 'Student', targetDate: 'Not set' }]
       : [],
   });
   res.status(201).json(meeting);

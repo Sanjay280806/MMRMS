@@ -16,7 +16,7 @@ import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
-import { TextArea, TextField } from '../../components/ui/Field.jsx';
+import { ChipGroup, TextArea, TextField } from '../../components/ui/Field.jsx';
 import { api } from '../../api/client.js';
 
 const TITLES = {
@@ -32,6 +32,18 @@ const TITLES = {
   reports: 'Term Reports',
   timeline: 'Activity Timeline',
 };
+
+const MEETING_CATEGORIES = ['Attendance', 'Academic', 'Profile Upgradation', 'Career', 'Others'];
+const MAX_MEETING_PHOTO_BYTES = 1024 * 1024;
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`Couldn't read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function MentorConsole() {
   const [section, setSection] = useState('dashboard');
@@ -139,7 +151,6 @@ export default function MentorConsole() {
             { label: 'Mentees ', value: stats.assignedMentees, tone: 'indigo' },
             { label: 'Compliance ', value: `${stats.compliance}%`, tone: stats.compliance >= 80 ? 'green' : 'amber' },
             { label: 'Flagged ', value: stats.flaggedCount, tone: stats.flaggedCount ? 'rose' : 'green' },
-            { label: 'Avg health ', value: stats.averageHealth, tone: 'slate' },
           ]}
           fields={[
             { key: 'Designation', value: mentor.designation },
@@ -183,6 +194,7 @@ export default function MentorConsole() {
               subtitle={`Mentees below the ${75}% requirement, lowest first`}
               mentees={data.attendanceWatch}
               onOpen={openMentee}
+              showHealth={false}
               metric={(m) => ({ label: 'Attendance', value: `${m.attendance}%`, tone: m.health < 50 ? 'rose' : 'amber' })}
               detail={(m) => `${m.shortageCount} subject${m.shortageCount === 1 ? '' : 's'} below requirement`}
               emptyTitle="No attendance shortfalls"
@@ -242,13 +254,56 @@ export default function MentorConsole() {
 function MeetingComposer({ onClose, onRecorded }) {
   const { data: roster, loading } = useResource('/mentor/me/mentees?sort=name&limit=100');
   const [menteeId, setMenteeId] = useState('');
-  const [date, setDate] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [category, setCategory] = useState('Academic');
+  const [agenda, setAgenda] = useState('');
   const [topicsDiscussed, setTopicsDiscussed] = useState('');
   const [actionItem, setActionItem] = useState('');
-  const [actionDate, setActionDate] = useState('');
-  const [nextReviewDate, setNextReviewDate] = useState('');
+  const [photoProofs, setPhotoProofs] = useState([]);
+  const [geotag, setGeotag] = useState(null);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  async function selectPhotos(event) {
+    const files = Array.from(event.target.files ?? []);
+    setError(null);
+    if (files.length > 4) return setError('Choose up to four photo proofs.');
+    if (files.some((file) => !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > MAX_MEETING_PHOTO_BYTES)) {
+      return setError('Use JPG, PNG, or WEBP photos smaller than 1 MB each.');
+    }
+    try {
+      setPhotoProofs(await Promise.all(files.map(async (file) => ({
+        name: file.name,
+        contentType: file.type,
+        dataUrl: await fileToDataUrl(file),
+      }))));
+    } catch (photoError) {
+      setError(photoError.message);
+    }
+  }
+
+  function captureLocation() {
+    if (!navigator.geolocation) return setError('Location services are not available in this browser.');
+    setError(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeotag({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          capturedAt: new Date().toISOString(),
+        });
+        setLocating(false);
+      },
+      () => {
+        setError('We could not capture the location. Check your browser permission and try again.');
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -257,11 +312,11 @@ function MeetingComposer({ onClose, onRecorded }) {
     try {
       await api(`/mentor/me/mentees/${menteeId}/meetings`, {
         method: 'POST',
-        body: { date, topicsDiscussed, actionItem, actionDate, nextReviewDate },
+        body: { date, category, agenda, topicsDiscussed, actionItem, photoProofs, geotag },
       });
       onRecorded();
-    } catch (err) {
-      setError(err.message);
+    } catch (submitError) {
+      setError(submitError.message);
     } finally {
       setSaving(false);
     }
@@ -269,9 +324,8 @@ function MeetingComposer({ onClose, onRecorded }) {
 
   return (
     <SectionCard
-      section="Section 12"
       title="Record Mentoring Session"
-      subtitle="Save meeting notes, a student action item, and the next review date to the mentee record book."
+      subtitle="Save the agenda, discussion category, optional action item, photo proof, and meeting location."
     >
       <form className="space-y-4" onSubmit={submit}>
         <label className="block text-[12.5px] font-semibold text-muted-strong">
@@ -284,16 +338,39 @@ function MeetingComposer({ onClose, onRecorded }) {
             disabled={loading}
           >
             <option value="">Select a mentee</option>
-            {roster?.mentees.map((mentee) => <option key={mentee.id} value={mentee.id}>{mentee.rollNumber} · {mentee.name}</option>)}
+            {roster?.mentees.map((mentee) => <option key={mentee.id} value={mentee.id}>{mentee.rollNumber} - {mentee.name} - {mentee.batch}</option>)}
           </select>
         </label>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <TextField label="Meeting date" placeholder="09 Aug 2026" value={date} onChange={(event) => setDate(event.target.value)} required />
-          <TextField label="Action-item target" placeholder="16 Aug 2026" value={actionDate} onChange={(event) => setActionDate(event.target.value)} />
-          <TextField label="Next review" placeholder="23 Aug 2026" value={nextReviewDate} onChange={(event) => setNextReviewDate(event.target.value)} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+          <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
         </div>
-        <TextArea label="Topics discussed" value={topicsDiscussed} onChange={(event) => setTopicsDiscussed(event.target.value)} required />
+        <TextField label="Agenda for meeting" placeholder="e.g. Review attendance recovery plan" value={agenda} onChange={(event) => setAgenda(event.target.value)} required />
+        <TextArea label="Discussion notes" value={topicsDiscussed} onChange={(event) => setTopicsDiscussed(event.target.value)} required />
         <TextField label="Student action item (optional)" value={actionItem} onChange={(event) => setActionItem(event.target.value)} />
+        <div className="grid gap-4 rounded-xl border border-line bg-canvas/50 p-4 sm:grid-cols-2">
+          <label className="text-[12.5px] font-semibold text-muted-strong">
+            Photo proofs (optional)
+            <input
+              className="mt-1.5 block w-full text-[12px] text-muted"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={selectPhotos}
+            />
+            <span className="mt-1 block text-[11px] font-normal text-muted">Up to four JPG, PNG, or WEBP photos, 1 MB each.</span>
+          </label>
+          <div>
+            <p className="text-[12.5px] font-semibold text-muted-strong">Meeting location (optional)</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="secondary" loading={locating} onClick={captureLocation}>
+                Capture location
+              </Button>
+              {geotag && <span className="text-[11.5px] font-medium text-good-ink">Location saved (accuracy {Math.round(geotag.accuracy)} m)</span>}
+            </div>
+          </div>
+          {photoProofs.length > 0 && <p className="text-[11.5px] text-good-ink sm:col-span-2">{photoProofs.length} photo proof{photoProofs.length === 1 ? '' : 's'} ready to save.</p>}
+        </div>
         {error && <p className="text-sm text-bad-ink">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" size="sm" loading={saving}>Save meeting</Button>

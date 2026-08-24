@@ -10,7 +10,7 @@ import { HealthDimensions } from '../../../components/dashboard/HealthDimensions
 
 /** The mentor's landing view: portfolio counts, then who needs attention. */
 export function MentorDashboard({ data, onOpenMentee }) {
-  const { stats, attention, cohortHealth } = data;
+  const { stats, attention, cohortHealth, initialInteractionAlerts } = data;
 
   return (
     <div className="space-y-5">
@@ -30,7 +30,7 @@ export function MentorDashboard({ data, onOpenMentee }) {
           label="Record Books Complete"
           value={stats.recordBooksComplete}
           suffix={`/ ${stats.recordBooksTotal}`}
-          footer="Section 1 recorded and signed"
+          footer="First record-book review recorded"
         />
         <StatTile
           label="Open Action Items"
@@ -40,11 +40,51 @@ export function MentorDashboard({ data, onOpenMentee }) {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <WatchTile label="Attendance shortfalls" value={stats.attendanceShortfalls} section="Section 3" tone="amber" />
-        <WatchTile label="Standing arrears" value={stats.standingArrears} section="Section 5" tone="indigo" />
-        <WatchTile label="Well-being concerns" value={stats.wellbeingConcerns} section="Section 10" tone="amber" />
-        <WatchTile label="Parent contacts logged" value={stats.parentContactsThisTerm} section="Section 11" tone="green" />
+        <WatchTile label="Attendance shortfalls" value={stats.attendanceShortfalls} tone="amber" />
+        <WatchTile label="Standing arrears" value={stats.standingArrears} tone="indigo" />
+        <WatchTile label="Well-being concerns" value={stats.wellbeingConcerns} tone="amber" />
+        <WatchTile label="Parent contacts logged" value={stats.parentContactsThisTerm} tone="green" />
       </div>
+
+      {initialInteractionAlerts.length > 0 && (
+        <SectionTable
+          title="Initial Mentor Interaction Due"
+          subtitle="These mentees have not had an interaction within one month of the semester start."
+          action={<Badge tone="rose" size="md">{initialInteractionAlerts.length} overdue</Badge>}
+        >
+          <DataTable
+            rows={initialInteractionAlerts}
+            rowKey={(m) => m.id}
+            onRowClick={(m) => onOpenMentee(m.id)}
+            columns={[
+              {
+                key: 'student',
+                header: 'Student',
+                render: (m, i) => (
+                  <div className="flex items-center gap-3">
+                    <Avatar initials={m.initials} seed={i} size="sm" />
+                    <div>
+                      <p className="font-medium">{m.name}</p>
+                      <p className="text-[11.5px] text-muted">{m.rollNumber} · {m.batch}</p>
+                    </div>
+                  </div>
+                ),
+              },
+              { key: 'status', header: 'Status', align: 'right', render: () => <Badge tone="rose">Interaction not recorded</Badge> },
+              {
+                key: 'open',
+                header: '',
+                align: 'right',
+                render: (m) => (
+                  <Button size="sm" variant="secondary" onClick={(event) => { event.stopPropagation(); onOpenMentee(m.id); }}>
+                    Open record
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </SectionTable>
+      )}
 
       <SectionTable
         title="Students Needing Attention"
@@ -133,11 +173,10 @@ export function MentorDashboard({ data, onOpenMentee }) {
   );
 }
 
-function WatchTile({ label, value, section, tone }) {
+function WatchTile({ label, value, tone }) {
   return (
     <div className="rounded-card border border-line bg-white p-4 shadow-card">
-      <p className="text-[10px] font-bold uppercase tracking-[.1em] text-brand-500">{section}</p>
-      <div className="mt-2 flex items-baseline gap-2">
+      <div className="flex items-baseline gap-2">
         <span className="tnum font-display text-[26px] font-semibold leading-none text-ink">{value}</span>
         <Badge tone={tone}>{label}</Badge>
       </div>

@@ -35,6 +35,8 @@ const ORDINAL = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 const seedOf = (name) => (name.charCodeAt(0) + name.length) % 3;
 
 export function menteeToStudent(mentee) {
+  if (mentee.recordBook) return structuredClone(mentee.recordBook);
+
   const seed = seedOf(mentee.name);
   const semester = mentee.year * 2 - 1;
   const completedSemesters = semester - 1;
@@ -294,7 +296,7 @@ export function menteeToStudent(mentee) {
       programme: 'B.E. Computer Science and Engineering',
       year: `${ORDINAL[mentee.year]} Year`,
       semester,
-      batch: `${admitYear}–${String(admitYear + 4).slice(2)}`,
+      batch: `${admitYear}-${String(admitYear + 4).slice(2)} Batch`,
       section: mentee.section,
       dateOfBirth: `${(mentee.name.length % 28) + 1} ${['Jan', 'Apr', 'Jul', 'Oct'][seed % 4]} ${2026 - 18 - mentee.year}`,
       mobile: `+91 98${String(40100000 + ((mentee.name.charCodeAt(1) * 31013) % 899999)).slice(0, 8)}`,
@@ -302,7 +304,7 @@ export function menteeToStudent(mentee) {
       parentName: `${mentee.name.split(' ').slice(-1)[0]} (guardian)`,
       parentContact: `+91 94${String(43200000 + ((mentee.name.length * 618031) % 799999)).slice(0, 8)}`,
       address: `${(mentee.name.length % 60) + 1}, ${['Peelamedu', 'Saravanampatti', 'Ganapathy'][seed]}, Coimbatore`,
-      yearCoordinator: 'Aarthi',
+      yearCoordinator: 'Anitha P',
       mentorSince: 'Aug 2024',
       bloodGroup: ['O+', 'B+', 'A+'][seed],
       hostelOrDayScholar: seed === 0 ? 'Hosteller' : 'Day Scholar',

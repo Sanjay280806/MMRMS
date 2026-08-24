@@ -4,6 +4,7 @@ import { HttpError } from '../middleware/error.js';
 import {
   acknowledgeGoal,
   addCertification,
+  addEvidence,
   addMessage,
   addParticipation,
   addSupportRequest,
@@ -38,6 +39,9 @@ function currentStudent(req) {
 const oneOf = (value, allowed, label) => {
   if (!allowed.includes(value)) throw new HttpError(400, `${label} must be one of: ${allowed.join(', ')}`);
 };
+
+const EVIDENCE_AREAS = ['participation', 'certifications', 'placement', 'internship'];
+const MAX_EVIDENCE_BYTES = 4 * 1024 * 1024;
 
 /** The whole record book. */
 router.get('/me/record-book', (req, res) => {
@@ -121,6 +125,31 @@ router.post('/me/certifications', (req, res, next) => {
       completionDate: completionDate?.trim() || null,
     }),
   );
+});
+
+/* Supporting certificates and files for each growth area. */
+router.post('/me/evidence/:area', (req, res, next) => {
+  const student = currentStudent(req);
+  const area = req.params.area;
+  const { name, contentType, size, dataUrl } = req.body ?? {};
+
+  if (!EVIDENCE_AREAS.includes(area)) return next(new HttpError(404, `Unknown evidence area "${area}"`));
+  if (!name?.trim() || !contentType?.trim() || typeof dataUrl !== 'string') {
+    return next(new HttpError(400, 'Choose a file to upload'));
+  }
+  if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+    return next(new HttpError(400, 'Upload a PDF, JPG, PNG, or WEBP file'));
+  }
+  if (!Number.isInteger(size) || size < 1 || size > MAX_EVIDENCE_BYTES || dataUrl.length > MAX_EVIDENCE_BYTES * 1.4) {
+    return next(new HttpError(400, 'Files must be smaller than 4 MB'));
+  }
+  if (!dataUrl.startsWith(`data:${contentType};base64,`)) {
+    return next(new HttpError(400, 'The uploaded file is invalid'));
+  }
+
+  res.status(201).json(addEvidence(student.id, area, {
+    name: name.trim().slice(0, 160), contentType, size, dataUrl,
+  }));
 });
 
 /* ── Section 8 — Placement Readiness ────────────────────────────────────── */

@@ -15,7 +15,7 @@ export function createApp() {
   app.disable('etag');
 
   app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') ?? true }));
-  app.use(express.json());
+  app.use(express.json({ limit: '8mb' }));
   app.use(morgan('dev'));
 
   app.use((_req, res, next) => {

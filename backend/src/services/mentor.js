@@ -2,9 +2,10 @@ import {
   ATTENDANCE_REQUIREMENT,
   INSTITUTION,
   READINESS_ITEMS,
+  SEMESTER_START_DATE,
 } from '../data/seed.js';
 import { dimensionList, healthIndex, scoreTone } from './health.js';
-import { computeDimensions, decorateGoals, initials, standingArrearCount } from './student.js';
+import { computeDimensions, decorateGoals, formatBatch, initials, standingArrearCount } from './student.js';
 import { menteeToStudent } from './mentee.js';
 import { listMentees } from '../data/store.js';
 
@@ -15,6 +16,12 @@ const FLAG_TONE = {
   'Well-being Concern': 'rose',
   'Standing Arrear': 'indigo',
 };
+
+function initialInteractionOverdue(mentee, today = new Date()) {
+  const deadline = new Date(`${SEMESTER_START_DATE}T00:00:00`);
+  deadline.setMonth(deadline.getMonth() + 1);
+  return today >= deadline && (mentee.meetingsHeld ?? 0) === 0;
+}
 
 /**
  * A mentee reduced to what a roster row or card needs. Everything numeric
@@ -28,8 +35,8 @@ export function summariseMentee(mentee) {
   const shortageSubjects = student.coursePerformance.filter(
     (c) => c.attendance < ATTENDANCE_REQUIREMENT,
   );
-  const openActions = student.meetings
-    .flatMap((m) => m.actionItems)
+  const openActions = (student.meetings ?? [])
+    .flatMap((m) => m.actionItems ?? [])
     .filter((a) => a.status !== 'Completed');
 
   return {
@@ -40,6 +47,7 @@ export function summariseMentee(mentee) {
     year: mentee.year,
     section: mentee.section,
     rollNumber: student.identity.rollNumber,
+    batch: formatBatch(student.identity.batch),
 
     health: index,
     healthTone: scoreTone(index),
@@ -65,6 +73,7 @@ export function summariseMentee(mentee) {
     flagReason: mentee.flagReason ?? null,
     flagTone: mentee.flagReason ? FLAG_TONE[mentee.flagReason] ?? 'slate' : null,
     suggestedAction: mentee.suggestedAction ?? null,
+    initialInteractionOverdue: initialInteractionOverdue(mentee),
   };
 }
 
@@ -78,6 +87,7 @@ export function buildMentorOverview(mentor) {
     mentees.reduce((s, m) => s + m.health, 0) / (mentees.length || 1),
   );
   const parentContactsThisTerm = buildParentLog(mentor).length;
+  const initialInteractionAlerts = mentees.filter((mentee) => mentee.initialInteractionOverdue);
 
   // Cohort radar: the mean of each dimension across the roster.
   const cohort = {};
@@ -120,9 +130,11 @@ export function buildMentorOverview(mentor) {
       parentContactsThisTerm,
       recordBooksComplete: mentees.filter((mentee) => mentee.meetingsHeld > 0).length,
       recordBooksTotal: mentees.length,
+      initialInteractionsOverdue: initialInteractionAlerts.length,
     },
 
     attention: flagged,
+    initialInteractionAlerts,
     cohortHealth: { dimensions: dimensionList(cohort), overall: healthIndex(cohort) },
 
     /* Section 3 across the roster. */
