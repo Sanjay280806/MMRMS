@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { Button } from '../../components/ui/Button.jsx';
-import { SectionCard } from '../../components/ui/SectionCard.jsx';
+import { Card } from '../../components/ui/Card.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { ErrorBoundary } from '../../components/ui/ErrorBoundary.jsx';
@@ -305,6 +306,19 @@ function MeetingComposer({ onClose, onRecorded }) {
     );
   }
 
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === 'Escape') onClose();
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose]);
+
   async function submit(event) {
     event.preventDefault();
     setSaving(true);
@@ -322,61 +336,117 @@ function MeetingComposer({ onClose, onRecorded }) {
     }
   }
 
-  return (
-    <SectionCard
-      title="Record Mentoring Session"
-      subtitle="Save the agenda, discussion category, optional action item, photo proof, and meeting location."
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-[2px] sm:p-6"
+      onClick={onClose}
+      role="presentation"
     >
-      <form className="space-y-4" onSubmit={submit}>
-        <label className="block text-[12.5px] font-semibold text-muted-strong">
-          Mentee
-          <select
-            className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink"
-            value={menteeId}
-            onChange={(event) => setMenteeId(event.target.value)}
-            required
-            disabled={loading}
-          >
-            <option value="">Select a mentee</option>
-            {roster?.mentees.map((mentee) => <option key={mentee.id} value={mentee.id}>{mentee.rollNumber} - {mentee.name} - {mentee.batch}</option>)}
-          </select>
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
-          <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
-        </div>
-        <TextField label="Agenda for meeting" placeholder="e.g. Review attendance recovery plan" value={agenda} onChange={(event) => setAgenda(event.target.value)} required />
-        <TextArea label="Discussion notes" value={topicsDiscussed} onChange={(event) => setTopicsDiscussed(event.target.value)} required />
-        <TextField label="Student action item (optional)" value={actionItem} onChange={(event) => setActionItem(event.target.value)} />
-        <div className="grid gap-4 rounded-xl border border-line bg-canvas/50 p-4 sm:grid-cols-2">
-          <label className="text-[12.5px] font-semibold text-muted-strong">
-            Photo proofs (optional)
-            <input
-              className="mt-1.5 block w-full text-[12px] text-muted"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={selectPhotos}
-            />
-            <span className="mt-1 block text-[11px] font-normal text-muted">Up to four JPG, PNG, or WEBP photos, 1 MB each.</span>
-          </label>
-          <div>
-            <p className="text-[12.5px] font-semibold text-muted-strong">Meeting location (optional)</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="secondary" loading={locating} onClick={captureLocation}>
-                Capture location
-              </Button>
-              {geotag && <span className="text-[11.5px] font-medium text-good-ink">Location saved (accuracy {Math.round(geotag.accuracy)} m)</span>}
+      <Card
+        as="div"
+        className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden animate-fadeRise"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="meeting-composer-title"
+      >
+        <header className="shrink-0 border-b border-line px-5 py-4">
+          <h3 id="meeting-composer-title" className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">
+            Record Mentoring Session
+          </h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+            Save the agenda, discussion category, optional action item, photo proof, and meeting location.
+          </p>
+        </header>
+
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+            <label className="block text-[12.5px] font-semibold text-muted-strong">
+              Mentee
+              <select
+                className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink"
+                value={menteeId}
+                onChange={(event) => setMenteeId(event.target.value)}
+                required
+                disabled={loading}
+              >
+                <option value="">Select a mentee</option>
+                {roster?.mentees.map((mentee) => (
+                  <option key={mentee.id} value={mentee.id}>
+                    {mentee.rollNumber} - {mentee.name} - {mentee.batch}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+              <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
             </div>
+            <TextField
+              label="Agenda for meeting"
+              placeholder="e.g. Review attendance recovery plan"
+              value={agenda}
+              onChange={(event) => setAgenda(event.target.value)}
+              required
+            />
+            <TextArea
+              label="Discussion notes"
+              value={topicsDiscussed}
+              onChange={(event) => setTopicsDiscussed(event.target.value)}
+              required
+            />
+            <TextField
+              label="Student action item (optional)"
+              value={actionItem}
+              onChange={(event) => setActionItem(event.target.value)}
+            />
+            <div className="grid gap-4 rounded-xl border border-line bg-canvas/50 p-4 sm:grid-cols-2">
+              <label className="text-[12.5px] font-semibold text-muted-strong">
+                Photo proofs (optional)
+                <input
+                  className="mt-1.5 block w-full text-[12px] text-muted"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={selectPhotos}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-muted">
+                  Up to four JPG, PNG, or WEBP photos, 1 MB each.
+                </span>
+              </label>
+              <div>
+                <p className="text-[12.5px] font-semibold text-muted-strong">Meeting location (optional)</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant="secondary" loading={locating} onClick={captureLocation}>
+                    Capture location
+                  </Button>
+                  {geotag && (
+                    <span className="text-[11.5px] font-medium text-good-ink">
+                      Location saved (accuracy {Math.round(geotag.accuracy)} m)
+                    </span>
+                  )}
+                </div>
+              </div>
+              {photoProofs.length > 0 && (
+                <p className="text-[11.5px] text-good-ink sm:col-span-2">
+                  {photoProofs.length} photo proof{photoProofs.length === 1 ? '' : 's'} ready to save.
+                </p>
+              )}
+            </div>
+            {error && <p className="text-sm text-bad-ink">{error}</p>}
           </div>
-          {photoProofs.length > 0 && <p className="text-[11.5px] text-good-ink sm:col-span-2">{photoProofs.length} photo proof{photoProofs.length === 1 ? '' : 's'} ready to save.</p>}
-        </div>
-        {error && <p className="text-sm text-bad-ink">{error}</p>}
-        <div className="flex gap-2">
-          <Button type="submit" size="sm" loading={saving}>Save meeting</Button>
-          <Button size="sm" variant="secondary" onClick={onClose}>Cancel</Button>
-        </div>
-      </form>
-    </SectionCard>
+
+          <div className="flex shrink-0 gap-2 border-t border-line bg-white px-5 py-4">
+            <Button type="submit" size="sm" loading={saving}>
+              Save meeting
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>,
+    document.body,
   );
 }

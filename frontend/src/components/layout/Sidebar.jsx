@@ -63,7 +63,7 @@ export function Sidebar({ product, groups, value, onChange, identity, open, onCl
           </button>
         )}
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-5" aria-label="Record book sections">
+        <nav className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-3 pb-5" aria-label="Record book sections">
           {groups.map((group) => (
             <div key={group.label} className="mb-4 last:mb-0">
               <p className="px-3 pb-1.5 pt-2 text-[9.5px] font-bold uppercase tracking-[.12em] text-white/30">
