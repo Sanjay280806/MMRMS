@@ -35,7 +35,20 @@ const TITLES = {
 };
 
 const MEETING_CATEGORIES = ['Attendance', 'Academic', 'Profile Upgradation', 'Career', 'Others'];
+const MEETING_AGENDA_ITEMS = [
+  'Academic Review',
+  'Attendance Review',
+  'Placement Preparation',
+  'Personal Discussion',
+  'Goal Progress',
+  'Other',
+];
+const MEETING_MODES = ['Offline', 'Online'];
+const ACTION_STATUSES = ['Pending', 'In Progress', 'Completed'];
 const MAX_MEETING_PHOTO_BYTES = 1024 * 1024;
+
+const newActionItem = () => ({ task: '', responsible: 'Student', targetDate: '', status: 'Pending' });
+const newGoalProgress = () => ({ goalId: '', currentStatus: '', progress: 0 });
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -255,16 +268,55 @@ export default function MentorConsole() {
 function MeetingComposer({ onClose, onRecorded }) {
   const { data: roster, loading } = useResource('/mentor/me/mentees?sort=name&limit=100');
   const [menteeId, setMenteeId] = useState('');
+  const { data: selectedMentee, loading: loadingMentee } = useResource(
+    menteeId ? '/mentor/me/mentees/' + menteeId : '',
+    { enabled: Boolean(menteeId) },
+  );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [durationMinutes, setDurationMinutes] = useState(30);
+  const [mode, setMode] = useState('Offline');
   const [category, setCategory] = useState('Academic');
-  const [agenda, setAgenda] = useState('');
+  const [agenda, setAgenda] = useState(['Academic Review']);
+  const [agendaNotes, setAgendaNotes] = useState('');
   const [topicsDiscussed, setTopicsDiscussed] = useState('');
-  const [actionItem, setActionItem] = useState('');
+  const [studentConcerns, setStudentConcerns] = useState('');
+  const [mentorSuggestions, setMentorSuggestions] = useState('');
+  const [supportRequired, setSupportRequired] = useState('');
+  const [actionItems, setActionItems] = useState([]);
+  const [progressSinceLastMeeting, setProgressSinceLastMeeting] = useState({
+    achievements: '',
+    pendingTasks: '',
+    improvementObserved: '',
+  });
+  const [goalProgress, setGoalProgress] = useState([]);
+  const [mentorRemarks, setMentorRemarks] = useState('');
+  const [studentRemarks, setStudentRemarks] = useState('');
+  const [nextReviewDate, setNextReviewDate] = useState('');
+  const [mentorSigned, setMentorSigned] = useState(true);
+  const [studentSigned, setStudentSigned] = useState(false);
   const [photoProofs, setPhotoProofs] = useState([]);
   const [geotag, setGeotag] = useState(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  function toggleAgenda(item) {
+    setAgenda((current) =>
+      current.includes(item) ? current.filter((value) => value !== item) : [...current, item],
+    );
+  }
+
+  function updateActionItem(index, patch) {
+    setActionItems((items) => items.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, ...patch } : item
+    )));
+  }
+
+  function updateGoalProgress(index, patch) {
+    setGoalProgress((items) => items.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, ...patch } : item
+    )));
+  }
 
   async function selectPhotos(event) {
     const files = Array.from(event.target.files ?? []);
@@ -326,7 +378,28 @@ function MeetingComposer({ onClose, onRecorded }) {
     try {
       await api(`/mentor/me/mentees/${menteeId}/meetings`, {
         method: 'POST',
-        body: { date, category, agenda, topicsDiscussed, actionItem, photoProofs, geotag },
+        body: {
+          date,
+          durationMinutes: Number(durationMinutes),
+          mode,
+          category,
+          agenda,
+          agendaNotes,
+          topicsDiscussed,
+          studentConcerns,
+          mentorSuggestions,
+          supportRequired,
+          actionItems,
+          progressSinceLastMeeting,
+          goalProgress,
+          mentorRemarks,
+          studentRemarks,
+          nextReviewDate,
+          mentorSigned,
+          studentSigned,
+          photoProofs,
+          geotag,
+        },
       });
       onRecorded();
     } catch (submitError) {
@@ -355,51 +428,295 @@ function MeetingComposer({ onClose, onRecorded }) {
             Record Mentoring Session
           </h3>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Save the agenda, discussion category, optional action item, photo proof, and meeting location.
+            Record the complete Section 12 minutes, follow-ups, signatures, photo proof, and meeting location.
           </p>
         </header>
 
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
-            <label className="block text-[12.5px] font-semibold text-muted-strong">
-              Mentee
-              <select
-                className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink"
-                value={menteeId}
-                onChange={(event) => setMenteeId(event.target.value)}
-                required
-                disabled={loading}
-              >
-                <option value="">Select a mentee</option>
-                {roster?.mentees.map((mentee) => (
-                  <option key={mentee.id} value={mentee.id}>
-                    {mentee.rollNumber} - {mentee.name} - {mentee.batch}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+            <section className="space-y-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting details</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">These details appear in the meeting-log header.</p>
+              </div>
+              <label className="block text-[12.5px] font-semibold text-muted-strong">
+                Mentee
+                <select
+                  className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink"
+                  value={menteeId}
+                  onChange={(event) => {
+                    setMenteeId(event.target.value);
+                    setGoalProgress([]);
+                  }}
+                  required
+                  disabled={loading}
+                >
+                  <option value="">Select a mentee</option>
+                  {roster?.mentees.map((mentee) => (
+                    <option key={mentee.id} value={mentee.id}>
+                      {mentee.rollNumber} - {mentee.name} - {mentee.batch}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+                <ChipGroup label="Mode" options={MEETING_MODES} value={mode} onChange={setMode} />
+                <TextField
+                  label="Duration (minutes)"
+                  type="number"
+                  min="5"
+                  max="240"
+                  value={durationMinutes}
+                  onChange={(event) => setDurationMinutes(event.target.value)}
+                  required
+                />
+              </div>
               <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
-            </div>
-            <TextField
-              label="Agenda for meeting"
-              placeholder="e.g. Review attendance recovery plan"
-              value={agenda}
-              onChange={(event) => setAgenda(event.target.value)}
-              required
-            />
-            <TextArea
-              label="Discussion notes"
-              value={topicsDiscussed}
-              onChange={(event) => setTopicsDiscussed(event.target.value)}
-              required
-            />
-            <TextField
-              label="Student action item (optional)"
-              value={actionItem}
-              onChange={(event) => setActionItem(event.target.value)}
-            />
+            </section>
+
+            <section className="space-y-3 border-t border-line pt-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Agenda</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">Choose every checklist item covered in this meeting.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {MEETING_AGENDA_ITEMS.map((item) => {
+                  const selected = agenda.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => toggleAgenda(item)}
+                      className={
+                        selected
+                          ? 'focus-ring rounded-full border border-ink bg-ink px-3.5 py-1.5 text-xs font-semibold text-white'
+                          : 'focus-ring rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-muted transition hover:border-muted-soft hover:text-ink'
+                      }
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
+              <TextField
+                label="Agenda details"
+                hint="A short purpose or context for the meeting."
+                placeholder="e.g. Review attendance recovery plan"
+                value={agendaNotes}
+                onChange={(event) => setAgendaNotes(event.target.value)}
+              />
+            </section>
+
+            <section className="space-y-4 border-t border-line pt-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting minutes</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">Capture the discussion, concerns, guidance, and required support.</p>
+              </div>
+              <TextArea
+                label="Topics discussed"
+                value={topicsDiscussed}
+                onChange={(event) => setTopicsDiscussed(event.target.value)}
+                required
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextArea
+                  label="Student concerns"
+                  rows={3}
+                  value={studentConcerns}
+                  onChange={(event) => setStudentConcerns(event.target.value)}
+                />
+                <TextArea
+                  label="Mentor suggestions"
+                  rows={3}
+                  value={mentorSuggestions}
+                  onChange={(event) => setMentorSuggestions(event.target.value)}
+                />
+              </div>
+              <TextArea
+                label="Support required"
+                rows={2}
+                value={supportRequired}
+                onChange={(event) => setSupportRequired(event.target.value)}
+              />
+            </section>
+            <section className="space-y-3 border-t border-line pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Action items</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted">Add each agreed follow-up, including owner, date, and starting status.</p>
+                </div>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setActionItems((items) => [...items, newActionItem()])}>
+                  Add action item
+                </Button>
+              </div>
+              {actionItems.map((item, index) => (
+                <div key={index} className="grid gap-3 rounded-xl border border-line bg-canvas/40 p-3 sm:grid-cols-6">
+                  <TextField
+                    className="sm:col-span-2"
+                    label="Task"
+                    value={item.task}
+                    onChange={(event) => updateActionItem(index, { task: event.target.value })}
+                    required
+                  />
+                  <label className="block text-[12.5px] font-semibold text-muted-strong">
+                    Responsible
+                    <select
+                      className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3 py-3 text-[13px] text-ink"
+                      value={item.responsible}
+                      onChange={(event) => updateActionItem(index, { responsible: event.target.value })}
+                    >
+                      <option>Student</option>
+                      <option>Mentor</option>
+                    </select>
+                  </label>
+                  <TextField
+                    label="Target date"
+                    type="date"
+                    value={item.targetDate}
+                    onChange={(event) => updateActionItem(index, { targetDate: event.target.value })}
+                  />
+                  <label className="block text-[12.5px] font-semibold text-muted-strong">
+                    Status
+                    <select
+                      className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3 py-3 text-[13px] text-ink"
+                      value={item.status}
+                      onChange={(event) => updateActionItem(index, { status: event.target.value })}
+                    >
+                      {ACTION_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                    </select>
+                  </label>
+                  <div className="flex items-end">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setActionItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {!actionItems.length && <p className="text-[12px] text-muted">No action items recorded for this meeting.</p>}
+            </section>
+
+            <section className="space-y-4 border-t border-line pt-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Progress since last meeting</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">Document what changed before this review.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <TextArea
+                  label="Achievements"
+                  rows={3}
+                  value={progressSinceLastMeeting.achievements}
+                  onChange={(event) => setProgressSinceLastMeeting((value) => ({ ...value, achievements: event.target.value }))}
+                />
+                <TextArea
+                  label="Pending tasks"
+                  rows={3}
+                  value={progressSinceLastMeeting.pendingTasks}
+                  onChange={(event) => setProgressSinceLastMeeting((value) => ({ ...value, pendingTasks: event.target.value }))}
+                />
+                <TextArea
+                  label="Improvement observed"
+                  rows={3}
+                  value={progressSinceLastMeeting.improvementObserved}
+                  onChange={(event) => setProgressSinceLastMeeting((value) => ({ ...value, improvementObserved: event.target.value }))}
+                />
+              </div>
+            </section>
+
+            <section className="space-y-3 border-t border-line pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">SMART goal progress</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted">Optional updates are shown in this meeting's goal-progress section.</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!menteeId || loadingMentee || !selectedMentee?.goals?.length}
+                  onClick={() => setGoalProgress((items) => [...items, newGoalProgress()])}
+                >
+                  Add goal update
+                </Button>
+              </div>
+              {!menteeId && <p className="text-[12px] text-muted">Choose a mentee to add their SMART-goal updates.</p>}
+              {goalProgress.map((item, index) => (
+                <div key={index} className="grid gap-3 rounded-xl border border-line bg-canvas/40 p-3 sm:grid-cols-6">
+                  <label className="block text-[12.5px] font-semibold text-muted-strong sm:col-span-2">
+                    Goal
+                    <select
+                      className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3 py-3 text-[13px] text-ink"
+                      value={item.goalId}
+                      onChange={(event) => updateGoalProgress(index, { goalId: event.target.value })}
+                      required
+                    >
+                      <option value="">Select a goal</option>
+                      {selectedMentee?.goals?.map((goal) => <option key={goal.id} value={goal.id}>{goal.text}</option>)}
+                    </select>
+                  </label>
+                  <TextField
+                    className="sm:col-span-2"
+                    label="Current status"
+                    value={item.currentStatus}
+                    onChange={(event) => updateGoalProgress(index, { currentStatus: event.target.value })}
+                    required
+                  />
+                  <TextField
+                    label="Progress (%)"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={item.progress}
+                    onChange={(event) => updateGoalProgress(index, { progress: Number(event.target.value) })}
+                    required
+                  />
+                  <div className="flex items-end">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setGoalProgress((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </section>
+
+            <section className="space-y-4 border-t border-line pt-4">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Remarks and review</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">Save both parties' remarks, the next review date, and acknowledgement state.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextArea
+                  label="Mentor remarks"
+                  rows={3}
+                  value={mentorRemarks}
+                  onChange={(event) => setMentorRemarks(event.target.value)}
+                />
+                <TextArea
+                  label="Student remarks"
+                  rows={3}
+                  value={studentRemarks}
+                  onChange={(event) => setStudentRemarks(event.target.value)}
+                />
+              </div>
+              <TextField
+                label="Next review date"
+                type="date"
+                value={nextReviewDate}
+                onChange={(event) => setNextReviewDate(event.target.value)}
+              />
+              <div className="space-y-2 rounded-xl border border-line bg-canvas/50 p-3.5 text-[12px] text-muted-strong">
+                <label className="flex items-start gap-2.5">
+                  <input className="mt-0.5" type="checkbox" checked={mentorSigned} onChange={(event) => setMentorSigned(event.target.checked)} required />
+                  <span><strong className="font-semibold text-ink">Mentor signature</strong> — I confirm these meeting minutes.</span>
+                </label>
+                <label className="flex items-start gap-2.5">
+                  <input className="mt-0.5" type="checkbox" checked={studentSigned} onChange={(event) => setStudentSigned(event.target.checked)} />
+                  <span><strong className="font-semibold text-ink">Student signature</strong> — the student has reviewed and acknowledged these minutes.</span>
+                </label>
+              </div>
+            </section>
+
             <div className="grid gap-4 rounded-xl border border-line bg-canvas/50 p-4 sm:grid-cols-2">
               <label className="text-[12.5px] font-semibold text-muted-strong">
                 Photo proofs (optional)
