@@ -3,7 +3,6 @@ import {
   ACTION_STATUSES,
   ARREAR_STATUSES,
   CAREER_PATHS,
-  CERTIFICATION_STATUSES,
   EXTRA_CURRICULAR_CATEGORIES,
   GPA_SCALE,
   INSTITUTION,
@@ -124,8 +123,75 @@ export function decorateReadiness(readiness = []) {
 }
 
 export function decorateCertifications(certifications = []) {
-  const tone = { Completed: 'green', 'In Progress': 'indigo', Planned: 'slate' };
-  return certifications.map((c) => ({ ...c, tone: tone[c.status] ?? 'slate' }));
+  return certifications.map((c) => ({
+    ...c,
+    evidence: c.evidence ?? [],
+  }));
+}
+
+/** Flatten participation groups into a single history list for the UI. */
+export function flattenParticipation(participation = {}) {
+  const technical = (participation.technical ?? []).map((r) => ({
+    ...r,
+    category: 'Technical',
+    evidence: r.evidence ?? [],
+  }));
+  const coCurricular = (participation.coCurricular ?? []).map((r) => ({
+    ...r,
+    category: 'Co-Curricular',
+    role: r.role ?? '—',
+    evidence: r.evidence ?? [],
+  }));
+  const extraCurricular = (participation.extraCurricular ?? []).map((r) => ({
+    ...r,
+    category: 'Extra-Curricular',
+    activity: r.activity ?? r.detail ?? '—',
+    activityType: r.activityType ?? r.category ?? null,
+    role: r.role ?? '—',
+    achievement: r.achievement ?? '—',
+    evidence: r.evidence ?? [],
+  }));
+  return [...technical, ...coCurricular, ...extraCurricular];
+}
+
+/** Normalize legacy single-object internship data into a records array. */
+export function normalizeInternshipAndProject(internshipAndProject = {}) {
+  if (internshipAndProject.records) {
+    return {
+      records: internshipAndProject.records.map((r) => ({ ...r, evidence: r.evidence ?? [] })),
+    };
+  }
+
+  const legacy = internshipAndProject;
+  if (!legacy.internshipCompany && !legacy.projectTitle) {
+    return { records: [] };
+  }
+
+  const records = [];
+  if (legacy.internshipCompany) {
+    records.push({
+      id: 'ip-legacy-internship',
+      type: 'Internship',
+      internshipCompany: legacy.internshipCompany,
+      internshipRole: legacy.internshipRole,
+      internshipPeriod: legacy.internshipPeriod,
+      facultyGuide: legacy.facultyGuide,
+      description: legacy.progressNote ?? '',
+      evidence: legacy.evidence ?? [],
+    });
+  }
+  if (legacy.projectTitle) {
+    records.push({
+      id: 'ip-legacy-project',
+      type: 'Project',
+      projectTitle: legacy.projectTitle,
+      facultyGuide: legacy.facultyGuide,
+      projectDescription: legacy.progressNote ?? '',
+      expectedCompletion: legacy.expectedCompletion,
+      evidence: legacy.evidence ?? [],
+    });
+  }
+  return { records };
 }
 
 export function decorateGoals(goals = []) {
@@ -296,6 +362,7 @@ export function buildStudentRecordBook(student) {
     participation: {
       ...student.participation,
       categories: EXTRA_CURRICULAR_CATEGORIES,
+      history: flattenParticipation(student.participation),
       counts: {
         technical: student.participation?.technical?.length ?? 0,
         coCurricular: student.participation?.coCurricular?.length ?? 0,
@@ -306,8 +373,6 @@ export function buildStudentRecordBook(student) {
     /* Section 7 */
     certifications: {
       rows: decorateCertifications(student.certifications),
-      statuses: CERTIFICATION_STATUSES,
-      completed: (student.certifications ?? []).filter((c) => c.status === 'Completed').length,
     },
 
     /* Section 8 */
@@ -320,13 +385,10 @@ export function buildStudentRecordBook(student) {
     },
 
     /* Section 9 */
-    internshipAndProject: student.internshipAndProject,
+    internshipAndProject: normalizeInternshipAndProject(student.internshipAndProject),
 
     evidence: {
-      participation: student.evidence?.participation ?? [],
-      certifications: student.evidence?.certifications ?? [],
       placement: student.evidence?.placement ?? [],
-      internship: student.evidence?.internship ?? [],
     },
 
     /* Section 10 */

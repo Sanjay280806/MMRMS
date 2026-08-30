@@ -31,7 +31,7 @@ import {
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
 import { GoalPanel } from '../../components/record/Goals.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
-import { AddParticipation, AddCertification } from './AddEntry.jsx';
+import { AddParticipation, AddCertification, AddInternshipProject } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { useResource } from '../../hooks/useResource.js';
 
@@ -284,17 +284,6 @@ export default function StudentRecordBook() {
                 }
                 saving={saving === 'participation'}
               />
-              <EvidencePanel
-                title="Participation Evidence"
-                description="Upload certificates, photos, or participation proof for your mentor to review."
-                evidence={data.evidence.participation}
-                saving={saving === 'evidence-participation'}
-                onUpload={(entry) =>
-                  mutate('evidence-participation', () =>
-                    api('/student/me/evidence/participation', { method: 'POST', body: entry }),
-                  )
-                }
-              />
               <ParticipationRecord participation={data.participation} />
             </>
           )}
@@ -302,24 +291,12 @@ export default function StudentRecordBook() {
           {section === 'certifications' && (
             <>
               <AddCertification
-                statuses={data.certifications.statuses}
                 onAdd={(entry) =>
                   mutate('certification', () =>
                     api('/student/me/certifications', { method: 'POST', body: entry }),
                   )
                 }
                 saving={saving === 'certification'}
-              />
-              <EvidencePanel
-                title="Certification Evidence"
-                description="Upload the completed certificate or a related proof from your device."
-                evidence={data.evidence.certifications}
-                saving={saving === 'evidence-certifications'}
-                onUpload={(entry) =>
-                  mutate('evidence-certifications', () =>
-                    api('/student/me/evidence/certifications', { method: 'POST', body: entry }),
-                  )
-                }
               />
               <CertificationTracker certifications={data.certifications} />
             </>
@@ -355,18 +332,15 @@ export default function StudentRecordBook() {
 
           {section === 'internship' && (
             <>
-              <EvidencePanel
-                title="Internship & Project Evidence"
-                description="Upload internship certificates, project letters, or progress proof for your mentor."
-                evidence={data.evidence.internship}
-                saving={saving === 'evidence-internship'}
-                onUpload={(entry) =>
-                  mutate('evidence-internship', () =>
-                    api('/student/me/evidence/internship', { method: 'POST', body: entry }),
+              <AddInternshipProject
+                onAdd={(entry) =>
+                  mutate('internship', () =>
+                    api('/student/me/internship-projects', { method: 'POST', body: entry }),
                   )
                 }
+                saving={saving === 'internship'}
               />
-              <InternshipAndProject record={data.internshipAndProject} />
+              <InternshipAndProject internshipAndProject={data.internshipAndProject} />
             </>
           )}
           {section === 'wellbeing' && <WellbeingReview wellbeing={data.wellbeing} />}

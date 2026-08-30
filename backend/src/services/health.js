@@ -42,9 +42,9 @@ export function careerScore({ readiness, certifications }) {
     ? readiness.reduce((s, r) => s + (readinessValue[r.status] ?? 0), 0) / readiness.length
     : 0;
 
-  // Planned certifications are intent, not progress — they don't drag the score.
-  const active = certifications.filter((c) => c.status !== 'Planned');
-  const certAvg = active.length ? active.reduce((s, c) => s + c.progress, 0) / active.length : 0;
+  const certAvg = certifications.length
+    ? certifications.reduce((s, c) => s + ((c.evidence?.length ?? 0) > 0 ? 100 : 60), 0) / certifications.length
+    : 0;
 
   return clamp(Math.round(readinessAvg * 0.6 + certAvg * 0.4));
 }

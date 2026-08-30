@@ -362,28 +362,91 @@ export const STUDENT_PROFILE = {
   /** Section 6 — Participation Record. */
   participation: {
     technical: [
-      { id: 'tech-1', activity: 'Smart India Hackathon — Regional Round', date: 'Mar 2026', role: 'Team Lead — Backend', achievement: 'Regional Winner' },
-      { id: 'tech-2', activity: 'KCT Codeathon 2025', date: 'Sep 2025', role: 'Participant', achievement: 'Top 10 of 180 teams' },
-      { id: 'tech-3', activity: 'IEEE Paper Presentation — Edge Computing', date: 'Feb 2026', role: 'Co-author & Presenter', achievement: 'Under review' },
+      {
+        id: 'tech-1',
+        activity: 'Smart India Hackathon — Regional Round',
+        date: 'Mar 2026',
+        role: 'Team Lead — Backend',
+        achievement: 'Regional Winner',
+        evidence: [
+          {
+            id: 'ev-tech-1',
+            name: 'hackathon_certificate.pdf',
+            contentType: 'application/pdf',
+            size: 245760,
+            dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+            uploadedOn: '2026-03-15T10:00:00.000Z',
+          },
+        ],
+      },
+      { id: 'tech-2', activity: 'KCT Codeathon 2025', date: 'Sep 2025', role: 'Participant', achievement: 'Top 10 of 180 teams', evidence: [] },
+      { id: 'tech-3', activity: 'IEEE Paper Presentation — Edge Computing', date: 'Feb 2026', role: 'Co-author & Presenter', achievement: 'Under review', evidence: [] },
     ],
     coCurricular: [
-      { id: 'co-1', activity: 'IEEE Student Branch', date: 'Jan 2026', achievement: 'Elected Treasurer' },
-      { id: 'co-2', activity: 'Departmental Technical Symposium', date: 'Aug 2025', achievement: 'Organising committee — logistics' },
+      {
+        id: 'co-1',
+        activity: 'IEEE Student Branch',
+        date: 'Jan 2026',
+        role: 'Treasurer',
+        achievement: 'Elected Treasurer',
+        evidence: [
+          {
+            id: 'ev-co-1',
+            name: 'ieee_appointment_letter.pdf',
+            contentType: 'application/pdf',
+            size: 184320,
+            dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+            uploadedOn: '2026-01-10T09:30:00.000Z',
+          },
+        ],
+      },
+      { id: 'co-2', activity: 'Departmental Technical Symposium', date: 'Aug 2025', role: 'Organising Committee', achievement: 'Logistics lead', evidence: [] },
     ],
     extraCurricular: [
-      { id: 'ec-1', category: 'Sports', detail: 'District-level badminton — Runner-up', date: 'Nov 2025' },
-      { id: 'ec-2', category: 'NSS', detail: 'Village literacy drive — 40 service hours', date: 'Dec 2025' },
-      { id: 'ec-3', category: 'Clubs', detail: 'Coding Club — core member', date: 'Aug 2025' },
+      {
+        id: 'ec-1',
+        activity: 'District-level Badminton',
+        activityType: 'Sports',
+        role: 'Participant',
+        achievement: 'Runner-up',
+        date: 'Nov 2025',
+        evidence: [],
+      },
+      {
+        id: 'ec-2',
+        activity: 'Village literacy drive',
+        activityType: 'NSS',
+        role: 'Volunteer',
+        achievement: '40 service hours',
+        date: 'Dec 2025',
+        evidence: [],
+      },
+      { id: 'ec-3', activity: 'Coding Club', activityType: 'Clubs', role: 'Core member', achievement: 'Active member', date: 'Aug 2025', evidence: [] },
     ],
   },
 
   /** Section 7 — Certification Tracker. */
   certifications: [
-    { id: 'cert-1', certification: 'Database Management Systems', platform: 'NPTEL', status: 'Completed', completionDate: 'Dec 2025', progress: 100 },
-    { id: 'cert-2', certification: 'Full-Stack Web Development Workshop', platform: 'KCT · CSE Dept', status: 'Completed', completionDate: 'Jul 2025', progress: 100 },
-    { id: 'cert-3', certification: 'Machine Learning Specialization', platform: 'Coursera', status: 'In Progress', completionDate: null, progress: 60 },
-    { id: 'cert-4', certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', status: 'In Progress', completionDate: null, progress: 35 },
-    { id: 'cert-5', certification: 'Meta Front-End Developer', platform: 'Coursera', status: 'Planned', completionDate: null, progress: 0 },
+    {
+      id: 'cert-1',
+      certification: 'Database Management Systems',
+      platform: 'NPTEL',
+      completionDate: 'Dec 2025',
+      evidence: [
+        {
+          id: 'ev-cert-1',
+          name: 'nptel_dms_certificate.pdf',
+          contentType: 'application/pdf',
+          size: 312000,
+          dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+          uploadedOn: '2025-12-20T14:00:00.000Z',
+        },
+      ],
+    },
+    { id: 'cert-2', certification: 'Full-Stack Web Development Workshop', platform: 'KCT · CSE Dept', completionDate: 'Jul 2025', evidence: [] },
+    { id: 'cert-3', certification: 'Machine Learning Specialization', platform: 'Coursera', completionDate: null, evidence: [] },
+    { id: 'cert-4', certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', completionDate: null, evidence: [] },
+    { id: 'cert-5', certification: 'Meta Front-End Developer', platform: 'Coursera', completionDate: null, evidence: [] },
   ],
 
   /** Section 8 — Placement Readiness. */
@@ -399,15 +462,36 @@ export const STUDENT_PROFILE = {
 
   /** Section 9 — Internship / Project Tracking. */
   internshipAndProject: {
-    internshipCompany: 'Zoho Corporation, Chennai',
-    internshipRole: 'Software Intern — Full-stack team',
-    internshipPeriod: 'May – Jul 2026',
-    internshipStatus: 'Completed',
-    projectTitle: 'Smart Attendance System using Face Recognition',
-    facultyGuide: 'Prof. R. Ramesh',
-    progress: 55,
-    progressNote: 'Dataset collected and model trained; classroom hardware integration pending.',
-    expectedCompletion: 'Apr 2027',
+    records: [
+      {
+        id: 'ip-1',
+        type: 'Internship',
+        internshipCompany: 'Zoho Corporation, Chennai',
+        internshipRole: 'Software Intern — Full-stack team',
+        internshipPeriod: 'May – Jul 2026',
+        facultyGuide: 'Prof. R. Ramesh',
+        description: 'Worked on full-stack features for the internal tools team.',
+        evidence: [
+          {
+            id: 'ev-ip-1',
+            name: 'internship_completion_letter.pdf',
+            contentType: 'application/pdf',
+            size: 198000,
+            dataUrl: 'data:application/pdf;base64,JVBERi0xLjQK',
+            uploadedOn: '2026-07-28T11:00:00.000Z',
+          },
+        ],
+      },
+      {
+        id: 'ip-2',
+        type: 'Project',
+        projectTitle: 'Smart Attendance System using Face Recognition',
+        facultyGuide: 'Prof. R. Ramesh',
+        projectDescription: 'Dataset collected and model trained; classroom hardware integration pending.',
+        expectedCompletion: 'Apr 2027',
+        evidence: [],
+      },
+    ],
   },
 
   /** Section 10 — Student Well-being. */

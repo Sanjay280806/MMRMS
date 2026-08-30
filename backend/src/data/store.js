@@ -44,6 +44,17 @@ const odRequests = clone(OD_REQUESTS);
 let sequence = 1000;
 const nextId = (prefix) => `${prefix}-${++sequence}`;
 
+function normalizeEvidenceFiles(files = []) {
+  return files.map((file) => ({
+    id: nextId('evidence'),
+    uploadedOn: new Date().toISOString(),
+    name: file.name,
+    contentType: file.contentType,
+    size: file.size,
+    dataUrl: file.dataUrl,
+  }));
+}
+
 /* ── users ─────────────────────────────────────────────────────────────── */
 
 export function findUserByEmail(email) {
@@ -202,7 +213,12 @@ export function addParticipation(studentId, group, entry) {
   if (!student) return null;
   student.participation ??= { technical: [], coCurricular: [], extraCurricular: [] };
   student.participation[group] ??= [];
-  const record = { id: nextId(group === 'technical' ? 'tech' : group === 'coCurricular' ? 'co' : 'ec'), ...entry };
+  const { evidence: evidenceFiles = [], ...rest } = entry;
+  const record = {
+    id: nextId(group === 'technical' ? 'tech' : group === 'coCurricular' ? 'co' : 'ec'),
+    evidence: normalizeEvidenceFiles(evidenceFiles),
+    ...rest,
+  };
   student.participation[group].unshift(record);
   return record;
 }
@@ -212,13 +228,32 @@ export function addCertification(studentId, entry) {
   const student = students.get(studentId);
   if (!student) return null;
   student.certifications ??= [];
+  const { evidence: evidenceFiles = [], ...rest } = entry;
   const record = {
     id: nextId('cert'),
-    progress: entry.status === 'Completed' ? 100 : entry.status === 'In Progress' ? 50 : 0,
-    completionDate: entry.status === 'Completed' ? entry.completionDate ?? null : null,
-    ...entry,
+    completionDate: rest.completionDate ?? null,
+    evidence: normalizeEvidenceFiles(evidenceFiles),
+    ...rest,
   };
   student.certifications.unshift(record);
+  return record;
+}
+
+/** Section 9 — Internship / Project records. */
+export function addInternshipProject(studentId, entry) {
+  const student = students.get(studentId);
+  if (!student) return null;
+  student.internshipAndProject ??= { records: [] };
+  if (!student.internshipAndProject.records) {
+    student.internshipAndProject = { records: [] };
+  }
+  const { evidence: evidenceFiles = [], ...rest } = entry;
+  const record = {
+    id: nextId('ip'),
+    evidence: normalizeEvidenceFiles(evidenceFiles),
+    ...rest,
+  };
+  student.internshipAndProject.records.unshift(record);
   return record;
 }
 

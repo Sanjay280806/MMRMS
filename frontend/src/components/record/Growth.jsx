@@ -1,116 +1,134 @@
+import { useState } from 'react';
 import { Badge } from '../ui/Badge.jsx';
+import { Button } from '../ui/Button.jsx';
 import { DataTable } from '../ui/DataTable.jsx';
-import { DefinitionList } from '../ui/DefinitionList.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { ProgressBar } from '../ui/ProgressBar.jsx';
 import { SectionCard, SectionTable } from '../ui/SectionCard.jsx';
 import { cx, tone as toneOf } from '../../lib/tone.js';
+import { EvidenceModal } from './EvidenceModal.jsx';
 
-/** Section 6 — Participation Record, in the book's three groups. */
-export function ParticipationRecord({ participation, action }) {
-  const empty = (what) => (
-    <EmptyState title={`No ${what} recorded`} description="Add entries as you take part." icon="◇" />
-  );
+function ViewEvidenceButton({ evidence = [], title, label = 'View' }) {
+  const [open, setOpen] = useState(false);
+  if (!evidence.length) return null;
 
   return (
-    <div className="space-y-5">
-      <SectionTable
-        section="Section 6 · Technical"
-        title="Technical Activities"
-        subtitle="Hackathons, symposia, paper presentations and technical events"
-        action={action}
-      >
-        <DataTable
-          rows={participation.technical}
-          rowKey={(r) => r.id}
-          empty={empty('technical activities')}
-          columns={[
-            { key: 'activity', header: 'Activity', className: 'font-medium' },
-            { key: 'date', header: 'Date', align: 'right', render: (r) => <span className="tnum">{r.date}</span> },
-            { key: 'role', header: 'Role', render: (r) => <span className="text-muted-strong">{r.role}</span> },
-            { key: 'achievement', header: 'Achievement', align: 'right', render: (r) => <Badge tone="indigo">{r.achievement}</Badge> },
-          ]}
-        />
-      </SectionTable>
-
-      <SectionTable
-        section="Section 6 · Co-Curricular"
-        title="Co-Curricular Activities"
-        subtitle="Clubs, societies and organising roles"
-      >
-        <DataTable
-          rows={participation.coCurricular}
-          rowKey={(r) => r.id}
-          empty={empty('co-curricular activities')}
-          columns={[
-            { key: 'activity', header: 'Activity', className: 'font-medium' },
-            { key: 'date', header: 'Date', align: 'right', render: (r) => <span className="tnum">{r.date}</span> },
-            { key: 'achievement', header: 'Achievement', align: 'right', render: (r) => <Badge tone="green">{r.achievement}</Badge> },
-          ]}
-        />
-      </SectionTable>
-
-      <SectionCard
-        section="Section 6 · Extra-Curricular"
-        title="Extra-Curricular Activities"
-        subtitle={participation.categories.join(' · ')}
-      >
-        {participation.extraCurricular.length === 0 ? (
-          empty('extra-curricular activities')
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
-            {participation.extraCurricular.map((e) => (
-              <li key={e.id} className="rounded-xl border border-line bg-canvas/60 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <Badge tone="slate">{e.category}</Badge>
-                  <span className="tnum text-[11.5px] text-muted-soft">{e.date}</span>
-                </div>
-                <p className="mt-2 text-[13px] leading-relaxed text-ink">{e.detail}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SectionCard>
-    </div>
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        {label}
+      </Button>
+      <EvidenceModal open={open} title={title} files={evidence} onClose={() => setOpen(false)} />
+    </>
   );
 }
 
-/** Section 7 — Certification Tracker. */
-export function CertificationTracker({ certifications, action }) {
+function categoryTone(category) {
+  if (category === 'Technical') return 'indigo';
+  if (category === 'Co-Curricular') return 'green';
+  return 'slate';
+}
+
+/** Section 6 — unified participation history with per-record evidence. */
+export function ParticipationRecord({ participation }) {
+  const records = participation.history ?? [];
+
   return (
-    <SectionTable
-      section="Section 7"
-      title="Certification Tracker"
-      subtitle={`${certifications.completed} of ${certifications.rows.length} completed`}
-      action={action}
+    <SectionCard
+      section="Section 6"
+      title="Participation History"
+      subtitle="Your technical, co-curricular, and extra-curricular activities"
     >
-      <DataTable
-        rows={certifications.rows}
-        rowKey={(r) => r.id ?? r.certification}
-        empty={<EmptyState title="No certifications yet" description="Track courses you plan, start and finish." />}
-        columns={[
-          { key: 'certification', header: 'Certification', className: 'font-medium' },
-          { key: 'platform', header: 'Platform', render: (r) => <span className="text-muted-strong">{r.platform}</span> },
-          {
-            key: 'progress',
-            header: 'Progress',
-            render: (r) => (
-              <div className="flex min-w-[110px] items-center gap-2">
-                <ProgressBar className="flex-1" percent={r.progress} tone={r.tone} height="h-1.5" />
-                <span className="tnum text-[11.5px] text-muted">{r.progress}%</span>
+      {records.length === 0 ? (
+        <EmptyState
+          title="No participation records yet"
+          description="Add your technical, co-curricular, or extra-curricular activities."
+          icon="◇"
+        />
+      ) : (
+        <ul className="divide-y divide-line">
+          {records.map((record) => {
+            const title = record.activity;
+            return (
+              <li key={record.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={categoryTone(record.category)}>{record.category}</Badge>
+                      {record.activityType && <Badge tone="slate">{record.activityType}</Badge>}
+                    </div>
+                    <p className="mt-2 text-[14px] font-semibold text-ink">{title}</p>
+                    <dl className="mt-2 grid gap-1 text-[12.5px] text-muted sm:grid-cols-2">
+                      <div>
+                        <span className="text-muted-soft">Date: </span>
+                        <span className="tnum font-medium text-muted-strong">{record.date}</span>
+                      </div>
+                      {record.role && record.role !== '—' && (
+                        <div>
+                          <span className="text-muted-soft">Role: </span>
+                          <span className="text-muted-strong">{record.role}</span>
+                        </div>
+                      )}
+                      {record.achievement && record.achievement !== '—' && (
+                        <div className="sm:col-span-2">
+                          <span className="text-muted-soft">Achievement: </span>
+                          <span className="text-muted-strong">{record.achievement}</span>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                  <ViewEvidenceButton evidence={record.evidence} title={title} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+/** Section 7 — Certification history with per-record certificates. */
+export function CertificationTracker({ certifications }) {
+  const rows = certifications.rows ?? [];
+
+  return (
+    <SectionCard
+      section="Section 7"
+      title="Certification History"
+      subtitle="Certifications you have added"
+    >
+      {rows.length === 0 ? (
+        <EmptyState
+          title="No certifications added yet"
+          description="Add certifications and upload your certificate when available."
+        />
+      ) : (
+        <ul className="divide-y divide-line">
+          {rows.map((row) => (
+            <li key={row.id ?? row.certification} className="py-4 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold text-ink">{row.certification}</p>
+                  <dl className="mt-2 grid gap-1 text-[12.5px] text-muted sm:grid-cols-2">
+                    <div>
+                      <span className="text-muted-soft">Platform: </span>
+                      <span className="text-muted-strong">{row.platform}</span>
+                    </div>
+                    {row.completionDate && (
+                      <div>
+                        <span className="text-muted-soft">Completed: </span>
+                        <span className="tnum text-muted-strong">{row.completionDate}</span>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+                <ViewEvidenceButton evidence={row.evidence} title={row.certification} />
               </div>
-            ),
-          },
-          { key: 'status', header: 'Status', align: 'right', render: (r) => <Badge tone={r.tone}>{r.status}</Badge> },
-          {
-            key: 'completionDate',
-            header: 'Completed',
-            align: 'right',
-            render: (r) => <span className="tnum text-muted">{r.completionDate ?? '—'}</span>,
-          },
-        ]}
-      />
-    </SectionTable>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
   );
 }
 
@@ -175,43 +193,78 @@ export function PlacementReadiness({ placementReadiness, onUpdate, saving }) {
   );
 }
 
-/** Section 9 — Internship / Project Tracking. */
-export function InternshipAndProject({ record }) {
-  return (
-    <SectionCard
-      section="Section 9"
-      title="Internship / Project Tracking"
-      action={
-        <Badge tone={record.internshipStatus === 'Completed' ? 'green' : 'amber'} size="md">
-          {record.internshipStatus}
-        </Badge>
-      }
-    >
-      <DefinitionList
-        columns={2}
-        items={[
-          { key: 'Internship Company', value: record.internshipCompany },
-          { key: 'Internship Role', value: record.internshipRole },
-          { key: 'Internship Period', value: record.internshipPeriod },
-          { key: 'Faculty Guide', value: record.facultyGuide },
-          { key: 'Project Title', value: record.projectTitle, span: true },
-          { key: 'Expected Completion', value: record.expectedCompletion },
-        ]}
-      />
+function internshipTypeLabel(type) {
+  if (type === 'Internship + Project') return 'INTERNSHIP + PROJECT';
+  return String(type ?? 'Record').toUpperCase();
+}
 
-      <div className="mt-5 rounded-xl border border-line bg-canvas/60 p-4">
-        <div className="mb-2 flex items-baseline justify-between">
-          <span className="text-[12.5px] font-semibold text-muted-strong">Project progress</span>
-          <span className="tnum text-[12.5px] font-semibold text-ink">{record.progress}%</span>
-        </div>
-        <ProgressBar
-          percent={record.progress}
-          tone={record.progress >= 70 ? 'green' : record.progress >= 40 ? 'indigo' : 'amber'}
+/** Section 9 — Internship / Project records with per-record evidence. */
+export function InternshipAndProject({ internshipAndProject }) {
+  const records = internshipAndProject?.records ?? [];
+
+  return (
+    <SectionCard section="Section 9" title="Internship / Project History">
+      {records.length === 0 ? (
+        <EmptyState
+          title="No internship or project records yet"
+          description="Add your internship or project details and supporting evidence."
         />
-        {record.progressNote && (
-          <p className="mt-2.5 text-[12px] leading-relaxed text-muted">{record.progressNote}</p>
-        )}
-      </div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {records.map((record) => {
+            const title =
+              record.type === 'Project'
+                ? record.projectTitle
+                : record.type === 'Internship + Project'
+                  ? `${record.internshipCompany} · ${record.projectTitle}`
+                  : record.internshipCompany;
+
+            return (
+              <li key={record.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Badge tone="indigo">{internshipTypeLabel(record.type)}</Badge>
+                    <p className="mt-2 text-[14px] font-semibold text-ink">{title}</p>
+                    <dl className="mt-2 space-y-1 text-[12.5px] text-muted">
+                      {record.internshipRole && (
+                        <div>
+                          <span className="text-muted-soft">Role: </span>
+                          <span className="text-muted-strong">{record.internshipRole}</span>
+                        </div>
+                      )}
+                      {record.internshipPeriod && (
+                        <div>
+                          <span className="text-muted-soft">Period: </span>
+                          <span className="tnum text-muted-strong">{record.internshipPeriod}</span>
+                        </div>
+                      )}
+                      {record.facultyGuide && (
+                        <div>
+                          <span className="text-muted-soft">Faculty Guide: </span>
+                          <span className="text-muted-strong">{record.facultyGuide}</span>
+                        </div>
+                      )}
+                      {record.expectedCompletion && (
+                        <div>
+                          <span className="text-muted-soft">Expected Completion: </span>
+                          <span className="tnum text-muted-strong">{record.expectedCompletion}</span>
+                        </div>
+                      )}
+                      {(record.description || record.projectDescription) && (
+                        <div>
+                          <span className="text-muted-soft">Details: </span>
+                          <span className="text-muted-strong">{record.description || record.projectDescription}</span>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                  <ViewEvidenceButton evidence={record.evidence} title={title} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </SectionCard>
   );
 }
