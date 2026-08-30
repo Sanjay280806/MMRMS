@@ -5,6 +5,7 @@ import {
   acknowledgeGoal,
   addCertification,
   addEvidence,
+  addInternshipProject,
   addMessage,
   addParticipation,
   addSupportRequest,
@@ -17,7 +18,6 @@ import {
 import { buildStudentRecordBook } from '../services/student.js';
 import {
   ACTION_STATUSES,
-  CERTIFICATION_STATUSES,
   EXTRA_CURRICULAR_CATEGORIES,
   READINESS_ITEMS,
   READINESS_STATUSES,
@@ -40,8 +40,37 @@ const oneOf = (value, allowed, label) => {
   if (!allowed.includes(value)) throw new HttpError(400, `${label} must be one of: ${allowed.join(', ')}`);
 };
 
-const EVIDENCE_AREAS = ['participation', 'certifications', 'placement', 'internship'];
+const EVIDENCE_AREAS = ['placement'];
 const MAX_EVIDENCE_BYTES = 4 * 1024 * 1024;
+const INTERNSHIP_TYPES = ['Internship', 'Project', 'Internship + Project'];
+
+function validateEvidenceFiles(files, next) {
+  if (!Array.isArray(files)) return [];
+  for (const file of files) {
+    if (!file?.name?.trim() || !file?.contentType?.trim() || typeof file.dataUrl !== 'string') {
+      next(new HttpError(400, 'Each uploaded file must include name, content type, and data'));
+      return null;
+    }
+    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.contentType)) {
+      next(new HttpError(400, 'Upload PDF, JPG, JPEG, PNG, or WEBP files only'));
+      return null;
+    }
+    if (!Number.isInteger(file.size) || file.size < 1 || file.size > MAX_EVIDENCE_BYTES || file.dataUrl.length > MAX_EVIDENCE_BYTES * 1.4) {
+      next(new HttpError(400, 'Files must be smaller than 4 MB'));
+      return null;
+    }
+    if (!file.dataUrl.startsWith(`data:${file.contentType};base64,`)) {
+      next(new HttpError(400, 'The uploaded file is invalid'));
+      return null;
+    }
+  }
+  return files.map((file) => ({
+    name: file.name.trim().slice(0, 160),
+    contentType: file.contentType,
+    size: file.size,
+    dataUrl: file.dataUrl,
+  }));
+}
 
 /** The whole record book. */
 router.get('/me/record-book', (req, res) => {
@@ -84,15 +113,20 @@ router.post('/me/participation/:group', (req, res, next) => {
   if (!key) return next(new HttpError(404, `Unknown participation group "${group}"`));
 
   const body = req.body ?? {};
+  const evidence = validateEvidenceFiles(body.evidence, next);
+  if (evidence === null) return;
 
   if (key === 'extraCurricular') {
-    if (!body.detail?.trim()) return next(new HttpError(400, 'Detail is required'));
-    oneOf(body.category, EXTRA_CURRICULAR_CATEGORIES, 'Category');
+    if (!body.activity?.trim()) return next(new HttpError(400, 'Activity name is required'));
+    oneOf(body.activityType ?? body.category, EXTRA_CURRICULAR_CATEGORIES, 'Activity type');
     return res.status(201).json(
       addParticipation(student.id, key, {
-        category: body.category,
-        detail: body.detail.trim(),
+        activity: body.activity.trim(),
+        activityType: body.activityType ?? body.category,
+        role: body.role?.trim() || '—',
+        achievement: body.achievement?.trim() || '—',
         date: body.date?.trim() || 'Jul 2026',
+        evidence,
       }),
     );
   }
@@ -101,9 +135,10 @@ router.post('/me/participation/:group', (req, res, next) => {
   const entry = {
     activity: body.activity.trim(),
     date: body.date?.trim() || 'Jul 2026',
+    role: body.role?.trim() || '—',
     achievement: body.achievement?.trim() || '—',
+    evidence,
   };
-  if (key === 'technical') entry.role = body.role?.trim() || 'Participant';
 
   res.status(201).json(addParticipation(student.id, key, entry));
 });
@@ -111,18 +146,54 @@ router.post('/me/participation/:group', (req, res, next) => {
 /* ── Section 7 — Certification Tracker ──────────────────────────────────── */
 router.post('/me/certifications', (req, res, next) => {
   const student = currentStudent(req);
-  const { certification, platform, status, completionDate } = req.body ?? {};
+  const { certification, platform, completionDate, evidence: evidenceFiles } = req.body ?? {};
+  const evidence = validateEvidenceFiles(evidenceFiles, next);
+  if (evidence === null) return;
 
   if (!certification?.trim()) return next(new HttpError(400, 'Certification name is required'));
   if (!platform?.trim()) return next(new HttpError(400, 'Platform is required'));
-  oneOf(status ?? 'Planned', CERTIFICATION_STATUSES, 'Status');
 
   res.status(201).json(
     addCertification(student.id, {
       certification: certification.trim(),
       platform: platform.trim(),
-      status: status ?? 'Planned',
       completionDate: completionDate?.trim() || null,
+      evidence,
+    }),
+  );
+});
+
+/* Section 9 — Internship / Project records with supporting evidence. */
+router.post('/me/internship-projects', (req, res, next) => {
+  const student = currentStudent(req);
+  const body = req.body ?? {};
+  const evidence = validateEvidenceFiles(body.evidence, next);
+  if (evidence === null) return;
+
+  oneOf(body.type ?? 'Internship', INTERNSHIP_TYPES, 'Type');
+
+  const includesInternship = body.type === 'Internship' || body.type === 'Internship + Project';
+  const includesProject = body.type === 'Project' || body.type === 'Internship + Project';
+
+  if (includesInternship && !body.internshipCompany?.trim()) {
+    return next(new HttpError(400, 'Internship company is required'));
+  }
+  if (includesProject && !body.projectTitle?.trim()) {
+    return next(new HttpError(400, 'Project title is required'));
+  }
+
+  res.status(201).json(
+    addInternshipProject(student.id, {
+      type: body.type,
+      internshipCompany: body.internshipCompany?.trim() || null,
+      internshipRole: body.internshipRole?.trim() || null,
+      internshipPeriod: body.internshipPeriod?.trim() || null,
+      facultyGuide: body.facultyGuide?.trim() || null,
+      description: body.description?.trim() || null,
+      projectTitle: body.projectTitle?.trim() || null,
+      projectDescription: body.projectDescription?.trim() || null,
+      expectedCompletion: body.expectedCompletion?.trim() || null,
+      evidence,
     }),
   );
 });

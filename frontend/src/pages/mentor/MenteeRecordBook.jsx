@@ -174,33 +174,16 @@ export function MenteeRecordBook({ menteeId, onBack }) {
       {tab === 'growth' && (
         <div className="space-y-5">
           <ParticipationRecord participation={data.participation} />
-          <EvidencePanel
-            title="Participation Evidence"
-            description="Certificates and proof submitted by the student."
-            evidence={data.evidence.participation}
-          />
           <CertificationTracker certifications={data.certifications} />
-          <EvidencePanel
-            title="Certification Evidence"
-            description="Certificates and proof submitted by the student."
-            evidence={data.evidence.certifications}
-          />
           <div className="grid gap-5 lg:grid-cols-2">
             <PlacementReadiness placementReadiness={data.placementReadiness} />
-            <InternshipAndProject record={data.internshipAndProject} />
+            <InternshipAndProject internshipAndProject={data.internshipAndProject} />
           </div>
-          <div className="grid gap-5 lg:grid-cols-2">
-            <EvidencePanel
-              title="Placement Evidence"
-              description="Documents submitted by the student for placement readiness."
-              evidence={data.evidence.placement}
-            />
-            <EvidencePanel
-              title="Internship & Project Evidence"
-              description="Documents submitted by the student for internship and project work."
-              evidence={data.evidence.internship}
-            />
-          </div>
+          <EvidencePanel
+            title="Placement Evidence"
+            description="Documents submitted by the student for placement readiness."
+            evidence={data.evidence.placement}
+          />
         </div>
       )}
 

@@ -120,22 +120,40 @@ export function menteeToStudent(mentee) {
   ];
   const participation = {
     technical: technicalPool.slice(0, seed + 1).map((t, i) => ({
-      id: `${mentee.id}-tech-${i + 1}`, date: ['Mar 2026', 'Sep 2025', 'Feb 2026'][i], ...t,
+      id: `${mentee.id}-tech-${i + 1}`,
+      date: ['Mar 2026', 'Sep 2025', 'Feb 2026'][i],
+      evidence: i === 0 ? [] : [],
+      ...t,
     })),
     coCurricular:
       mentee.wellbeingConcerns > 1
         ? []
-        : [{ id: `${mentee.id}-co-1`, activity: 'Departmental Symposium', date: 'Aug 2025', achievement: 'Volunteer' }],
+        : [{
+            id: `${mentee.id}-co-1`,
+            activity: 'Departmental Symposium',
+            date: 'Aug 2025',
+            role: 'Volunteer',
+            achievement: 'Event support',
+            evidence: [],
+          }],
     extraCurricular: [
-      { id: `${mentee.id}-ec-1`, category: EXTRA_CURRICULAR_CATEGORIES[seed], detail: 'Active participant', date: 'Dec 2025' },
+      {
+        id: `${mentee.id}-ec-1`,
+        activity: 'Campus activity',
+        activityType: EXTRA_CURRICULAR_CATEGORIES[seed],
+        role: 'Participant',
+        achievement: 'Active participant',
+        date: 'Dec 2025',
+        evidence: [],
+      },
     ],
   };
 
   /* Section 7 */
   const certPool = [
-    { certification: 'Data Structures', platform: 'NPTEL', status: 'Completed', completionDate: 'Dec 2025', progress: 100 },
-    { certification: 'Python for Everybody', platform: 'Coursera', status: 'In Progress', completionDate: null, progress: 45 + seed * 10 },
-    { certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', status: 'Planned', completionDate: null, progress: 0 },
+    { certification: 'Data Structures', platform: 'NPTEL', completionDate: 'Dec 2025', evidence: [] },
+    { certification: 'Python for Everybody', platform: 'Coursera', completionDate: null, evidence: [] },
+    { certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', completionDate: null, evidence: [] },
   ];
   const certifications = certPool
     .slice(0, mentee.readinessDone >= 4 ? 3 : 2)
@@ -150,15 +168,40 @@ export function menteeToStudent(mentee) {
 
   /* Section 9 */
   const internshipAndProject = {
-    internshipCompany: mentee.year === 4 && mentee.readinessDone >= 3 ? 'Cognizant, Coimbatore' : null,
-    internshipRole: mentee.year === 4 && mentee.readinessDone >= 3 ? 'Intern — Application Development' : null,
-    internshipPeriod: mentee.year === 4 && mentee.readinessDone >= 3 ? 'May – Jul 2026' : null,
-    internshipStatus: mentee.year === 4 && mentee.readinessDone >= 3 ? 'Completed' : 'Not yet secured',
-    projectTitle: ['Library Seat Tracker', 'Crop Disease Classifier', 'Campus Grievance Bot'][seed],
-    facultyGuide: ['Prof. R. Ramesh', 'Dr. K. Anitha', 'Prof. S. Vignesh'][seed],
-    progress: clamp(Math.round(mentee.gpa * 8), 10, 95),
-    progressNote: 'Reviewed at the last mentoring meeting.',
-    expectedCompletion: mentee.year === 4 ? 'Apr 2027' : 'Apr 2028',
+    records:
+      mentee.year === 4 && mentee.readinessDone >= 3
+        ? [
+            {
+              id: `${mentee.id}-ip-1`,
+              type: 'Internship',
+              internshipCompany: 'Cognizant, Coimbatore',
+              internshipRole: 'Intern — Application Development',
+              internshipPeriod: 'May – Jul 2026',
+              facultyGuide: ['Prof. R. Ramesh', 'Dr. K. Anitha', 'Prof. S. Vignesh'][seed],
+              description: 'Application development internship.',
+              evidence: [],
+            },
+            {
+              id: `${mentee.id}-ip-2`,
+              type: 'Project',
+              projectTitle: ['Library Seat Tracker', 'Crop Disease Classifier', 'Campus Grievance Bot'][seed],
+              facultyGuide: ['Prof. R. Ramesh', 'Dr. K. Anitha', 'Prof. S. Vignesh'][seed],
+              projectDescription: 'Reviewed at the last mentoring meeting.',
+              expectedCompletion: mentee.year === 4 ? 'Apr 2027' : 'Apr 2028',
+              evidence: [],
+            },
+          ]
+        : [
+            {
+              id: `${mentee.id}-ip-1`,
+              type: 'Project',
+              projectTitle: ['Library Seat Tracker', 'Crop Disease Classifier', 'Campus Grievance Bot'][seed],
+              facultyGuide: ['Prof. R. Ramesh', 'Dr. K. Anitha', 'Prof. S. Vignesh'][seed],
+              projectDescription: 'Reviewed at the last mentoring meeting.',
+              expectedCompletion: mentee.year === 4 ? 'Apr 2027' : 'Apr 2028',
+              evidence: [],
+            },
+          ],
   };
 
   /* Section 10 — the first `wellbeingConcerns` aspects are flagged. */
@@ -324,8 +367,8 @@ export function menteeToStudent(mentee) {
       path: mentee.gpa >= 8.5 ? 'Higher Studies' : 'Job',
       preferredCompanies: [['TCS', 'Infosys'], ['Zoho', 'Freshworks'], ['Bosch', 'HCL']][seed],
       areasOfInterest: [['Web Development'], ['Data Science'], ['Networking']][seed],
-      certificationsCompleted: certifications.filter((c) => c.status === 'Completed').map((c) => c.certification),
-      certificationsPlanned: certifications.filter((c) => c.status === 'Planned').map((c) => c.certification),
+      certificationsCompleted: certifications.filter((c) => (c.evidence?.length ?? 0) > 0).map((c) => c.certification),
+      certificationsPlanned: certifications.filter((c) => !(c.evidence?.length)).map((c) => c.certification),
     },
 
     skillAssessment: SKILL_ITEMS.map((skill, i) => {
