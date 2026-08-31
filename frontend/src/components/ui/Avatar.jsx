@@ -9,9 +9,9 @@ const PALETTE = [
 ];
 
 const SIZES = {
-  sm: 'h-8 w-8 text-[11px] rounded-[9px]',
-  md: 'h-10 w-10 text-[12.5px] rounded-[11px]',
-  lg: 'h-14 w-14 text-base rounded-[14px]',
+  sm: 'h-8 w-8 text-[11px] rounded-[10px]',
+  md: 'h-10 w-10 text-[12.5px] rounded-xl',
+  lg: 'h-14 w-14 text-base rounded-2xl',
 };
 
 export function Avatar({ initials, seed = 0, size = 'md', className, variant }) {
@@ -20,7 +20,7 @@ export function Avatar({ initials, seed = 0, size = 'md', className, variant }) 
     <span
       aria-hidden="true"
       className={cx(
-        'inline-flex shrink-0 items-center justify-center font-semibold tracking-[.02em]',
+        'inline-flex shrink-0 items-center justify-center font-semibold tracking-[.02em] shadow-inner transition-all duration-300',
         SIZES[size],
         palette,
         className,

@@ -5,7 +5,10 @@ export function Tabs({ items, value, onChange, className, size = 'md' }) {
   return (
     <div
       role="tablist"
-      className={cx('flex flex-wrap items-center gap-1.5', className)}
+      className={cx(
+        'inline-flex flex-wrap items-center gap-1 rounded-2xl bg-canvas/80 p-1 shadow-inner',
+        className,
+      )}
     >
       {items.map((item) => {
         const key = typeof item === 'string' ? item : item.value;
@@ -20,11 +23,9 @@ export function Tabs({ items, value, onChange, className, size = 'md' }) {
             aria-selected={selected}
             onClick={() => onChange(key)}
             className={cx(
-              'focus-ring rounded-full font-semibold transition',
+              'tab-pill',
               size === 'sm' ? 'px-3 py-1.5 text-[11.5px]' : 'px-3.5 py-2 text-xs',
-              selected
-                ? 'bg-ink text-white'
-                : 'text-muted hover:bg-white hover:text-ink',
+              selected ? 'tab-pill-active' : 'tab-pill-inactive',
             )}
           >
             {label}

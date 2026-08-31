@@ -7,12 +7,12 @@ export function AlertBanner({ tone = 'rose', title, description, className }) {
   return (
     <div
       role="alert"
-      className={cx('flex items-start gap-3 rounded-xl border px-3.5 py-3', t.bg, t.border, className)}
+      className={cx('alert-banner animate-badgePop', t.bg, t.border, className)}
     >
       <span
         aria-hidden="true"
         className={cx(
-          'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white',
+          'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-pop',
           t.solid,
         )}
       >

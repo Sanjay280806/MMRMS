@@ -41,9 +41,9 @@ export function ConsoleLayout({
           onMenu={() => setMenuOpen(true)}
           greet={greet}
         />
-        <main className="space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+        <main className="page-enter space-y-6 px-5 py-6 lg:px-8 lg:py-8">
           {profile}
-          {children}
+          <div className="page-enter-stagger space-y-6">{children}</div>
         </main>
       </div>
     </div>

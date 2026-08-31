@@ -11,12 +11,12 @@ export function StatTile({ label, value, suffix, decimals = 0, footer, aside, cl
   const display = typeof value === 'number' ? animated.toFixed(decimals) : value;
 
   return (
-    <Card className={cx('flex flex-col justify-between p-5', className)} as="div">
+    <Card className={cx('flex flex-col justify-between p-6', className)} as="div" interactive>
       <div className="flex items-start justify-between gap-3">
         <span className="text-[12.5px] font-medium text-muted">{label}</span>
         {aside}
       </div>
-      <div className="mt-3 flex items-baseline gap-1">
+      <div className="mt-4 flex items-baseline gap-1">
         <span className="tnum font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ink">
           {display}
         </span>

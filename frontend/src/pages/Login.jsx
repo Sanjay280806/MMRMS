@@ -82,10 +82,8 @@ export default function Login() {
             </div>
           </div>
 
-          <h1 className="font-display text-[28px] font-semibold tracking-[-0.01em] text-ink">
-            Sign in to MMRMS
-          </h1>
-          <p className="mt-1.5 text-[13.5px] text-muted">Access your mentoring workspace</p>
+          <h1 className="hero-title text-[28px]">Sign in to MMRMS</h1>
+          <p className="hero-subtitle">Access your mentoring workspace</p>
 
           {error && <AlertBanner tone="rose" className="mt-5" title={error} />}
           {locked && (
@@ -133,7 +131,7 @@ export default function Login() {
             <PasswordRules password={password} />
 
             <div className="flex justify-end">
-              <a href="#reset" className="text-[12.5px] font-medium text-brand-500 hover:underline">
+              <a href="#reset" className="link-accent text-[12.5px]">
                 Forgot password?
               </a>
             </div>

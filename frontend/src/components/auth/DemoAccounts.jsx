@@ -11,7 +11,7 @@ const PASSWORD = 'mmrms@2026';
 
 export function DemoAccounts({ roles, onPick }) {
   return (
-    <div className="mt-8 rounded-xl border border-dashed border-line-strong bg-white/60 p-4">
+    <div className="mt-8 rounded-2xl border border-dashed border-line-strong bg-brand-gradient-subtle p-5 shadow-inner">
       <p className="text-[11px] font-semibold uppercase tracking-[.06em] text-muted-soft">
         Demo accounts · password {PASSWORD}
       </p>
@@ -25,7 +25,7 @@ export function DemoAccounts({ roles, onPick }) {
               type="button"
               onClick={() => onPick({ ...account, password: PASSWORD })}
               title={account.email}
-              className="focus-ring rounded-full border border-line bg-white px-3 py-1.5 text-[11.5px] font-semibold text-muted transition hover:border-brand-300 hover:text-brand-500"
+              className="focus-ring rounded-full border border-line bg-white px-3 py-1.5 text-[11.5px] font-semibold text-muted shadow-inner transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:text-brand-500 hover:shadow-pop"
             >
               {role?.name ?? account.role}
               {!role?.target && <span className="ml-1.5 text-muted-faint">· no dashboard</span>}
