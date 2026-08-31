@@ -24,7 +24,7 @@ export function ProgressBar({
         </div>
       )}
       <div
-        className={cx('overflow-hidden rounded-full bg-line', height, trackClassName)}
+        className={cx('overflow-hidden rounded-full bg-line shadow-inner', height, trackClassName)}
         role="progressbar"
         aria-valuenow={Math.round(clamped)}
         aria-valuemin={0}

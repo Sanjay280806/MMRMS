@@ -22,11 +22,11 @@ export function ProfileHeader({
 }) {
   return (
     <Card as="header" className="overflow-hidden">
-      <div className="flex flex-wrap items-start gap-5 p-5 lg:p-6">
+      <div className="flex flex-wrap items-start gap-5 p-6 lg:p-7">
         <Avatar initials={initials} size="lg" seed={seed} />
 
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          <h2 className="hero-title">
             {name}
           </h2>
           {subtitle && <p className="mt-1 text-[13px] text-muted-strong">{subtitle}</p>}
@@ -76,7 +76,7 @@ export function ProfileHeader({
 export function HealthDial({ index, tone, label }) {
   const t = toneOf(tone);
   return (
-    <div className={cx('rounded-2xl px-6 py-4 text-center', t.bg)}>
+    <div className={cx('rounded-2xl px-6 py-4 text-center shadow-inner transition-all duration-300', t.bg, t.border, 'border')}>
       <div className="flex items-baseline justify-center gap-1">
         <span className={cx('tnum font-display text-[38px] font-semibold leading-none', t.text)}>
           {index}

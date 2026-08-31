@@ -1,16 +1,14 @@
 import { cx } from '../../lib/tone.js';
 
 const VARIANTS = {
-  primary:
-    'bg-brand-500 text-white shadow-raised hover:bg-brand-600 disabled:bg-brand-300 disabled:shadow-none',
-  secondary:
-    'border border-line-strong bg-white text-ink hover:border-muted-soft hover:bg-canvas disabled:text-muted-soft',
-  ghost: 'text-muted hover:text-brand-500 disabled:text-muted-soft',
-  dark: 'bg-ink text-white hover:bg-ink-soft disabled:bg-muted-soft',
+  primary: 'btn-primary',
+  secondary: 'btn-secondary',
+  ghost: 'btn-ghost',
+  dark: 'btn-dark',
 };
 
 const SIZES = {
-  sm: 'px-3 py-1.5 text-xs rounded-lg',
+  sm: 'px-3.5 py-2 text-xs rounded-xl',
   md: 'px-4 py-2.5 text-[13px] rounded-field',
   lg: 'w-full px-4 py-3.5 text-sm rounded-xl',
 };
@@ -28,13 +26,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={cx(
-        'focus-ring inline-flex items-center justify-center gap-2 font-semibold transition',
-        'disabled:cursor-not-allowed',
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={cx(VARIANTS[variant], SIZES[size], className)}
       {...rest}
     >
       {loading && <Spinner />}

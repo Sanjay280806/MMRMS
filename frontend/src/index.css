@@ -5,30 +5,201 @@
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply bg-canvas font-sans text-ink;
+    @apply bg-canvas font-sans text-ink antialiased;
   }
 
   /* Tabular numerals keep counting-up statistics from jittering. */
   .tnum {
     font-variant-numeric: tabular-nums;
   }
+
+  ::selection {
+    @apply bg-brand-200 text-ink;
+  }
 }
 
 @layer components {
+  /* ── Focus & interaction primitives ─────────────────────────────── */
+
+  .focus-ring {
+    @apply outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2;
+  }
+
+  /* ── Buttons ──────────────────────────────────────────────────── */
+
+  .btn-base {
+    @apply focus-ring inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn-base bg-brand-gradient text-white shadow-raised hover:-translate-y-0.5 hover:bg-brand-gradient-hover hover:shadow-glow active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0;
+  }
+
+  .btn-secondary {
+    @apply btn-base border border-line-strong bg-white text-ink shadow-inner hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-pop active:translate-y-0 disabled:text-muted-soft disabled:hover:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply btn-base text-muted hover:text-brand-500 disabled:text-muted-soft;
+  }
+
+  .btn-dark {
+    @apply btn-base bg-ink text-white shadow-pop hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-0 disabled:bg-muted-soft disabled:hover:translate-y-0;
+  }
+
+  /* ── Cards & surfaces ─────────────────────────────────────────── */
+
+  .card-surface {
+    @apply rounded-card border border-line-faint/80 bg-white shadow-card transition-all duration-300;
+  }
+
+  .card-interactive {
+    @apply card-surface hover:-translate-y-0.5 hover:shadow-card-hover;
+  }
+
+  .card-header {
+    @apply flex items-start justify-between gap-4 border-b border-line/60 px-6 py-4;
+  }
+
+  /* ── Forms & inputs ───────────────────────────────────────────── */
+
+  .input-field {
+    @apply w-full rounded-field border-[1.5px] border-line-strong bg-white px-4 py-3 text-[13.5px] text-ink shadow-inner-field placeholder:text-muted-soft transition-all duration-300 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+  }
+
+  .input-label {
+    @apply mb-1.5 block text-[12.5px] font-semibold text-muted-strong;
+  }
+
+  /* ── Typography — hero & page headers ─────────────────────────── */
+
+  .hero-title {
+    @apply font-display text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ink lg:text-[30px];
+  }
+
+  .hero-subtitle {
+    @apply mt-1 text-[12.5px] leading-relaxed text-muted;
+  }
+
+  .section-title {
+    @apply font-display text-[15px] font-semibold tracking-[-0.01em] text-ink;
+  }
+
+  /* ── Links ────────────────────────────────────────────────────── */
+
+  .link-accent {
+    @apply font-medium text-brand-500 transition-all duration-300 hover:text-brand-violet hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2;
+  }
+
+  /* ── Navigation ───────────────────────────────────────────────── */
+
+  .nav-item {
+    @apply relative flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[12.5px] transition-all duration-300;
+  }
+
+  .nav-item-active {
+    @apply bg-brand-gradient-subtle font-semibold text-white shadow-inner;
+  }
+
+  .nav-item-inactive {
+    @apply text-white/55 hover:bg-white/[0.05] hover:text-white/90;
+  }
+
+  .nav-indicator {
+    @apply absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-gradient transition-all duration-300;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────── */
+
+  .table-head {
+    @apply border-b border-line bg-canvas/60;
+  }
+
+  .table-th {
+    @apply px-6 py-3 text-[11px] font-semibold uppercase tracking-[.07em] text-muted-soft;
+  }
+
+  .table-row {
+    @apply border-b border-line/50 transition-all duration-200 last:border-0 even:bg-canvas/30;
+  }
+
+  .table-row-interactive {
+    @apply table-row cursor-pointer hover:bg-brand-50/40 hover:shadow-[inset_3px_0_0_#6366F1];
+  }
+
+  .table-td {
+    @apply px-6 py-4 text-[13px] text-ink;
+  }
+
+  /* ── Badges & alerts ──────────────────────────────────────────── */
+
+  .badge-soft {
+    @apply inline-flex items-center gap-1.5 rounded-full font-semibold transition-all duration-300;
+  }
+
+  .badge-animate {
+    @apply animate-badgePop;
+  }
+
+  .alert-banner {
+    @apply flex items-start gap-3 rounded-xl border px-4 py-3.5 shadow-pop transition-all duration-300;
+  }
+
+  /* ── Page transitions ─────────────────────────────────────────── */
+
+  .page-enter {
+    @apply animate-fadeRise;
+  }
+
+  .page-enter-stagger > * {
+    @apply animate-slideUp;
+  }
+
+  .page-enter-stagger > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .page-enter-stagger > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .page-enter-stagger > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .page-enter-stagger > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .page-enter-stagger > *:nth-child(5) {
+    animation-delay: 240ms;
+  }
+
+  /* ── Tabs ─────────────────────────────────────────────────────── */
+
+  .tab-pill {
+    @apply focus-ring rounded-full font-semibold transition-all duration-300;
+  }
+
+  .tab-pill-active {
+    @apply bg-brand-gradient text-white shadow-raised;
+  }
+
+  .tab-pill-inactive {
+    @apply text-muted hover:bg-white hover:text-ink hover:shadow-pop;
+  }
+
+  /* ── Skeleton loading ─────────────────────────────────────────── */
+
   .skeleton {
-    @apply animate-shimmer rounded-lg;
-    background-image: linear-gradient(90deg, #ececef, #f5f5f7, #ececef);
+    @apply animate-shimmer rounded-xl;
+    background-image: linear-gradient(90deg, #e8e9ef, #f4f5f8, #e8e9ef);
     background-size: 200% 100%;
   }
 
-  .focus-ring {
-    @apply outline-none ring-brand-500/25 focus-visible:ring-4;
-  }
+  /* ── Sidebar scrollbar ────────────────────────────────────────── */
 
-  /* Thin, low-contrast scrollbar for dark navigation rails. */
   .sidebar-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
@@ -47,7 +218,7 @@
     border-radius: 9999px;
   }
 
-  .sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.24);
   }
 }
