@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, getToken, setToken } from '../api/client.js';
+import { api, getToken, setToken, silentRefresh } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -7,49 +7,58 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null); // { user, role }
   const [restoring, setRestoring] = useState(true);
 
-  // Re-establish the session from a stored token on first load. With no token
-  // there is nothing to restore, so we skip the request rather than 401.
+  // On mount: try to restore session from the httpOnly refresh cookie.
+  // If the cookie is valid, /api/auth/refresh returns a new access token
+  // and we then fetch /api/auth/me to get the user object.
   useEffect(() => {
     let active = true;
     (async () => {
-      if (!getToken()) {
-        setRestoring(false);
-        return;
-      }
       try {
+        const newToken = await silentRefresh();
+        if (!newToken || !active) {
+          setRestoring(false);
+          return;
+        }
+        // Token set in memory by silentRefresh — api() will pick it up.
         const me = await api('/auth/me');
-        if (active) setSession(me);
+        if (active && me) setSession(me);
       } catch {
-        setToken(null);
+        // No valid refresh cookie — user must log in manually.
       } finally {
         if (active) setRestoring(false);
       }
     })();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   const login = useCallback(async (email, password) => {
+    // api() returns body.data automatically (envelope unwrapped)
     const result = await api('/auth/login', {
       method: 'POST',
       auth: false,
       body: { email, password },
     });
-    setToken(result.token);
+    // Store access token in memory (Phase 0 — not localStorage)
+    setToken(result.accessToken ?? result.token ?? null);
     setSession({ user: result.user, role: result.role });
     return result;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      // Tell the server to clear the httpOnly refresh cookie
+      await api('/auth/logout', { method: 'POST' });
+    } catch {
+      // Even if the server call fails, clear local state
+    }
     setToken(null);
     setSession(null);
   }, []);
 
   const value = useMemo(
     () => ({
-      user: session?.user ?? null,
-      role: session?.role ?? null,
+      user:            session?.user ?? null,
+      role:            session?.role ?? null,
       isAuthenticated: Boolean(session),
       restoring,
       login,

@@ -5,7 +5,7 @@
 
 ---
 
-## Current Phase: 0
+## Current Phase: 1
 
 *(Update this line when a phase completes — e.g. change to `1` after Phase 0 is done)*
 
@@ -446,7 +446,7 @@ After finishing a phase, tell the user:
 
 | Phase | Status | Completed At | Notes |
 |---|---|---|---|
-| Phase 0 — Security Hardening | ⏳ Pending | — | — |
+| Phase 0 — Security Hardening | ✅ Complete | 2026-09-17 17:24 | helmet, cookie-parser, zod, envelope, httpOnly refresh token, bcrypt cost 12. 18/18 tests pass, 29/29 baseline. |
 | Phase 1 — PostgreSQL + Prisma | ⏳ Pending | — | Requires Phase 0 |
 | Phase 2 — Admin + HOD Roles | ⏳ Pending | — | Requires Phase 1 |
 | Phase 3 — Notifications | ⏳ Pending | — | Requires Phase 1 + Redis |
