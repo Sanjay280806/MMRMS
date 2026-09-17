@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Badge } from '../ui/Badge.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DefinitionList } from '../ui/DefinitionList.jsx';
@@ -43,87 +45,333 @@ function parseInputDate(isoStr) {
 }
 
 /**
- * Generates and triggers a CSV download for a single meeting record.
- * Uses the native Blob + URL API — no external dependencies required.
+ * Loads the KSI logo image from the public directory and converts it to a Data URL.
+ * Falls back safely if loading fails.
+ */
+function getKsiLogoDataUrl() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve({
+          dataUrl: canvas.toDataURL('image/jpeg'),
+          width: canvas.width,
+          height: canvas.height,
+        });
+      } catch (err) {
+        console.warn('[MeetingLog] Failed to convert logo canvas:', err);
+        resolve(null);
+      }
+    };
+    img.onerror = () => {
+      const fallbackImg = new Image();
+      fallbackImg.crossOrigin = 'Anonymous';
+      fallbackImg.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = fallbackImg.naturalWidth || fallbackImg.width;
+          canvas.height = fallbackImg.naturalHeight || fallbackImg.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(fallbackImg, 0, 0);
+          resolve({
+            dataUrl: canvas.toDataURL('image/jpeg'),
+            width: canvas.width,
+            height: canvas.height,
+          });
+        } catch (e) {
+          resolve(null);
+        }
+      };
+      fallbackImg.onerror = () => resolve(null);
+      fallbackImg.src = '/KI%20KSI%20LOGO.jpg';
+    };
+    img.src = '/ksi-logo.jpg';
+  });
+}
+
+/**
+ * Generates and triggers a PDF download for a single meeting record.
+ * Renders the KSI logo at the top, meeting metadata, agenda, discussion,
+ * action items, progress, goal progress, remarks, and signature status.
  *
  * @param {object} meeting - the decorated meeting object from the API
  * @param {string} menteeName - the mentee's full name for the report header
  */
-function downloadMeetingReport(meeting, menteeName) {
-  // Safe date slug for the filename: spaces → underscores, strip commas/slashes.
+async function downloadMeetingReport(meeting, menteeName) {
   const dateSlug = String(meeting.date ?? '').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
-  const filename = `MMRMS_Meeting_Report_${meeting.number}_${dateSlug}.csv`;
+  const filename = `MMRMS_Meeting_Report_${meeting.number}_${dateSlug}.pdf`;
 
-  // Escape a cell value for RFC 4180 CSV.
-  const cell = (v) => {
-    const s = String(v ?? '—');
-    return s.includes(',') || s.includes('"') || s.includes('\n')
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  // 1. Header with KSI Logo
+  const logoInfo = await getKsiLogoDataUrl();
+  if (logoInfo && logoInfo.dataUrl) {
+    const logoWidth = 45;
+    const logoHeight = (logoInfo.height / logoInfo.width) * logoWidth;
+    doc.addImage(logoInfo.dataUrl, 'JPEG', margin, y, logoWidth, logoHeight);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin + logoWidth + 6, y + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin + logoWidth + 6, y + 10);
+
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`MEETING REPORT — MEETING #${meeting.number}`, margin + logoWidth + 6, y + 16);
+
+    y += Math.max(logoHeight, 18) + 4;
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin, y + 5);
+    doc.setFontSize(9.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin, y + 10);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`MEETING REPORT — MEETING #${meeting.number}`, margin, y + 16);
+    y += 22;
+  }
+
+  // Divider Line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 5;
+
+  const addSectionHeading = (title) => {
+    if (y > 260) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentWidth, 6.5, 'F');
+    doc.text(title, margin + 3, y + 4.5);
+    y += 8.5;
   };
-  const row = (...cols) => cols.map(cell).join(',');
 
-  const lines = [
-    row('MMRMS Meeting Report'),
-    row('Mentee', menteeName ?? '—'),
-    row('Meeting Number', meeting.number),
-    row('Meeting Date', meeting.date),
-    row('Mode', meeting.mode),
-    row('Category', meeting.category ?? '—'),
-    row('Duration', meeting.duration),
-    row('Agenda', (meeting.agenda ?? []).join('; ')),
-    row(''),
-    row('MINUTES'),
-    row('Topics Discussed', meeting.topicsDiscussed),
-    row('Student Concerns', meeting.studentConcerns),
-    row('Mentor Suggestions', meeting.mentorSuggestions),
-    row('Support Required', meeting.supportRequired),
-    row(''),
-    row('PROGRESS SINCE LAST MEETING'),
-    row('Achievements', meeting.progressSinceLastMeeting?.achievements),
-    row('Pending Tasks', meeting.progressSinceLastMeeting?.pendingTasks),
-    row('Improvement Observed', meeting.progressSinceLastMeeting?.improvementObserved),
-  ];
+  // 2. Summary Table
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      1: { cellWidth: 53 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      3: { cellWidth: 53 },
+    },
+    body: [
+      ['Mentee Name', menteeName || '—', 'Meeting Number', String(meeting.number ?? '—')],
+      ['Meeting Date', String(meeting.date ?? '—'), 'Mode', String(meeting.mode ?? '—')],
+      ['Category', String(meeting.category ?? '—'), 'Duration', String(meeting.duration ?? '—')],
+      ['Next Review Date', String(meeting.nextReviewDate ?? '—'), 'Signed Status', meeting.signed ? 'Signed ✓' : 'Pending Signature'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
 
-  // Action items table.
-  if ((meeting.actionItems ?? []).length > 0) {
-    lines.push(row(''));
-    lines.push(row('ACTION ITEMS'));
-    lines.push(row('Task', 'Responsible', 'Target Date', 'Status'));
-    for (const item of meeting.actionItems) {
-      lines.push(row(item.task, item.responsible, item.targetDate, item.status));
-    }
+  // 3. Agenda
+  addSectionHeading('1. Agenda & Scope');
+  const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
+    ? meeting.agenda.map(a => `• ${a}`).join('\n')
+    : '• No agenda items listed.';
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
+  doc.text(agendaLines, margin + 2, y);
+  y += agendaLines.length * 4 + 4;
+
+  // 4. Minutes of Meeting
+  addSectionHeading('2. Minutes of Meeting');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Topics Discussed', meeting.topicsDiscussed || '—'],
+      ['Student Concerns', meeting.studentConcerns || '—'],
+      ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
+      ['Support Required', meeting.supportRequired || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 5. Progress Since Last Meeting
+  addSectionHeading('3. Progress Since Last Meeting');
+  const prog = meeting.progressSinceLastMeeting || {};
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Achievements', prog.achievements || '—'],
+      ['Pending Tasks', prog.pendingTasks || '—'],
+      ['Improvement Observed', prog.improvementObserved || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 6. Action Items
+  addSectionHeading('4. Action Items');
+  const actionItems = meeting.actionItems || [];
+  if (actionItems.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      columns: [
+        { header: '#', dataKey: 'idx' },
+        { header: 'Task', dataKey: 'task' },
+        { header: 'Responsible', dataKey: 'responsible' },
+        { header: 'Target Date', dataKey: 'targetDate' },
+        { header: 'Status', dataKey: 'status' },
+      ],
+      body: actionItems.map((item, idx) => ({
+        idx: idx + 1,
+        task: item.task || '—',
+        responsible: item.responsible || '—',
+        targetDate: item.targetDate || '—',
+        status: item.status || '—',
+      })),
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No action items recorded for this meeting.', margin + 2, y);
+    y += 7;
   }
 
-  // Goal progress table.
-  if ((meeting.goalProgress ?? []).length > 0) {
-    lines.push(row(''));
-    lines.push(row('SMART GOAL PROGRESS'));
-    lines.push(row('Goal', 'Current Status', 'Progress %'));
-    for (const gp of meeting.goalProgress) {
-      lines.push(row(gp.goal ?? gp.goalId, gp.currentStatus, gp.progress));
-    }
+  // 7. SMART Goal Progress
+  addSectionHeading('5. SMART Goal Progress');
+  const goalProgress = meeting.goalProgress || [];
+  if (goalProgress.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      columns: [
+        { header: '#', dataKey: 'idx' },
+        { header: 'Goal', dataKey: 'goal' },
+        { header: 'Current Status', dataKey: 'status' },
+        { header: 'Progress', dataKey: 'progress' },
+      ],
+      body: goalProgress.map((gp, idx) => ({
+        idx: idx + 1,
+        goal: gp.goal || gp.goalId || '—',
+        status: gp.currentStatus || '—',
+        progress: `${gp.progress ?? 0}%`,
+      })),
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No goal progress recorded for this meeting.', margin + 2, y);
+    y += 7;
   }
 
-  // Remarks and review.
-  lines.push(row(''));
-  lines.push(row('REMARKS AND REVIEW'));
-  lines.push(row('Mentor Remarks', meeting.mentorRemarks));
-  lines.push(row('Student Remarks', meeting.studentRemarks));
-  lines.push(row('Next Review Date', meeting.nextReviewDate));
-  lines.push(row('Mentor Signature', meeting.mentorSigned ? 'Signed' : 'Pending'));
-  lines.push(row('Student Signature', meeting.studentSigned ? 'Signed' : 'Pending'));
+  // 8. Remarks & Review
+  addSectionHeading('6. Remarks & Review');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Mentor Remarks', meeting.mentorRemarks || '—'],
+      ['Student Remarks', meeting.studentRemarks || '—'],
+      ['Next Review Date', meeting.nextReviewDate || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
 
-  const csv = lines.join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // 9. Signatures & Verification
+  addSectionHeading('7. Verification & Signatures');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: (contentWidth - 84) / 2 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      3: { cellWidth: (contentWidth - 84) / 2 },
+    },
+    body: [
+      [
+        'Mentor Signature',
+        meeting.mentorSigned ? 'Signed ✓' : 'Pending Signature',
+        'Student Signature',
+        meeting.studentSigned ? 'Signed ✓' : 'Pending Signature',
+      ],
+    ],
+  });
+
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 287, pageWidth - margin, 287);
+
+    doc.text('Kumaraguru School of Innovation — MMRMS Meeting Report', margin, 291);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 291, { align: 'right' });
+  }
+
+  doc.save(filename);
 }
 
 /**
@@ -316,11 +564,11 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
 function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, savingAction }) {
   const [downloadError, setDownloadError] = useState(null);
 
-  function handleDownload(e) {
+  async function handleDownload(e) {
     e.stopPropagation(); // prevent the card toggle from firing
     setDownloadError(null);
     try {
-      downloadMeetingReport(meeting, menteeName);
+      await downloadMeetingReport(meeting, menteeName);
     } catch (err) {
       setDownloadError('Download failed. Please try again.');
       // eslint-disable-next-line no-console
