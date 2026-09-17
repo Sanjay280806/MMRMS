@@ -1,19 +1,185 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '../ui/Badge.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DefinitionList } from '../ui/DefinitionList.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 import { ProgressBar } from '../ui/ProgressBar.jsx';
 import { SectionCard } from '../ui/SectionCard.jsx';
+import { Button } from '../ui/Button.jsx';
 import { cx, tone as toneOf } from '../../lib/tone.js';
+
+/** Month abbreviation → 1-based number. Matches the "DD Mon YYYY" format used by all existing meeting records. */
+const MONTH_NUM = {
+  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+};
+
+/**
+ * Parses a display-format meeting date ("22 Jul 2026") into a YYYYMMDD integer
+ * for reliable inclusive-range comparison. Returns null if the format is not recognised.
+ */
+function parseMeetingDate(dateStr) {
+  if (!dateStr) return null;
+  const parts = String(dateStr).trim().split(/\s+/);
+  if (parts.length !== 3) return null;
+  const [d, mon, y] = parts;
+  const m = MONTH_NUM[mon];
+  if (!m) return null;
+  const day = parseInt(d, 10);
+  const year = parseInt(y, 10);
+  if (!Number.isFinite(day) || !Number.isFinite(year)) return null;
+  return year * 10000 + m * 100 + day;
+}
+
+/**
+ * Converts a native date-input value ("YYYY-MM-DD") to a YYYYMMDD integer
+ * so it can be compared directly with parseMeetingDate results.
+ */
+function parseInputDate(isoStr) {
+  if (!isoStr) return null;
+  const [y, m, d] = isoStr.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return y * 10000 + m * 100 + d;
+}
+
+/**
+ * Generates and triggers a CSV download for a single meeting record.
+ * Uses the native Blob + URL API — no external dependencies required.
+ *
+ * @param {object} meeting - the decorated meeting object from the API
+ * @param {string} menteeName - the mentee's full name for the report header
+ */
+function downloadMeetingReport(meeting, menteeName) {
+  // Safe date slug for the filename: spaces → underscores, strip commas/slashes.
+  const dateSlug = String(meeting.date ?? '').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+  const filename = `MMRMS_Meeting_Report_${meeting.number}_${dateSlug}.csv`;
+
+  // Escape a cell value for RFC 4180 CSV.
+  const cell = (v) => {
+    const s = String(v ?? '—');
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  const row = (...cols) => cols.map(cell).join(',');
+
+  const lines = [
+    row('MMRMS Meeting Report'),
+    row('Mentee', menteeName ?? '—'),
+    row('Meeting Number', meeting.number),
+    row('Meeting Date', meeting.date),
+    row('Mode', meeting.mode),
+    row('Category', meeting.category ?? '—'),
+    row('Duration', meeting.duration),
+    row('Agenda', (meeting.agenda ?? []).join('; ')),
+    row(''),
+    row('MINUTES'),
+    row('Topics Discussed', meeting.topicsDiscussed),
+    row('Student Concerns', meeting.studentConcerns),
+    row('Mentor Suggestions', meeting.mentorSuggestions),
+    row('Support Required', meeting.supportRequired),
+    row(''),
+    row('PROGRESS SINCE LAST MEETING'),
+    row('Achievements', meeting.progressSinceLastMeeting?.achievements),
+    row('Pending Tasks', meeting.progressSinceLastMeeting?.pendingTasks),
+    row('Improvement Observed', meeting.progressSinceLastMeeting?.improvementObserved),
+  ];
+
+  // Action items table.
+  if ((meeting.actionItems ?? []).length > 0) {
+    lines.push(row(''));
+    lines.push(row('ACTION ITEMS'));
+    lines.push(row('Task', 'Responsible', 'Target Date', 'Status'));
+    for (const item of meeting.actionItems) {
+      lines.push(row(item.task, item.responsible, item.targetDate, item.status));
+    }
+  }
+
+  // Goal progress table.
+  if ((meeting.goalProgress ?? []).length > 0) {
+    lines.push(row(''));
+    lines.push(row('SMART GOAL PROGRESS'));
+    lines.push(row('Goal', 'Current Status', 'Progress %'));
+    for (const gp of meeting.goalProgress) {
+      lines.push(row(gp.goal ?? gp.goalId, gp.currentStatus, gp.progress));
+    }
+  }
+
+  // Remarks and review.
+  lines.push(row(''));
+  lines.push(row('REMARKS AND REVIEW'));
+  lines.push(row('Mentor Remarks', meeting.mentorRemarks));
+  lines.push(row('Student Remarks', meeting.studentRemarks));
+  lines.push(row('Next Review Date', meeting.nextReviewDate));
+  lines.push(row('Mentor Signature', meeting.mentorSigned ? 'Signed' : 'Pending'));
+  lines.push(row('Student Signature', meeting.studentSigned ? 'Signed' : 'Pending'));
+
+  const csv = lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 /**
  * Section 12 — the Mentor Meeting Log. Each meeting renders as the printed
  * minutes: header, agenda, discussion, action items, progress, goal progress,
  * remarks, next review and the signature line.
  */
-export function MeetingLog({ meetings, onUpdateAction, savingAction }) {
+export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction }) {
   const [openId, setOpenId] = useState(meetings.rows[0]?.id ?? null);
+
+  // ── Date-range filter state ───────────────────────────────────────────────
+  // startDate / endDate: controlled input values (YYYY-MM-DD strings)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate]     = useState('');
+  // appliedStart / appliedEnd: the values actually used for filtering (set on Apply)
+  const [appliedStart, setAppliedStart] = useState('');
+  const [appliedEnd,   setAppliedEnd]   = useState('');
+  // validation error shown when start > end
+  const [filterError, setFilterError] = useState('');
+
+  /** Meetings visible after applying the current filter. Never mutates meetings.rows. */
+  const filteredRows = useMemo(() => {
+    if (!appliedStart && !appliedEnd) return meetings.rows;
+    const s = parseInputDate(appliedStart);
+    const e = parseInputDate(appliedEnd);
+    return meetings.rows.filter((m) => {
+      const d = parseMeetingDate(m.date);
+      if (d === null) return true; // unrecognised format: show rather than hide
+      if (s !== null && d < s) return false;
+      if (e !== null && d > e) return false;
+      return true;
+    });
+  }, [meetings.rows, appliedStart, appliedEnd]);
+
+  function handleApply() {
+    const s = parseInputDate(startDate);
+    const e = parseInputDate(endDate);
+    if (s !== null && e !== null && s > e) {
+      setFilterError('Start date must be on or before end date.');
+      return;
+    }
+    setFilterError('');
+    setAppliedStart(startDate);
+    setAppliedEnd(endDate);
+  }
+
+  function handleClear() {
+    setStartDate('');
+    setEndDate('');
+    setAppliedStart('');
+    setAppliedEnd('');
+    setFilterError('');
+  }
+
+  const isFiltered = Boolean(appliedStart || appliedEnd);
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (!meetings.rows.length) {
     return (
@@ -44,25 +210,124 @@ export function MeetingLog({ meetings, onUpdateAction, savingAction }) {
           )
         }
       >
-        <ol className="space-y-2.5">
-          {meetings.rows.map((meeting) => (
-            <li key={meeting.id}>
-              <MeetingEntry
-                meeting={meeting}
-                open={openId === meeting.id}
-                onToggle={() => setOpenId(openId === meeting.id ? null : meeting.id)}
-                onUpdateAction={onUpdateAction}
-                savingAction={savingAction}
+        {/* ── Date-range filter bar ──────────────────────────────────────── */}
+        <div className="mb-4 rounded-xl border border-line bg-canvas/60 px-4 py-3">
+          <p className="mb-2.5 text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">
+            Filter by Date Range
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="meeting-filter-from"
+                className="text-[10.5px] font-semibold text-muted"
+              >
+                From
+              </label>
+              <input
+                id="meeting-filter-from"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="focus-ring rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-[12.5px] text-ink"
+                aria-label="Filter meetings from date"
               />
-            </li>
-          ))}
-        </ol>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="meeting-filter-to"
+                className="text-[10.5px] font-semibold text-muted"
+              >
+                To
+              </label>
+              <input
+                id="meeting-filter-to"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="focus-ring rounded-lg border border-line-strong bg-white px-2.5 py-1.5 text-[12.5px] text-ink"
+                aria-label="Filter meetings to date"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                id="meeting-filter-apply"
+                variant="secondary"
+                size="sm"
+                onClick={handleApply}
+              >
+                Apply
+              </Button>
+              {isFiltered && (
+                <Button
+                  id="meeting-filter-clear"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClear}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {filterError && (
+            <p role="alert" className="mt-2 text-[11.5px] font-semibold text-bad-ink">
+              {filterError}
+            </p>
+          )}
+
+          {isFiltered && !filterError && (
+            <p className="mt-2 text-[11px] text-muted">
+              Showing {filteredRows.length} of {meetings.total} meeting{meetings.total === 1 ? '' : 's'}
+            </p>
+          )}
+        </div>
+        {/* ─────────────────────────────────────────────────────────────────── */}
+
+        {filteredRows.length === 0 ? (
+          <EmptyState
+            title="No meetings in this range"
+            description="Try a different date range or clear the filter to see all meetings."
+            icon="◷"
+          />
+        ) : (
+          <ol className="space-y-2.5">
+            {filteredRows.map((meeting) => (
+              <li key={meeting.id}>
+                <MeetingEntry
+                  meeting={meeting}
+                  menteeName={menteeName}
+                  open={openId === meeting.id}
+                  onToggle={() => setOpenId(openId === meeting.id ? null : meeting.id)}
+                  onUpdateAction={onUpdateAction}
+                  savingAction={savingAction}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
       </SectionCard>
     </div>
   );
 }
 
-function MeetingEntry({ meeting, open, onToggle, onUpdateAction, savingAction }) {
+function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, savingAction }) {
+  const [downloadError, setDownloadError] = useState(null);
+
+  function handleDownload(e) {
+    e.stopPropagation(); // prevent the card toggle from firing
+    setDownloadError(null);
+    try {
+      downloadMeetingReport(meeting, menteeName);
+    } catch (err) {
+      setDownloadError('Download failed. Please try again.');
+      // eslint-disable-next-line no-console
+      console.error('[MeetingLog] download failed:', err);
+    }
+  }
+
   return (
     <Card as="article" className={cx('overflow-hidden', open && 'ring-1 ring-brand-200')}>
       <button
@@ -93,11 +358,26 @@ function MeetingEntry({ meeting, open, onToggle, onUpdateAction, savingAction })
             </Badge>
           )}
           {meeting.signed && <Badge tone="green">Signed</Badge>}
+          <button
+            type="button"
+            id={`download-meeting-${meeting.id}`}
+            aria-label={`Download meeting report for meeting ${meeting.number}`}
+            onClick={handleDownload}
+            className="focus-ring rounded-md border border-line px-2 py-1 text-[10.5px] font-semibold text-muted transition hover:border-muted-soft hover:text-ink"
+          >
+            ↓ Download
+          </button>
           <span aria-hidden="true" className={cx('text-[10px] text-muted-soft transition', open && 'rotate-180')}>
             ▼
           </span>
         </div>
       </button>
+
+      {downloadError && (
+        <p role="alert" className="px-4 pb-2 text-[11.5px] text-bad-ink">
+          {downloadError}
+        </p>
+      )}
 
       {open && (
         <div className="space-y-5 border-t border-line bg-canvas/40 px-5 py-5">
