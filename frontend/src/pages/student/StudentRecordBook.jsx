@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../api/client.js';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -33,7 +34,9 @@ import { GoalPanel } from '../../components/record/Goals.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { AddParticipation, AddCertification, AddInternshipProject } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
+import { AnnouncementsHistory } from './AnnouncementsHistory.jsx';
 import { useResource } from '../../hooks/useResource.js';
+import { useAnnouncements } from '../../hooks/useAnnouncements.js';
 
 const NAV_GROUPS = [
   {
@@ -74,6 +77,7 @@ const NAV_GROUPS = [
       { key: 'meetings', label: 'Meeting Log' },
       { key: 'goals', label: 'SMART Goals' },
       { key: 'contact', label: 'Contact Mentor' },
+      { key: 'announcements', label: 'Announcements' },
     ],
   },
 ];
@@ -94,12 +98,14 @@ const TITLES = {
   meetings: 'Mentor Meeting Log',
   goals: 'SMART Goals',
   contact: 'Contact Your Mentor',
+  announcements: 'Announcements',
 };
 
 export default function StudentRecordBook() {
   const [section, setSection] = useState('profile');
   const [saving, setSaving] = useState(null);
   const { data, loading, error, reload, setData } = useResource('/student/me/record-book');
+  const { announcement, clearAnnouncement } = useAnnouncements();
 
   /** Every write refetches the book so derived figures stay truthful. */
   const mutate = useCallback(
@@ -220,6 +226,26 @@ export default function StudentRecordBook() {
         />
       }
     >
+      {announcement && createPortal(
+        <div className="fixed top-6 right-6 z-[200] max-w-sm w-full animate-fadeRise">
+          <div className="bg-white rounded-xl shadow-xl border border-line-strong overflow-hidden flex flex-col">
+            <div className="bg-indigo-600 px-4 py-2 flex justify-between items-center">
+              <span className="text-white font-semibold text-sm">Announcement from {announcement.mentorName || 'Mentor'}</span>
+              <button 
+                onClick={clearAnnouncement}
+                className="text-white/80 hover:text-white transition-colors p-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 text-[14px] text-ink leading-relaxed">
+              {announcement.message}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <ErrorBoundary resetKey={section}>
         <div className="animate-fadeRise space-y-5">
           {section === 'profile' && (
@@ -388,6 +414,8 @@ export default function StudentRecordBook() {
               }
             />
           )}
+
+          {section === 'announcements' && <AnnouncementsHistory />}
         </div>
       </ErrorBoundary>
     </ConsoleLayout>

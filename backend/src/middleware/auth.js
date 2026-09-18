@@ -12,7 +12,8 @@ export function signToken(user) {
 
 export function requireAuth(req, _res, next) {
   const header = req.headers.authorization ?? '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  let token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token && req.query.token) token = req.query.token;
   if (!token) return next(new HttpError(401, 'Missing bearer token'));
 
   let payload;
