@@ -16,6 +16,7 @@ import { GoalsOverview } from './sections/GoalsOverview.jsx';
 import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
+import { Announcements } from './sections/Announcements.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
 import { ChipGroup, TextArea, TextField } from '../../components/ui/Field.jsx';
 import { api } from '../../api/client.js';
@@ -32,6 +33,7 @@ const TITLES = {
   parents: 'Parent Interaction Log',
   reports: 'Term Reports',
   timeline: 'Activity Timeline',
+  announcements: 'Announcements',
 };
 
 const MEETING_CATEGORIES = ['Attendance', 'Academic', 'Profile Upgradation', 'Career', 'Others'];
@@ -125,6 +127,7 @@ export default function MentorConsole() {
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
         { key: 'goals', label: 'SMART Goals' },
         { key: 'parents', label: 'Parent Log' },
+        { key: 'announcements', label: 'Announcements' },
       ],
     },
     {
@@ -257,6 +260,7 @@ export default function MentorConsole() {
           {section === 'actions' && <ActionItemQueue onOpenMentee={openMentee} />}
           {section === 'goals' && <GoalsOverview onOpenMentee={openMentee} />}
           {section === 'parents' && <ParentLog />}
+          {section === 'announcements' && <Announcements />}
           {section === 'reports' && <Reports />}
           {section === 'timeline' && <ActivityTimeline events={data.timeline} />}
         </div>
