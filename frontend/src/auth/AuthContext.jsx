@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, getToken, setToken } from '../api/client.js';
+import { api, setToken } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -7,20 +7,23 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null); // { user, role }
   const [restoring, setRestoring] = useState(true);
 
-  // Re-establish the session from a stored token on first load. With no token
-  // there is nothing to restore, so we skip the request rather than 401.
+  // Re-establish session on mount via refresh cookie
   useEffect(() => {
     let active = true;
     (async () => {
-      if (!getToken()) {
-        setRestoring(false);
-        return;
-      }
       try {
-        const me = await api('/auth/me');
-        if (active) setSession(me);
+        const res = await api('/auth/refresh', {
+          method: 'POST',
+          auth: false,
+          retry: false,
+        });
+        if (active && res) {
+          setToken(res.accessToken ?? res.token);
+          setSession({ user: res.user, role: res.role });
+        }
       } catch {
         setToken(null);
+        setSession(null);
       } finally {
         if (active) setRestoring(false);
       }
@@ -36,14 +39,20 @@ export function AuthProvider({ children }) {
       auth: false,
       body: { email, password },
     });
-    setToken(result.token);
+    setToken(result.accessToken ?? result.token);
     setSession({ user: result.user, role: result.role });
     return result;
   }, []);
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setSession(null);
+  const logout = useCallback(async () => {
+    try {
+      await api('/auth/logout', { method: 'POST', auth: false, retry: false });
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      setToken(null);
+      setSession(null);
+    }
   }, []);
 
   const value = useMemo(

@@ -1,12 +1,23 @@
-const TOKEN_KEY = 'mmrms.token';
+let memoryToken = null;
+
+// Clean up any legacy localStorage tokens on load
+try {
+  localStorage.removeItem('mmrms.token');
+} catch {
+  // Ignore in SSR/non-browser contexts
+}
 
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return memoryToken;
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  memoryToken = token;
+  try {
+    localStorage.removeItem('mmrms.token');
+  } catch {
+    // Ignore in non-browser contexts
+  }
 }
 
 export class ApiError extends Error {
@@ -17,8 +28,40 @@ export class ApiError extends Error {
   }
 }
 
-/** Thin fetch wrapper: attaches the bearer token and unwraps API errors. */
-export async function api(path, { method = 'GET', body, auth = true } = {}) {
+let refreshingPromise = null;
+
+async function refreshAccessToken() {
+  if (!refreshingPromise) {
+    refreshingPromise = (async () => {
+      try {
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (!response.ok) {
+          setToken(null);
+          return null;
+        }
+        const text = await response.text();
+        const payload = text ? JSON.parse(text) : null;
+        const data = payload?.data !== undefined ? payload.data : payload;
+        const token = data?.accessToken ?? data?.token ?? null;
+        setToken(token);
+        return data;
+      } catch {
+        setToken(null);
+        return null;
+      } finally {
+        refreshingPromise = null;
+      }
+    })();
+  }
+  return refreshingPromise;
+}
+
+/** Thin fetch wrapper: attaches bearer token, passes cookies, unwraps envelopes, and handles 401 refresh. */
+export async function api(path, { method = 'GET', body, auth = true, retry = true } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -29,14 +72,26 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: 'include',
   });
 
   const text = await response.text();
   const contentType = response.headers.get('content-type') ?? '';
   const payload = text && contentType.includes('application/json') ? JSON.parse(text) : null;
 
+  if (response.status === 401 && auth && retry && !path.startsWith('/auth/')) {
+    const refreshData = await refreshAccessToken();
+    if (refreshData?.accessToken || refreshData?.token) {
+      return api(path, { method, body, auth, retry: false });
+    }
+  }
+
   if (!response.ok) {
-    throw new ApiError(response.status, payload?.error ?? response.statusText, payload);
+    const errorMsg =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : payload?.error?.message ?? response.statusText;
+    throw new ApiError(response.status, errorMsg, payload);
   }
 
   if (text && !payload) {
@@ -45,5 +100,5 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
     });
   }
 
-  return payload;
+  return payload && typeof payload === 'object' && payload.data !== undefined ? payload.data : payload;
 }
