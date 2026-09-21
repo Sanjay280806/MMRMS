@@ -40,6 +40,7 @@ export function ConsoleLayout({
           actions={actions}
           onMenu={() => setMenuOpen(true)}
           greet={greet}
+          onNavChange={onNavChange}
         />
         <main className="page-enter space-y-6 px-5 py-6 lg:px-8 lg:py-8">
           {profile}

@@ -7,6 +7,7 @@ import {
   addEvidence,
   addInternshipProject,
   addMessage,
+  addNotification,
   addParticipation,
   addSupportRequest,
   findStudentById,
@@ -255,19 +256,31 @@ router.post('/me/goals/:goalId/acknowledge', (req, res, next) => {
 /* ── support between meetings ───────────────────────────────────────────── */
 router.post('/me/support-requests', (req, res, next) => {
   const student = currentStudent(req);
-  const { subject, category, priority } = req.body ?? {};
+  const { subject, category, priority, details } = req.body ?? {};
 
   if (!subject?.trim()) return next(new HttpError(400, 'A request needs a subject'));
   oneOf(category ?? 'Academic', SUPPORT_CATEGORIES, 'Category');
   oneOf(priority ?? 'Medium', SUPPORT_PRIORITIES, 'Priority');
 
-  res.status(201).json(
-    addSupportRequest(student.id, {
-      subject: subject.trim(),
-      category: category ?? 'Academic',
-      priority: priority ?? 'Medium',
-    }),
-  );
+  const created = addSupportRequest(student.id, {
+    subject: subject.trim(),
+    category: category ?? 'Academic',
+    priority: priority ?? 'Medium',
+    details: details?.trim() ?? '',
+  });
+
+  if (student.mentorId) {
+    addNotification({
+      recipientId: student.mentorId,
+      recipientRole: 'mentor',
+      title: 'New Support Request',
+      message: `${student.identity?.name || student.name || 'Student'} raised a support request: ${subject.trim()}`,
+      type: 'ticket_raised',
+      link: 'tickets',
+    });
+  }
+
+  res.status(201).json(created);
 });
 
 router.post('/me/messages', (req, res, next) => {

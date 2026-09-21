@@ -1,5 +1,6 @@
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { Button } from '../ui/Button.jsx';
+import { NotificationBell } from '../notifications/NotificationBell.jsx';
 
 function greeting(name) {
   const h = new Date().getHours();
@@ -7,8 +8,8 @@ function greeting(name) {
   return `Good ${part}, ${name}`;
 }
 
-/** Page heading strip: title, contextual subtitle, actions, and sign-out. */
-export function Topbar({ title, subtitle, actions, onMenu, greet }) {
+/** Page heading strip: title, contextual subtitle, actions, notifications, and sign-out. */
+export function Topbar({ title, subtitle, actions, onMenu, greet, onNavChange }) {
   const { logout, user } = useAuth();
   const displayTitle = greet && user?.name ? greeting(user.name) : title;
 
@@ -33,6 +34,7 @@ export function Topbar({ title, subtitle, actions, onMenu, greet }) {
 
         <div className="flex items-center gap-2.5">
           {actions}
+          <NotificationBell onNavChange={onNavChange} />
           <Button variant="secondary" size="sm" onClick={logout} title={`Signed in as ${user?.email}`}>
             Sign out
           </Button>

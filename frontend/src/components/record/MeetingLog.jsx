@@ -9,6 +9,7 @@ import { ProgressBar } from '../ui/ProgressBar.jsx';
 import { SectionCard } from '../ui/SectionCard.jsx';
 import { Button } from '../ui/Button.jsx';
 import { cx, tone as toneOf } from '../../lib/tone.js';
+import { downloadOverallStudentReview } from '../../lib/overallStudentReviewPdf.js';
 
 /** Month abbreviation → 1-based number. Matches the "DD Mon YYYY" format used by all existing meeting records. */
 const MONTH_NUM = {
@@ -96,9 +97,400 @@ function getKsiLogoDataUrl() {
 }
 
 /**
+ * Asynchronously loads an image from a data URL to get its dimensions.
+ * Resolves with { width, height, aspectRatio } or null if invalid.
+ */
+function loadImageDimensions(dataUrl) {
+  return new Promise((resolve) => {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      if (img.width > 0 && img.height > 0) {
+        resolve({
+          width: img.width,
+          height: img.height,
+          aspectRatio: img.width / img.height,
+        });
+      } else {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Embeds a photo proof image onto a jsPDF document safely preserving aspect ratio.
+ * Fallbacks cleanly if image loading or embedding fails.
+ */
+async function addPhotoProofToPdf(doc, photo, x, y, maxW, maxH) {
+  try {
+    const dimensions = await loadImageDimensions(photo.dataUrl);
+    if (!dimensions || !dimensions.aspectRatio) {
+      return { success: false, height: 0 };
+    }
+    let w = maxW;
+    let h = w / dimensions.aspectRatio;
+    if (h > maxH) {
+      h = maxH;
+      w = h * dimensions.aspectRatio;
+    }
+
+    let format = 'JPEG';
+    if (photo.contentType === 'image/png' || photo.dataUrl.startsWith('data:image/png')) {
+      format = 'PNG';
+    } else if (photo.contentType === 'image/webp' || photo.dataUrl.startsWith('data:image/webp')) {
+      format = 'WEBP';
+    }
+
+    doc.addImage(photo.dataUrl, format, x, y, w, h);
+    return { success: true, width: w, height: h };
+  } catch (err) {
+    console.warn('[MeetingLog] Failed to add photo proof to PDF:', photo?.name, err);
+    return { success: false, height: 0 };
+  }
+}
+
+/**
+ * Shared helper to render meeting sections 1 to 8 onto a jsPDF document.
+ */
+async function renderMeetingSectionsToPdf(doc, meeting, startY, options = {}) {
+  const { isCombined = false, menteeName = '', margin = 14, contentWidth = 182 } = options;
+  let y = startY;
+
+  const addSectionHeading = (title) => {
+    if (y > 260) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentWidth, 6, 'F');
+    doc.text(title, margin + 3, y + 4.2);
+    y += 8;
+  };
+
+  // Summary Table
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      1: { cellWidth: 53 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      3: { cellWidth: 53 },
+    },
+    body: [
+      ['Student / Mentee Name', menteeName || '—', 'Meeting Number', String(meeting.number ?? '—')],
+      ['Meeting Date', String(meeting.date ?? '—'), 'Mode', String(meeting.mode ?? '—')],
+      ['Category', String(meeting.category ?? '—'), 'Duration', String(meeting.duration ?? '—')],
+      ['Next Review Date', String(meeting.nextReviewDate ?? '—'), 'Signed Status', meeting.signed || (meeting.mentorSigned && meeting.studentSigned) ? 'Signed' : 'Pending Signature'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 1. Agenda
+  addSectionHeading('1. Agenda & Scope');
+  const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
+    ? meeting.agenda.map(a => `• ${a}`).join('\n')
+    : '• No agenda items listed.';
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
+  doc.text(agendaLines, margin + 2, y);
+  y += agendaLines.length * 4 + 4;
+
+  // 2. Minutes of Meeting
+  addSectionHeading('2. Minutes of Meeting');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Topics Discussed', meeting.topicsDiscussed || '—'],
+      ['Student Concerns', meeting.studentConcerns || '—'],
+      ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
+      ['Support Required', meeting.supportRequired || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 3. Progress Since Last Meeting
+  addSectionHeading('3. Progress Since Last Meeting');
+  const prog = meeting.progressSinceLastMeeting || {};
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Achievements', prog.achievements || '—'],
+      ['Pending Tasks', prog.pendingTasks || '—'],
+      ['Improvement Observed', prog.improvementObserved || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 4. Action Items
+  addSectionHeading('4. Action Items');
+  const actionItems = meeting.actionItems || [];
+  if (actionItems.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      columns: [
+        { header: '#', dataKey: 'idx' },
+        { header: 'Task', dataKey: 'task' },
+        { header: 'Responsible', dataKey: 'responsible' },
+        { header: 'Target Date', dataKey: 'targetDate' },
+        { header: 'Status', dataKey: 'status' },
+      ],
+      body: actionItems.map((item, idx) => ({
+        idx: idx + 1,
+        task: item.task || '—',
+        responsible: item.responsible || '—',
+        targetDate: item.targetDate || '—',
+        status: item.status || '—',
+      })),
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No action items recorded for this meeting.', margin + 2, y);
+    y += 7;
+  }
+
+  // 5. SMART Goal Progress
+  addSectionHeading('5. SMART Goal Progress');
+  const goalProgress = meeting.goalProgress || [];
+  if (goalProgress.length > 0) {
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 8.5, cellPadding: 2.5 },
+      columns: [
+        { header: '#', dataKey: 'idx' },
+        { header: 'Goal', dataKey: 'goal' },
+        { header: 'Current Status', dataKey: 'status' },
+        { header: 'Progress', dataKey: 'progress' },
+      ],
+      body: goalProgress.map((gp, idx) => ({
+        idx: idx + 1,
+        goal: gp.goal || gp.goalId || '—',
+        status: gp.currentStatus || '—',
+        progress: `${gp.progress ?? 0}%`,
+      })),
+    });
+    y = doc.lastAutoTable.finalY + 5;
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No goal progress recorded for this meeting.', margin + 2, y);
+    y += 7;
+  }
+
+  // 6. Remarks & Review
+  if (y > 210) {
+    doc.addPage();
+    y = margin;
+  }
+  addSectionHeading('6. Remarks & Review');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    pageBreak: 'avoid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: contentWidth - 42 },
+    },
+    body: [
+      ['Mentor Remarks', meeting.mentorRemarks || '—'],
+      ['Student Remarks', meeting.studentRemarks || '—'],
+      ['Next Review Date', meeting.nextReviewDate || '—'],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 7. Verification & Signatures
+  if (y > 235) {
+    doc.addPage();
+    y = margin;
+  }
+  addSectionHeading('7. Verification & Signatures');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    pageBreak: 'avoid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      1: { cellWidth: (contentWidth - 84) / 2 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
+      3: { cellWidth: (contentWidth - 84) / 2 },
+    },
+    body: [
+      [
+        'Mentor Signature',
+        meeting.mentorSigned ? 'Signed' : 'Pending Signature',
+        'Student Signature',
+        meeting.studentSigned ? 'Signed' : 'Pending Signature',
+      ],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // 8. Meeting Evidence
+  addSectionHeading('8. Meeting Evidence');
+  const photoProofs = Array.isArray(meeting.photoProofs) ? meeting.photoProofs : [];
+  const geotag = meeting.geotag || null;
+  const isOnline = meeting.mode === 'Online';
+  const hasEvidence = photoProofs.length > 0 || Boolean(geotag);
+
+  if (isOnline) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text('Meeting Mode: Online', margin + 2, y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Online Evidence: ${hasEvidence ? 'Available' : 'Not available'}`, margin + 45, y);
+    y += 5;
+  }
+
+  if (hasEvidence) {
+    if (photoProofs.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      doc.text(`Attached Photo Proofs (${photoProofs.length}):`, margin + 2, y);
+      y += 5;
+
+      if (isCombined) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        for (const photo of photoProofs) {
+          doc.text(`• ${photo.name || 'Photo proof'} (${photo.contentType || 'image'})`, margin + 4, y);
+          y += 4.5;
+        }
+      } else {
+        for (const photo of photoProofs) {
+          if (y > 235) {
+            doc.addPage();
+            y = margin;
+          }
+          let embedded = false;
+          if (photo.dataUrl) {
+            const result = await addPhotoProofToPdf(doc, photo, margin + 2, y, contentWidth - 4, 45);
+            if (result.success) {
+              embedded = true;
+              y += result.height + 2;
+              doc.setFont('helvetica', 'italic');
+              doc.setFontSize(7.5);
+              doc.setTextColor(100, 116, 139);
+              doc.text(`Photo proof: ${photo.name || 'Image'}`, margin + 2, y);
+              y += 5;
+            }
+          }
+          if (!embedded) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(51, 65, 85);
+            doc.text(`• Photo proof: ${photo.name || 'Attached file'} (Preview unavailable)`, margin + 2, y);
+            y += 5;
+          }
+        }
+      }
+    }
+
+    if (geotag) {
+      if (y > 255) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      doc.text('Captured Geotag Location:', margin + 2, y);
+      y += 5;
+
+      const geoDetails = [];
+      if (geotag.latitude != null) geoDetails.push(`Latitude: ${geotag.latitude}`);
+      if (geotag.longitude != null) geoDetails.push(`Longitude: ${geotag.longitude}`);
+      if (geotag.accuracy != null) geoDetails.push(`Accuracy: ${geotag.accuracy} m`);
+      if (geotag.capturedAt) {
+        const capDate = new Date(geotag.capturedAt);
+        const formattedCap = !isNaN(capDate.getTime()) ? capDate.toLocaleString() : geotag.capturedAt;
+        geoDetails.push(`Captured At: ${formattedCap}`);
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      const geoText = geoDetails.join('  |  ');
+      const geoLines = doc.splitTextToSize(geoText, contentWidth - 4);
+      doc.text(geoLines, margin + 2, y);
+      y += geoLines.length * 4.5 + 2;
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No meeting evidence attached.', margin + 2, y);
+    y += 5;
+  }
+
+  // Disclaimer text
+  if (y > 265) {
+    doc.addPage();
+    y = margin;
+  }
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text(
+    'Note: Attached meeting evidence is recorded for verification purposes and does not independently confirm meeting occurrence.',
+    margin + 2,
+    y
+  );
+  y += 6;
+
+  return y;
+}
+
+/**
  * Generates and triggers a PDF download for a single meeting record.
  * Renders the KSI logo at the top, meeting metadata, agenda, discussion,
- * action items, progress, goal progress, remarks, and signature status.
+ * action items, progress, goal progress, remarks, signature status, and evidence.
  *
  * @param {object} meeting - the decorated meeting object from the API
  * @param {string} menteeName - the mentee's full name for the report header
@@ -160,199 +552,11 @@ async function downloadMeetingReport(meeting, menteeName) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 5;
 
-  const addSectionHeading = (title) => {
-    if (y > 260) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(30, 41, 59);
-    doc.setFillColor(241, 245, 249);
-    doc.rect(margin, y, contentWidth, 6.5, 'F');
-    doc.text(title, margin + 3, y + 4.5);
-    y += 8.5;
-  };
-
-  // 2. Summary Table
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      1: { cellWidth: 53 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      3: { cellWidth: 53 },
-    },
-    body: [
-      ['Mentee Name', menteeName || '—', 'Meeting Number', String(meeting.number ?? '—')],
-      ['Meeting Date', String(meeting.date ?? '—'), 'Mode', String(meeting.mode ?? '—')],
-      ['Category', String(meeting.category ?? '—'), 'Duration', String(meeting.duration ?? '—')],
-      ['Next Review Date', String(meeting.nextReviewDate ?? '—'), 'Signed Status', meeting.signed ? 'Signed ✓' : 'Pending Signature'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 3. Agenda
-  addSectionHeading('1. Agenda & Scope');
-  const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
-    ? meeting.agenda.map(a => `• ${a}`).join('\n')
-    : '• No agenda items listed.';
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(51, 65, 85);
-  const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
-  doc.text(agendaLines, margin + 2, y);
-  y += agendaLines.length * 4 + 4;
-
-  // 4. Minutes of Meeting
-  addSectionHeading('2. Minutes of Meeting');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Topics Discussed', meeting.topicsDiscussed || '—'],
-      ['Student Concerns', meeting.studentConcerns || '—'],
-      ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
-      ['Support Required', meeting.supportRequired || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 5. Progress Since Last Meeting
-  addSectionHeading('3. Progress Since Last Meeting');
-  const prog = meeting.progressSinceLastMeeting || {};
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Achievements', prog.achievements || '—'],
-      ['Pending Tasks', prog.pendingTasks || '—'],
-      ['Improvement Observed', prog.improvementObserved || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 6. Action Items
-  addSectionHeading('4. Action Items');
-  const actionItems = meeting.actionItems || [];
-  if (actionItems.length > 0) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      columns: [
-        { header: '#', dataKey: 'idx' },
-        { header: 'Task', dataKey: 'task' },
-        { header: 'Responsible', dataKey: 'responsible' },
-        { header: 'Target Date', dataKey: 'targetDate' },
-        { header: 'Status', dataKey: 'status' },
-      ],
-      body: actionItems.map((item, idx) => ({
-        idx: idx + 1,
-        task: item.task || '—',
-        responsible: item.responsible || '—',
-        targetDate: item.targetDate || '—',
-        status: item.status || '—',
-      })),
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('No action items recorded for this meeting.', margin + 2, y);
-    y += 7;
-  }
-
-  // 7. SMART Goal Progress
-  addSectionHeading('5. SMART Goal Progress');
-  const goalProgress = meeting.goalProgress || [];
-  if (goalProgress.length > 0) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      columns: [
-        { header: '#', dataKey: 'idx' },
-        { header: 'Goal', dataKey: 'goal' },
-        { header: 'Current Status', dataKey: 'status' },
-        { header: 'Progress', dataKey: 'progress' },
-      ],
-      body: goalProgress.map((gp, idx) => ({
-        idx: idx + 1,
-        goal: gp.goal || gp.goalId || '—',
-        status: gp.currentStatus || '—',
-        progress: `${gp.progress ?? 0}%`,
-      })),
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('No goal progress recorded for this meeting.', margin + 2, y);
-    y += 7;
-  }
-
-  // 8. Remarks & Review
-  addSectionHeading('6. Remarks & Review');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Mentor Remarks', meeting.mentorRemarks || '—'],
-      ['Student Remarks', meeting.studentRemarks || '—'],
-      ['Next Review Date', meeting.nextReviewDate || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 9. Signatures & Verification
-  addSectionHeading('7. Verification & Signatures');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: (contentWidth - 84) / 2 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      3: { cellWidth: (contentWidth - 84) / 2 },
-    },
-    body: [
-      [
-        'Mentor Signature',
-        meeting.mentorSigned ? 'Signed ✓' : 'Pending Signature',
-        'Student Signature',
-        meeting.studentSigned ? 'Signed ✓' : 'Pending Signature',
-      ],
-    ],
+  await renderMeetingSectionsToPdf(doc, meeting, y, {
+    isCombined: false,
+    menteeName,
+    margin,
+    contentWidth,
   });
 
   // Footer on all pages
@@ -375,11 +579,167 @@ async function downloadMeetingReport(meeting, menteeName) {
 }
 
 /**
+ * Generates and triggers a combined PDF report for all meetings currently filtered by date range.
+ *
+ * @param {array} filteredRows - list of meeting objects matching active filter
+ * @param {string} menteeName - mentee full name
+ * @param {string} startDate - filter start date ISO string (YYYY-MM-DD)
+ * @param {string} endDate - filter end date ISO string (YYYY-MM-DD)
+ */
+async function downloadFilteredMeetingReport(filteredRows, menteeName, startDate, endDate) {
+  const cleanMenteeName = String(menteeName || 'Student').trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+  const startSlug = startDate || 'Start';
+  const endSlug = endDate || 'End';
+  const filename = `MMRMS_Meeting_History_${cleanMenteeName}_${startSlug}_to_${endSlug}.pdf`;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  // Header with KSI Logo
+  const logoInfo = await getKsiLogoDataUrl();
+  if (logoInfo && logoInfo.dataUrl) {
+    const logoWidth = 45;
+    const logoHeight = (logoInfo.height / logoInfo.width) * logoWidth;
+    doc.addImage(logoInfo.dataUrl, 'JPEG', margin, y, logoWidth, logoHeight);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin + logoWidth + 6, y + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin + logoWidth + 6, y + 10);
+
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text('MEETING HISTORY REPORT', margin + logoWidth + 6, y + 16);
+
+    y += Math.max(logoHeight, 18) + 4;
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin, y + 5);
+    doc.setFontSize(9.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin, y + 10);
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('MEETING HISTORY REPORT', margin, y + 16);
+    y += 22;
+  }
+
+  // Divider Line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 5;
+
+  // Summary Metrics calculation
+  const totalMeetings = filteredRows.length;
+  const onlineCount = filteredRows.filter((m) => m.mode === 'Online').length;
+  const offlineCount = filteredRows.filter((m) => m.mode === 'Offline' || m.mode !== 'Online').length;
+  const signedCount = filteredRows.filter((m) => m.signed || (m.mentorSigned && m.studentSigned)).length;
+  const openActionItemCount = filteredRows.reduce((acc, m) => {
+    const items = Array.isArray(m.actionItems) ? m.actionItems : [];
+    return acc + items.filter((a) => a.status && a.status !== 'Completed').length;
+  }, 0);
+
+  const rangeLabel = startDate && endDate
+    ? `${startDate} to ${endDate}`
+    : startDate
+    ? `From ${startDate}`
+    : endDate
+    ? `Up to ${endDate}`
+    : 'All dates';
+
+  // Report Summary Table
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 40 },
+      1: { cellWidth: 51 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 40 },
+      3: { cellWidth: 51 },
+    },
+    body: [
+      ['Student / Mentee Name', menteeName || '—', 'Selected Date Range', rangeLabel],
+      ['Total Meetings Included', String(totalMeetings), 'Signed Meetings', `${signedCount} of ${totalMeetings}`],
+      ['Online Meetings', String(onlineCount), 'Offline Meetings', String(offlineCount)],
+      ['Open Action Items', String(openActionItemCount), 'Generated On', new Date().toLocaleDateString()],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 6;
+
+  // Render each filtered meeting sequentially
+  for (let i = 0; i < filteredRows.length; i++) {
+    const meeting = filteredRows[i];
+
+    if (y > 210) {
+      doc.addPage();
+      y = margin;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(255, 255, 255);
+    doc.setFillColor(30, 41, 59);
+    doc.rect(margin, y, contentWidth, 7, 'F');
+    doc.text(`MEETING #${meeting.number} — ${meeting.date || 'Date N/A'}`, margin + 4, y + 5);
+    y += 9;
+
+    y = await renderMeetingSectionsToPdf(doc, meeting, y, {
+      isCombined: true,
+      menteeName,
+      margin,
+      contentWidth,
+    });
+
+    y += 6;
+  }
+
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 287, pageWidth - margin, 287);
+
+    doc.text('Kumaraguru School of Innovation — MMRMS Meeting History Report', margin, 291);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 291, { align: 'right' });
+  }
+
+  doc.save(filename);
+}
+
+/**
+ * Generates and triggers a comprehensive overall student meeting review PDF.
+
+
+/**
  * Section 12 — the Mentor Meeting Log. Each meeting renders as the printed
  * minutes: header, agenda, discussion, action items, progress, goal progress,
  * remarks, next review and the signature line.
  */
-export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction }) {
+export function MeetingLog({ meetings, menteeName, recordBook, onUpdateAction, savingAction }) {
   const [openId, setOpenId] = useState(meetings.rows[0]?.id ?? null);
 
   // ── Date-range filter state ───────────────────────────────────────────────
@@ -391,6 +751,10 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
   const [appliedEnd,   setAppliedEnd]   = useState('');
   // validation error shown when start > end
   const [filterError, setFilterError] = useState('');
+  const [downloadingFiltered, setDownloadingFiltered] = useState(false);
+  const [filteredReportError, setFilteredReportError] = useState(null);
+  const [downloadingOverall, setDownloadingOverall] = useState(false);
+  const [overallReportError, setOverallReportError] = useState(null);
 
   /** Meetings visible after applying the current filter. Never mutates meetings.rows. */
   const filteredRows = useMemo(() => {
@@ -424,6 +788,38 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
     setAppliedStart('');
     setAppliedEnd('');
     setFilterError('');
+    setFilteredReportError(null);
+    setOverallReportError(null);
+  }
+
+  async function handleDownloadFiltered() {
+    setFilteredReportError(null);
+    setDownloadingFiltered(true);
+    try {
+      await downloadFilteredMeetingReport(filteredRows, menteeName, appliedStart, appliedEnd);
+    } catch (err) {
+      console.error('[MeetingLog] Download filtered report failed:', err);
+      setFilteredReportError('Failed to generate report. Please try again.');
+    } finally {
+      setDownloadingFiltered(false);
+    }
+  }
+
+  async function handleDownloadOverall() {
+    setOverallReportError(null);
+    setDownloadingOverall(true);
+    try {
+      const payload = recordBook || {
+        identity: { name: menteeName },
+        meetings: { rows: filteredRows },
+      };
+      await downloadOverallStudentReview(payload);
+    } catch (err) {
+      console.error('[MeetingLog] Download overall review failed:', err);
+      setOverallReportError('Failed to generate overall review. Please try again.');
+    } finally {
+      setDownloadingOverall(false);
+    }
   }
 
   const isFiltered = Boolean(appliedStart || appliedEnd);
@@ -526,9 +922,39 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
             </p>
           )}
 
-          {isFiltered && !filterError && (
-            <p className="mt-2 text-[11px] text-muted">
-              Showing {filteredRows.length} of {meetings.total} meeting{meetings.total === 1 ? '' : 's'}
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-2.5">
+            <p className="text-[11px] text-muted">
+              {isFiltered
+                ? `Showing ${filteredRows.length} of ${meetings.total} meeting${meetings.total === 1 ? '' : 's'}`
+                : `${meetings.total} meeting${meetings.total === 1 ? '' : 's'} available`}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                id="download-overall-review"
+                variant="secondary"
+                size="sm"
+                disabled={downloadingOverall}
+                onClick={handleDownloadOverall}
+              >
+                {downloadingOverall ? 'Generating Review...' : 'Download Overall Review'}
+              </Button>
+              {isFiltered && !filterError && filteredRows.length > 0 && (
+                <Button
+                  id="download-filtered-report"
+                  variant="secondary"
+                  size="sm"
+                  disabled={downloadingFiltered}
+                  onClick={handleDownloadFiltered}
+                >
+                  {downloadingFiltered ? 'Generating Report...' : 'Download Filtered Report'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {(filteredReportError || overallReportError) && (
+            <p role="alert" className="mt-2 text-[11.5px] font-semibold text-bad-ink">
+              {filteredReportError || overallReportError}
             </p>
           )}
         </div>

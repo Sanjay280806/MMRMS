@@ -417,7 +417,7 @@ export function buildStudentRecordBook(student) {
     support: {
       requests: (student.supportRequests ?? []).map((r) => ({
         ...r,
-        tone: { Raised: 'amber', Replied: 'indigo', Resolved: 'green' }[r.status] ?? 'slate',
+        tone: { Raised: 'amber', 'In Progress': 'indigo', Replied: 'indigo', Resolved: 'green' }[r.status] ?? 'slate',
         priorityTone: { High: 'rose', Medium: 'indigo', Low: 'slate' }[r.priority] ?? 'slate',
       })),
       messages: student.messages ?? [],

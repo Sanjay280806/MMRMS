@@ -28,6 +28,8 @@ export function ContactMentor({ support, mentor, onRequestAdded, onMessageAdded 
   const [sent, setSent] = useState(false);
   const [error, setError] = useState(null);
 
+  const [expandedRequestId, setExpandedRequestId] = useState(null);
+
   async function submit(event) {
     event.preventDefault();
     if (!subject.trim() || sending) return;
@@ -38,7 +40,7 @@ export function ContactMentor({ support, mentor, onRequestAdded, onMessageAdded 
       onRequestAdded(
         await api('/student/me/support-requests', {
           method: 'POST',
-          body: { subject: subject.trim(), category, priority },
+          body: { subject: subject.trim(), category, priority, details: message.trim() },
         }),
       );
 
@@ -112,37 +114,94 @@ export function ContactMentor({ support, mentor, onRequestAdded, onMessageAdded 
 
       <div className="space-y-5">
         <SectionTable title="My Requests" subtitle={`${support.requests.length} raised this term`}>
-          <DataTable
-            rows={support.requests}
-            rowKey={(r) => r.id}
-            empty={<EmptyState title="No requests yet" description="Anything you raise appears here." />}
-            columns={[
-              {
-                key: 'subject',
-                header: 'Request',
-                render: (r) => (
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{r.subject}</p>
-                    <p className="tnum mt-0.5 text-[11.5px] text-muted">
-                      {r.id} · {r.category} · {r.raisedOn}
-                    </p>
+          <div className="divide-y divide-line">
+            {support.requests.length === 0 ? (
+              <EmptyState title="No requests yet" description="Anything you raise appears here." />
+            ) : (
+              support.requests.map((r) => {
+                const isExpanded = expandedRequestId === r.id;
+                const comments = r.comments ?? [];
+                const hasComments = comments.length > 0;
+
+                return (
+                  <div key={r.id} className="p-4 space-y-3 transition-colors hover:bg-surface/50">
+                    <div
+                      className="flex items-start justify-between gap-3 cursor-pointer"
+                      onClick={() => setExpandedRequestId(isExpanded ? null : r.id)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="tnum font-mono text-xs font-semibold text-brand-600">{r.id}</span>
+                          <span className="text-xs font-semibold text-muted-strong">{r.category}</span>
+                          <Badge tone={r.priorityTone ?? 'slate'} size="sm">{r.priority}</Badge>
+                        </div>
+                        <p className="mt-1 font-semibold text-ink text-sm">{r.subject}</p>
+                        <p className="tnum mt-0.5 text-[11.5px] text-muted">Created {r.raisedOn}</p>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge tone={r.tone}>{r.status}</Badge>
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-brand-600 hover:underline"
+                        >
+                          {isExpanded ? 'Hide details ▲' : 'View responses ▼'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded details & comment thread */}
+                    {isExpanded && (
+                      <div className="rounded-card border border-line bg-surface/70 p-3.5 space-y-3 mt-2 text-xs">
+                        {r.details && (
+                          <div className="border-b border-line/60 pb-2.5">
+                            <span className="font-bold text-muted uppercase text-[10px] tracking-wider block mb-1">Original Request Context</span>
+                            <p className="text-ink font-medium leading-relaxed whitespace-pre-wrap">{r.details}</p>
+                          </div>
+                        )}
+
+                        <div>
+                          <span className="font-bold text-muted uppercase text-[10px] tracking-wider block mb-2">Mentor Responses & Activity</span>
+                          
+                          {!hasComments && !r.response && (
+                            <p className="text-muted italic">No responses from mentor yet.</p>
+                          )}
+
+                          {!hasComments && r.response && (
+                            <div className="rounded border border-indigo-200 bg-indigo-50/50 p-2.5">
+                              <span className="font-bold text-indigo-900 block mb-1">Mentor Response</span>
+                              <p className="text-ink leading-relaxed whitespace-pre-wrap">{r.response}</p>
+                            </div>
+                          )}
+
+                          {hasComments && (
+                            <div className="space-y-2">
+                              {comments.map((cmt) => (
+                                <div
+                                  key={cmt.id}
+                                  className={`rounded border p-2.5 space-y-1 ${
+                                    cmt.authorRole === 'mentor'
+                                      ? 'border-indigo-200 bg-indigo-50/50'
+                                      : 'border-slate-200 bg-white'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="font-bold text-ink">{cmt.authorName} ({cmt.authorRole})</span>
+                                    <span className="tnum text-muted">{cmt.createdAt}</span>
+                                  </div>
+                                  <p className="text-ink leading-relaxed whitespace-pre-wrap">{cmt.message}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ),
-              },
-              {
-                key: 'priority',
-                header: 'Priority',
-                align: 'right',
-                render: (r) => <Badge tone={r.priorityTone}>{r.priority}</Badge>,
-              },
-              {
-                key: 'status',
-                header: 'Status',
-                align: 'right',
-                render: (r) => <Badge tone={r.tone}>{r.status}</Badge>,
-              },
-            ]}
-          />
+                );
+              })
+            )}
+          </div>
         </SectionTable>
 
         <SectionCard title="Messages" subtitle={mentor?.name}>

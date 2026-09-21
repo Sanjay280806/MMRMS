@@ -17,6 +17,7 @@ import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
 import { Announcements } from './sections/Announcements.jsx';
+import { TicketQueue } from './sections/TicketQueue.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
 import { ChipGroup, TextArea, TextField } from '../../components/ui/Field.jsx';
 import { api } from '../../api/client.js';
@@ -24,6 +25,7 @@ import { api } from '../../api/client.js';
 const TITLES = {
   dashboard: 'Mentor Dashboard',
   mentees: 'My Mentees',
+  tickets: 'Support Requests',
   attendance: 'Attendance Watch',
   arrears: 'Arrear Watch',
   wellbeing: 'Well-being Watch',
@@ -124,6 +126,7 @@ export default function MentorConsole() {
     {
       label: 'Mentoring',
       items: [
+        { key: 'tickets', label: 'Support Requests' },
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
         { key: 'goals', label: 'SMART Goals' },
         { key: 'parents', label: 'Parent Log' },
@@ -155,7 +158,7 @@ export default function MentorConsole() {
       title={menteeId ? 'Mentee Record Book' : TITLES[section]}
       subtitle={`${data.institution.recordBook} · ${data.institution.term} · ${stats.reviewCycle} review cycle`}
       greet={!menteeId && section === 'dashboard'}
-      actions={<Button size="sm" onClick={() => setRecordingMeeting(true)}>＋ Record a Meeting</Button>}
+      actions={<Button size="sm" onClick={() => setRecordingMeeting(true)}>＋ Conduct Meeting</Button>}
       profile={
         <ProfileHeader
           initials={mentor.initials}
@@ -257,6 +260,7 @@ export default function MentorConsole() {
             />
           )}
 
+          {section === 'tickets' && <TicketQueue onOpenMentee={openMentee} />}
           {section === 'actions' && <ActionItemQueue onOpenMentee={openMentee} />}
           {section === 'goals' && <GoalsOverview onOpenMentee={openMentee} />}
           {section === 'parents' && <ParentLog />}
@@ -515,10 +519,10 @@ function MeetingComposer({ onClose, onRecorded }) {
       >
         <header className="shrink-0 border-b border-line px-5 py-4">
           <h3 id="meeting-composer-title" className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">
-            Record Mentoring Session
+            Conduct Mentoring Session
           </h3>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Record the complete Section 12 minutes, follow-ups, signatures, photo proof, and meeting location.
+            Conduct and record the complete Section 12 mentoring session, follow-ups, signatures, photo proof, and meeting location.
           </p>
         </header>
 

@@ -331,19 +331,51 @@ export function acknowledgeGoal(studentId, goalId) {
 }
 
 /** Support request raised between meetings. */
-export function addSupportRequest(studentId, { subject, category, priority }) {
+export function addSupportRequest(studentId, { subject, category, priority, details }) {
   const student = students.get(studentId);
   if (!student) return null;
   student.supportRequests ??= [];
   const request = {
     id: `SR-${103 + student.supportRequests.length}`,
     subject,
+    details: details ?? '',
     category,
     priority,
     raisedOn: 'Just now',
     status: 'Raised',
+    comments: [],
   };
   student.supportRequests.unshift(request);
+  return request;
+}
+
+/** Update support request status, add mentor response, or append to comment thread. */
+export function updateSupportRequest(studentId, requestId, { status, response, message, authorRole, authorId, authorName }) {
+  const student = students.get(studentId);
+  if (!student) return null;
+  student.supportRequests ??= [];
+  const request = student.supportRequests.find((r) => r.id === requestId);
+  if (!request) return null;
+
+  if (status && ['Raised', 'In Progress', 'Replied', 'Resolved'].includes(status)) {
+    request.status = status;
+  }
+
+  request.comments ??= [];
+  const commentText = (response ?? message ?? '').trim();
+  if (commentText) {
+    const commentObj = {
+      id: nextId('cmt'),
+      authorRole: authorRole ?? 'mentor',
+      authorId: authorId ?? 'm-1',
+      authorName: authorName ?? 'Mentor',
+      message: commentText,
+      createdAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    request.comments.push(commentObj);
+    request.response = commentText;
+  }
+
   return request;
 }
 
@@ -355,3 +387,52 @@ export function addMessage(studentId, text) {
   student.messages.push(message);
   return message;
 }
+
+/* ── notifications ──────────────────────────────────────────────────────── */
+
+const notifications = [];
+
+export function addNotification({ recipientId, recipientRole, title, message, type, link }) {
+  if (!recipientId || !title || !message) return null;
+  const notif = {
+    id: nextId('notif'),
+    recipientId,
+    recipientRole: recipientRole ?? 'student',
+    title: title.trim(),
+    message: message.trim(),
+    type: type ?? 'system',
+    link: link ?? '',
+    read: false,
+    createdAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+  notifications.unshift(notif);
+  return notif;
+}
+
+export function listNotifications(recipientId, recipientRole) {
+  if (!recipientId) return [];
+  return notifications.filter(
+    (n) => n.recipientId === recipientId && (!recipientRole || n.recipientRole === recipientRole),
+  );
+}
+
+export function markNotificationRead(recipientId, recipientRole, notificationId) {
+  const notif = notifications.find(
+    (n) => n.id === notificationId && n.recipientId === recipientId && (!recipientRole || n.recipientRole === recipientRole),
+  );
+  if (!notif) return null;
+  notif.read = true;
+  return notif;
+}
+
+export function markAllNotificationsRead(recipientId, recipientRole) {
+  let count = 0;
+  for (const n of notifications) {
+    if (n.recipientId === recipientId && (!recipientRole || n.recipientRole === recipientRole) && !n.read) {
+      n.read = true;
+      count += 1;
+    }
+  }
+  return count;
+}
+

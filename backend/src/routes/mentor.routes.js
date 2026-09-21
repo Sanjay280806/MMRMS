@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
-import { addMentorMeeting, findMenteeById, findMentorById, listMentees } from '../data/store.js';
+import { addMentorMeeting, addNotification, findMenteeById, findMentorById, listMentees, updateSupportRequest } from '../data/store.js';
 import {
   buildActionItemQueue,
   buildGoalOverview,
@@ -204,6 +204,16 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
       status: item.status,
     })),
   });
+
+  addNotification({
+    recipientId: mentee.id,
+    recipientRole: 'student',
+    title: 'Meeting Recorded',
+    message: `A mentoring meeting was recorded for ${date.trim()}.`,
+    type: 'meeting_recorded',
+    link: 'meetings',
+  });
+
   res.status(201).json(meeting);
 });
 
@@ -303,10 +313,87 @@ router.post('/me/meetings/batch', (req, res, next) => {
         status: item.status,
       })),
     });
+    addNotification({
+      recipientId: mentee.id,
+      recipientRole: 'student',
+      title: 'Meeting Recorded',
+      message: `A mentoring meeting was recorded for ${date.trim()}.`,
+      type: 'meeting_recorded',
+      link: 'meetings',
+    });
     createdMeetings.push(meeting);
   }
 
   res.status(201).json({ count: createdMeetings.length, meetings: createdMeetings });
+});
+
+router.get('/me/support-requests', (req, res) => {
+  const mentor = currentMentor(req);
+  const mentees = listMentees(mentor.id);
+  const requests = [];
+
+  for (const mentee of mentees) {
+    for (const reqItem of mentee.supportRequests ?? []) {
+      requests.push({
+        ...reqItem,
+        studentId: mentee.id,
+        studentName: mentee.identity?.name ?? mentee.name,
+        rollNumber: mentee.identity?.rollNumber ?? mentee.rollNumber,
+        department: mentee.identity?.department ?? mentee.department,
+        year: mentee.identity?.year ?? mentee.year,
+        tone: { Raised: 'amber', 'In Progress': 'indigo', Replied: 'indigo', Resolved: 'green' }[reqItem.status] ?? 'slate',
+        priorityTone: { High: 'rose', Medium: 'indigo', Low: 'slate' }[reqItem.priority] ?? 'slate',
+      });
+    }
+  }
+
+  res.json(requests);
+});
+
+router.patch('/me/mentees/:menteeId/support-requests/:requestId', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const mentee = findMenteeById(req.params.menteeId);
+  if (!mentee || mentee.mentorId !== mentor.id) {
+    return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
+  }
+
+  const { status, response, message } = req.body ?? {};
+  if (status && !['Raised', 'In Progress', 'Replied', 'Resolved'].includes(status)) {
+    return next(new HttpError(400, 'Status must be Raised, In Progress, Replied, or Resolved'));
+  }
+
+  const updated = updateSupportRequest(mentee.id, req.params.requestId, {
+    status,
+    response,
+    message,
+    authorRole: 'mentor',
+    authorId: mentor.id,
+    authorName: mentor.name,
+  });
+
+  if (!updated) {
+    return next(new HttpError(404, `Support request ${req.params.requestId} not found`));
+  }
+
+  addNotification({
+    recipientId: mentee.id,
+    recipientRole: 'student',
+    title: 'Support Request Updated',
+    message: `Your mentor responded to your support request: ${updated.subject}`,
+    type: 'ticket_reply',
+    link: 'contact',
+  });
+
+  res.json({
+    ...updated,
+    studentId: mentee.id,
+    studentName: mentee.identity?.name ?? mentee.name,
+    rollNumber: mentee.identity?.rollNumber ?? mentee.rollNumber,
+    department: mentee.identity?.department ?? mentee.department,
+    year: mentee.identity?.year ?? mentee.year,
+    tone: { Raised: 'amber', 'In Progress': 'indigo', Replied: 'indigo', Resolved: 'green' }[updated.status] ?? 'slate',
+    priorityTone: { High: 'rose', Medium: 'indigo', Low: 'slate' }[updated.priority] ?? 'slate',
+  });
 });
 
 router.get('/me/goals', (req, res) => {
