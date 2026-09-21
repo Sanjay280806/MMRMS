@@ -53,7 +53,8 @@ export default function Login() {
     setError(null);
     try {
       const result = await login(email.trim(), password);
-      navigate(location.state?.from?.pathname ?? homeFor(result.user.role), { replace: true });
+      const userRole = result?.user?.role || result?.role?.key || result?.role || 'mentor';
+      navigate(location.state?.from?.pathname ?? homeFor(userRole), { replace: true });
     } catch (err) {
       if (err.status === 423) {
         setLockedFor(err.body?.retryInSeconds ?? 900);

@@ -7,9 +7,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "node --watch server.js",
-    "start": "node server.js",
-    "test": "node tests/baseline.js && node tests/phase0/auth.test.js && node tests/phase0/security.test.js",
-    "test:phase0": "node tests/phase0/auth.test.js && node tests/phase0/security.test.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

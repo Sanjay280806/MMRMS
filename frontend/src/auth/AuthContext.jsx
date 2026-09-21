@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, setToken } from '../api/client.js';
+import { api, getToken, setToken } from '../api/client.js';
 
 const AuthContext = createContext(null);
 
@@ -7,23 +7,37 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null); // { user, role }
   const [restoring, setRestoring] = useState(true);
 
-  // Re-establish session on mount via refresh cookie
+  // Re-establish the session: first try /api/auth/refresh with httpOnly cookie.
+  // If no cookie, fall back to stored token with /api/auth/me.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const res = await api('/auth/refresh', {
-          method: 'POST',
-          auth: false,
-          retry: false,
-        });
-        if (active && res) {
-          setToken(res.accessToken ?? res.token);
-          setSession({ user: res.user, role: res.role });
+        const refreshed = await api('/auth/refresh', { method: 'POST', auth: false });
+        const refData = (refreshed && refreshed.success && refreshed.data) ? refreshed.data : refreshed;
+        if (active && (refData?.accessToken || refData?.token)) {
+          const tok = refData.accessToken || refData.token;
+          setToken(tok);
+          setSession({ user: refData.user, role: refData.role });
+          setRestoring(false);
+          return;
         }
       } catch {
+        // Refresh cookie not present or expired; try token restore
+      }
+
+      const storedToken = getToken();
+      if (!storedToken) {
+        if (active) setRestoring(false);
+        return;
+      }
+
+      try {
+        const me = await api('/auth/me');
+        const meData = (me && me.success && me.data) ? me.data : me;
+        if (active) setSession({ user: meData.user, role: meData.role });
+      } catch {
         setToken(null);
-        setSession(null);
       } finally {
         if (active) setRestoring(false);
       }
@@ -39,16 +53,20 @@ export function AuthProvider({ children }) {
       auth: false,
       body: { email, password },
     });
-    setToken(result.accessToken ?? result.token);
-    setSession({ user: result.user, role: result.role });
-    return result;
+    const data = (result && result.success && result.data) ? result.data : result;
+    const user = data?.user || result?.user;
+    const role = data?.role || result?.role;
+    const token = data?.accessToken || data?.token || result?.accessToken || result?.token;
+    setToken(token);
+    setSession({ user, role });
+    return { ...result, ...data, user, role, token, accessToken: token };
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await api('/auth/logout', { method: 'POST', auth: false, retry: false });
+      await api('/auth/logout', { method: 'POST', auth: false });
     } catch {
-      // Ignore network errors on logout
+      // Ignore errors on logout
     } finally {
       setToken(null);
       setSession(null);
