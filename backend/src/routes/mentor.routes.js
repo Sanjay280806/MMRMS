@@ -333,14 +333,30 @@ router.get('/me/support-requests', (req, res) => {
   const requests = [];
 
   for (const mentee of mentees) {
-    for (const reqItem of mentee.supportRequests ?? []) {
+    const reqsMap = new Map();
+    for (const r of mentee.supportRequests ?? []) {
+      reqsMap.set(r.id, r);
+    }
+    if (mentee.recordBook?.supportRequests) {
+      for (const r of mentee.recordBook.supportRequests) {
+        reqsMap.set(r.id, r);
+      }
+    }
+
+    const sName = mentee.identity?.name ?? mentee.name ?? 'Student';
+    const sRoll = mentee.identity?.rollNumber ?? mentee.rollNumber ?? '';
+    const sDept = mentee.identity?.department ?? mentee.department ?? '';
+    const sYear = mentee.identity?.year ?? mentee.year ?? '';
+
+    for (const reqItem of reqsMap.values()) {
       requests.push({
         ...reqItem,
         studentId: mentee.id,
-        studentName: mentee.identity?.name ?? mentee.name,
-        rollNumber: mentee.identity?.rollNumber ?? mentee.rollNumber,
-        department: mentee.identity?.department ?? mentee.department,
-        year: mentee.identity?.year ?? mentee.year,
+        studentName: sName,
+        student: sName,
+        rollNumber: sRoll,
+        department: sDept,
+        year: sYear,
         tone: { Raised: 'amber', 'In Progress': 'indigo', Replied: 'indigo', Resolved: 'green' }[reqItem.status] ?? 'slate',
         priorityTone: { High: 'rose', Medium: 'indigo', Low: 'slate' }[reqItem.priority] ?? 'slate',
       });

@@ -40,11 +40,19 @@ export function TicketQueue({ onOpenMentee }) {
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      const matchSubject = (t.subject ?? '').toLowerCase().includes(q);
-      const matchStudent = (t.studentName ?? '').toLowerCase().includes(q);
-      const matchRoll = (t.rollNumber ?? '').toLowerCase().includes(q);
-      const matchId = (t.id ?? '').toLowerCase().includes(q);
-      if (!matchSubject && !matchStudent && !matchRoll && !matchId) return false;
+      const studentNameStr = String(t.studentName ?? t.student ?? t.name ?? t.menteeName ?? '').toLowerCase();
+      const rollNumberStr = String(t.rollNumber ?? '').toLowerCase();
+      const subjectStr = String(t.subject ?? '').toLowerCase();
+      const detailsStr = String(t.details ?? '').toLowerCase();
+      const idStr = String(t.id ?? '').toLowerCase();
+
+      const matchStudent = studentNameStr.includes(q);
+      const matchRoll = rollNumberStr.includes(q);
+      const matchSubject = subjectStr.includes(q);
+      const matchDetails = detailsStr.includes(q);
+      const matchId = idStr.includes(q);
+
+      if (!matchStudent && !matchRoll && !matchSubject && !matchDetails && !matchId) return false;
     }
     return true;
   });
