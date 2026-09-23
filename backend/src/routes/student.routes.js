@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
 import {
   acknowledgeGoal,
+  addActivity,
   addCertification,
   addEvidence,
   addInternshipProject,
@@ -16,6 +17,7 @@ import {
   updateSkillRating,
 } from '../data/store.js';
 import { buildStudentRecordBook } from '../services/student.js';
+import { ACTIVITY_AREAS } from '../services/student.js';
 import {
   ACTION_STATUSES,
   EXTRA_CURRICULAR_CATEGORIES,
@@ -102,6 +104,38 @@ router.patch('/me/self-assessment', (req, res, next) => {
 
   if (!Object.keys(patch).length) return next(new HttpError(400, 'Nothing to update'));
   res.json(updateSelfAssessment(student.id, patch));
+});
+
+/* ── Activities & Achievements (unified growth section) ─────────────────── */
+router.post('/me/activities', (req, res, next) => {
+  const student = currentStudent(req);
+  const body = req.body ?? {};
+  const evidence = validateEvidenceFiles(body.evidence, next);
+  if (evidence === null) return;
+
+  const area = body.area?.trim();
+  if (!area) return next(new HttpError(400, 'Area of participation is required'));
+
+  // For 'Others', a custom area name is required
+  if (area === 'Others') {
+    if (!body.customArea?.trim()) return next(new HttpError(400, 'Please specify your area of participation'));
+  } else if (!ACTIVITY_AREAS.includes(area)) {
+    return next(new HttpError(400, `Area must be one of: ${ACTIVITY_AREAS.join(', ')}`));
+  }
+
+  if (!body.activityName?.trim()) return next(new HttpError(400, 'Activity name is required'));
+
+  res.status(201).json(
+    addActivity(student.id, {
+      area,
+      customArea: area === 'Others' ? body.customArea.trim() : null,
+      activityName: body.activityName.trim(),
+      description: body.description?.trim() || null,
+      achievement: body.achievement?.trim() || null,
+      date: body.date?.trim() || null,
+      evidence,
+    }),
+  );
 });
 
 /* ── Section 6 — Participation Record ───────────────────────────────────── */

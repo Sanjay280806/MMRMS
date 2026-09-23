@@ -207,6 +207,22 @@ export function addMentorMeeting(menteeId, entry) {
 
 /* ── student writes ────────────────────────────────────────────────────── */
 
+/** Unified Activities & Achievements — replaces Participation, Certifications, Internship sections. */
+export function addActivity(studentId, entry) {
+  const student = students.get(studentId);
+  if (!student) return null;
+  student.activities ??= [];
+  const { evidence: evidenceFiles = [], ...rest } = entry;
+  const record = {
+    id: nextId('act'),
+    createdAt: new Date().toISOString(),
+    evidence: normalizeEvidenceFiles(evidenceFiles),
+    ...rest,
+  };
+  student.activities.unshift(record);
+  return record;
+}
+
 /** Section 6 — Participation Record. */
 export function addParticipation(studentId, group, entry) {
   const student = students.get(studentId);
