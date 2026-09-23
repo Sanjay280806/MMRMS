@@ -75,7 +75,6 @@ export function Roster({ onOpenMentee }) {
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {m.flagReason && <Badge tone={m.flagTone}>{m.flagReason}</Badge>}
                   {m.meetingsOverdue > 0 && <Badge tone="rose">{m.meetingsOverdue} overdue</Badge>}
-                  {m.wellbeingConcerns > 0 && <Badge tone="amber">{m.wellbeingConcerns} well-being</Badge>}
                 </div>
 
                 <div className="mt-auto flex items-center justify-between border-t border-line pt-3 text-[11.5px]">

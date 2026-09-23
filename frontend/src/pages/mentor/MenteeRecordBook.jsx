@@ -10,9 +10,6 @@ import { HealthPanel } from '../../components/record/HealthPanel.jsx';
 import {
   AcademicBackground,
   Aspirations,
-  MentorAssessment,
-  SelfAssessment,
-  SkillAssessment,
 } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
@@ -27,20 +24,17 @@ import {
   ParentInteractionLog,
   ParticipationRecord,
   PlacementReadiness,
-  WellbeingReview,
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
-import { GoalPanel } from '../../components/record/Goals.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { useResource } from '../../hooks/useResource.js';
 
 const TABS = [
   { value: 'profile', label: 'Profile & Background' },
-  { value: 'skills', label: 'Skills & Assessment' },
   { value: 'academics', label: 'Academics' },
   { value: 'growth', label: 'Growth & Career' },
-  { value: 'support', label: 'Well-being & Parents' },
-  { value: 'meetings', label: 'Meetings & Goals' },
+  { value: 'support', label: 'Parent Interactions' },
+  { value: 'meetings', label: 'Meeting Log' },
 ];
 
 /**
@@ -147,16 +141,6 @@ export function MenteeRecordBook({ menteeId, onBack }) {
         </div>
       )}
 
-      {tab === 'skills' && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SkillAssessment skills={data.sectionOne.skillAssessment} />
-          <div className="space-y-5">
-            <SelfAssessment assessment={data.sectionOne.selfAssessment} />
-            <MentorAssessment assessment={data.sectionOne.mentorAssessment} />
-          </div>
-        </div>
-      )}
-
       {tab === 'academics' && (
         <div className="space-y-5">
           <div className="grid gap-5 lg:grid-cols-3">
@@ -189,7 +173,6 @@ export function MenteeRecordBook({ menteeId, onBack }) {
 
       {tab === 'support' && (
         <div className="space-y-5">
-          <WellbeingReview wellbeing={data.wellbeing} />
           <ParentInteractionLog parentInteractions={data.parentInteractions} />
         </div>
       )}
@@ -197,7 +180,6 @@ export function MenteeRecordBook({ menteeId, onBack }) {
       {tab === 'meetings' && (
         <div className="space-y-5">
           <MeetingLog meetings={data.meetings} />
-          <GoalPanel goals={data.goals} />
         </div>
       )}
     </div>

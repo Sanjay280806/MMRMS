@@ -39,10 +39,9 @@ export function MentorDashboard({ data, onOpenMentee }) {
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-3">
         <WatchTile label="Attendance shortfalls" value={stats.attendanceShortfalls} tone="amber" />
         <WatchTile label="Standing arrears" value={stats.standingArrears} tone="indigo" />
-        <WatchTile label="Well-being concerns" value={stats.wellbeingConcerns} tone="amber" />
         <WatchTile label="Parent contacts logged" value={stats.parentContactsThisTerm} tone="green" />
       </div>
 

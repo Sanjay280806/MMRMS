@@ -135,27 +135,7 @@ function MeetingEntry({ meeting, open, onToggle, onUpdateAction, savingAction })
             />
           </div>
 
-          {meeting.goalProgress.length > 0 && (
-            <div>
-              <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">
-                SMART Goal Progress
-              </p>
-              <ul className="space-y-3">
-                {meeting.goalProgress.map((gp) => (
-                  <li key={gp.goalId} className="rounded-xl border border-line bg-white p-3.5">
-                    <p className="text-[12.5px] font-semibold text-ink">{gp.goal}</p>
-                    <p className="mt-0.5 text-[11.5px] text-muted">{gp.currentStatus}</p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <ProgressBar className="flex-1" percent={gp.progress} tone="indigo" height="h-1.5" />
-                      <span className="tnum text-[11.5px] font-semibold text-muted-strong">
-                        {gp.progress}%
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Remark label="Mentor Remarks" text={meeting.mentorRemarks} tone="indigo" />

@@ -12,7 +12,6 @@ import { MentorDashboard } from './sections/MentorDashboard.jsx';
 import { Roster } from './sections/Roster.jsx';
 import { WatchList } from './sections/WatchList.jsx';
 import { ActionItemQueue } from './sections/ActionItemQueue.jsx';
-import { GoalsOverview } from './sections/GoalsOverview.jsx';
 import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
@@ -26,10 +25,8 @@ const TITLES = {
   mentees: 'My Mentees',
   attendance: 'Attendance Watch',
   arrears: 'Arrear Watch',
-  wellbeing: 'Well-being Watch',
   overdue: 'Overdue Meetings',
   actions: 'Action Items',
-  goals: 'SMART Goals',
   parents: 'Parent Interaction Log',
   reports: 'Term Reports',
   timeline: 'Activity Timeline',
@@ -117,7 +114,6 @@ export default function MentorConsole() {
       items: [
         { key: 'attendance', label: 'Attendance', badge: stats.attendanceShortfalls, badgeTone: 'rose' },
         { key: 'arrears', label: 'Arrears', badge: stats.standingArrears },
-        { key: 'wellbeing', label: 'Well-being', badge: stats.wellbeingConcerns, badgeTone: 'rose' },
         { key: 'overdue', label: 'Overdue Meetings', badge: stats.overdueMeetings, badgeTone: 'rose' },
       ],
     },
@@ -125,7 +121,6 @@ export default function MentorConsole() {
       label: 'Mentoring',
       items: [
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
-        { key: 'goals', label: 'SMART Goals' },
         { key: 'parents', label: 'Parent Log' },
         { key: 'announcements', label: 'Announcements' },
       ],
@@ -231,19 +226,6 @@ export default function MentorConsole() {
             />
           )}
 
-          {section === 'wellbeing' && (
-            <WatchList
-              section="Section 10"
-              title="Well-being Watch"
-              subtitle="Mentees with a flagged well-being aspect"
-              mentees={data.wellbeingWatch}
-              onOpen={openMentee}
-              metric={(m) => ({ label: 'Concerns', value: m.wellbeingConcerns, tone: m.wellbeingConcerns > 2 ? 'rose' : 'amber' })}
-              detail={(m) => `Last met ${m.lastMeeting}`}
-              emptyTitle="No well-being concerns flagged"
-            />
-          )}
-
           {section === 'overdue' && (
             <WatchList
               section="Section 12"
@@ -258,7 +240,7 @@ export default function MentorConsole() {
           )}
 
           {section === 'actions' && <ActionItemQueue onOpenMentee={openMentee} />}
-          {section === 'goals' && <GoalsOverview onOpenMentee={openMentee} />}
+
           {section === 'parents' && <ParentLog />}
           {section === 'announcements' && <Announcements />}
           {section === 'reports' && <Reports />}
@@ -292,7 +274,6 @@ function MeetingComposer({ onClose, onRecorded }) {
     pendingTasks: '',
     improvementObserved: '',
   });
-  const [goalProgress, setGoalProgress] = useState([]);
   const [mentorRemarks, setMentorRemarks] = useState('');
   const [studentRemarks, setStudentRemarks] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
@@ -312,12 +293,6 @@ function MeetingComposer({ onClose, onRecorded }) {
 
   function updateActionItem(index, patch) {
     setActionItems((items) => items.map((item, itemIndex) => (
-      itemIndex === index ? { ...item, ...patch } : item
-    )));
-  }
-
-  function updateGoalProgress(index, patch) {
-    setGoalProgress((items) => items.map((item, itemIndex) => (
       itemIndex === index ? { ...item, ...patch } : item
     )));
   }
@@ -395,7 +370,6 @@ function MeetingComposer({ onClose, onRecorded }) {
           supportRequired,
           actionItems,
           progressSinceLastMeeting,
-          goalProgress,
           mentorRemarks,
           studentRemarks,
           nextReviewDate,
@@ -450,7 +424,6 @@ function MeetingComposer({ onClose, onRecorded }) {
                   value={menteeId}
                   onChange={(event) => {
                     setMenteeId(event.target.value);
-                    setGoalProgress([]);
                   }}
                   required
                   disabled={loading}
@@ -628,61 +601,6 @@ function MeetingComposer({ onClose, onRecorded }) {
               </div>
             </section>
 
-            <section className="space-y-3 border-t border-line pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">SMART goal progress</p>
-                  <p className="mt-0.5 text-[11.5px] text-muted">Optional updates are shown in this meeting's goal-progress section.</p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  disabled={!menteeId || loadingMentee || !selectedMentee?.goals?.length}
-                  onClick={() => setGoalProgress((items) => [...items, newGoalProgress()])}
-                >
-                  Add goal update
-                </Button>
-              </div>
-              {!menteeId && <p className="text-[12px] text-muted">Choose a mentee to add their SMART-goal updates.</p>}
-              {goalProgress.map((item, index) => (
-                <div key={index} className="grid gap-3 rounded-xl border border-line bg-canvas/40 p-3 sm:grid-cols-6">
-                  <label className="block text-[12.5px] font-semibold text-muted-strong sm:col-span-2">
-                    Goal
-                    <select
-                      className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3 py-3 text-[13px] text-ink"
-                      value={item.goalId}
-                      onChange={(event) => updateGoalProgress(index, { goalId: event.target.value })}
-                      required
-                    >
-                      <option value="">Select a goal</option>
-                      {selectedMentee?.goals?.map((goal) => <option key={goal.id} value={goal.id}>{goal.text}</option>)}
-                    </select>
-                  </label>
-                  <TextField
-                    className="sm:col-span-2"
-                    label="Current status"
-                    value={item.currentStatus}
-                    onChange={(event) => updateGoalProgress(index, { currentStatus: event.target.value })}
-                    required
-                  />
-                  <TextField
-                    label="Progress (%)"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={item.progress}
-                    onChange={(event) => updateGoalProgress(index, { progress: Number(event.target.value) })}
-                    required
-                  />
-                  <div className="flex items-end">
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setGoalProgress((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </section>
 
             <section className="space-y-4 border-t border-line pt-4">
               <div>

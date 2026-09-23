@@ -10,9 +10,6 @@ import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import {
   AcademicBackground,
   Aspirations,
-  MentorAssessment,
-  SelfAssessment,
-  SkillAssessment,
 } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
@@ -24,13 +21,10 @@ import {
 import {
   CertificationTracker,
   InternshipAndProject,
-  ParentInteractionLog,
   ParticipationRecord,
   PlacementReadiness,
-  WellbeingReview,
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
-import { GoalPanel } from '../../components/record/Goals.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { AddParticipation, AddCertification, AddInternshipProject } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
@@ -43,7 +37,6 @@ const NAV_GROUPS = [
     label: 'My Record Book',
     items: [
       { key: 'profile', label: 'Profile & Background' },
-      { key: 'skills', label: 'Skills & Assessment' },
     ],
   },
   {
@@ -65,17 +58,9 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Support',
-    items: [
-      { key: 'wellbeing', label: 'Well-being' },
-      { key: 'parents', label: 'Parent Interactions' },
-    ],
-  },
-  {
     label: 'Mentoring',
     items: [
       { key: 'meetings', label: 'Meeting Log' },
-      { key: 'goals', label: 'SMART Goals' },
       { key: 'contact', label: 'Contact Mentor' },
       { key: 'announcements', label: 'Announcements' },
     ],
@@ -84,7 +69,6 @@ const NAV_GROUPS = [
 
 const TITLES = {
   profile: 'Profile & Academic Background',
-  skills: 'Skills & Assessment',
   performance: 'Academic Performance Tracker',
   attendance: 'Attendance Monitoring',
   courses: 'Course Performance',
@@ -93,10 +77,7 @@ const TITLES = {
   certifications: 'Certification Tracker',
   placement: 'Placement Readiness',
   internship: 'Internship & Project',
-  wellbeing: 'Student Well-being',
-  parents: 'Parent Interaction Log',
   meetings: 'Mentor Meeting Log',
-  goals: 'SMART Goals',
   contact: 'Contact Your Mentor',
   announcements: 'Announcements',
 };
@@ -215,8 +196,6 @@ export default function StudentRecordBook() {
             { key: 'Blood Group', value: identity.bloodGroup },
             { key: 'Mobile Number', value: identity.mobile },
             { key: 'Email ID', value: identity.email },
-            { key: 'Parent / Guardian', value: identity.parentName },
-            { key: 'Parent Contact', value: identity.parentContact },
             { key: 'Day Scholar / Hosteller', value: identity.hostelOrDayScholar },
             { key: 'Mentor Since', value: identity.mentorSince },
             { key: 'Address', value: identity.address, span: true },
@@ -257,33 +236,6 @@ export default function StudentRecordBook() {
                 </div>
               </div>
             </>
-          )}
-
-          {section === 'skills' && (
-            <div className="grid gap-5 lg:grid-cols-2">
-              <SkillAssessment
-                skills={data.sectionOne.skillAssessment}
-                onRate={(skill, rating) =>
-                  mutate(skill, () =>
-                    api(`/student/me/skills/${encodeURIComponent(skill)}`, {
-                      method: 'PATCH',
-                      body: { rating },
-                    }),
-                  )
-                }
-              />
-              <div className="space-y-5">
-                <SelfAssessment
-                  assessment={data.sectionOne.selfAssessment}
-                  onSave={(patch) =>
-                    mutate('self', () =>
-                      api('/student/me/self-assessment', { method: 'PATCH', body: patch }),
-                    )
-                  }
-                />
-                <MentorAssessment assessment={data.sectionOne.mentorAssessment} />
-              </div>
-            </div>
           )}
 
           {section === 'performance' && (
@@ -327,7 +279,6 @@ export default function StudentRecordBook() {
               <CertificationTracker certifications={data.certifications} />
             </>
           )}
-
           {section === 'placement' && (
             <>
               <EvidencePanel
@@ -369,8 +320,7 @@ export default function StudentRecordBook() {
               <InternshipAndProject internshipAndProject={data.internshipAndProject} />
             </>
           )}
-          {section === 'wellbeing' && <WellbeingReview wellbeing={data.wellbeing} />}
-          {section === 'parents' && <ParentInteractionLog parentInteractions={data.parentInteractions} />}
+
 
           {section === 'meetings' && (
             <MeetingLog
@@ -384,17 +334,7 @@ export default function StudentRecordBook() {
             />
           )}
 
-          {section === 'goals' && (
-            <GoalPanel
-              goals={data.goals}
-              acknowledging={saving}
-              onAcknowledge={(goalId) =>
-                mutate(goalId, () =>
-                  api(`/student/me/goals/${goalId}/acknowledge`, { method: 'POST' }),
-                )
-              }
-            />
-          )}
+
 
           {section === 'contact' && (
             <ContactMentor
