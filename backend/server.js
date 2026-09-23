@@ -21,5 +21,5 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Export the app instance for Vercel Serverless execution
+// Export the app ibnstance for Vercel Serverless execution
 export default app;
