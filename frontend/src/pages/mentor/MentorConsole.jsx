@@ -253,12 +253,54 @@ export default function MentorConsole() {
 
 function MeetingComposer({ onClose, onRecorded }) {
   const { data: roster, loading } = useResource('/mentor/me/mentees?sort=name&limit=100');
-  const [menteeId, setMenteeId] = useState('');
+  const [selectedMenteeIds, setSelectedMenteeIds] = useState([]);
+  const [studentPickerOpen, setStudentPickerOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+
+  const menteesList = roster?.mentees ?? [];
+  const isAllSelected = menteesList.length > 0 && selectedMenteeIds.length === menteesList.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedMenteeIds([]);
+    } else {
+      setSelectedMenteeIds(menteesList.map((m) => m.id));
+    }
+  };
+
+  const toggleMentee = (id) => {
+    setSelectedMenteeIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  };
+
+  const primaryMenteeId = selectedMenteeIds[0] || '';
   const { data: selectedMentee, loading: loadingMentee } = useResource(
-    menteeId ? '/mentor/me/mentees/' + menteeId : '',
-    { enabled: Boolean(menteeId) },
+    primaryMenteeId ? '/mentor/me/mentees/' + primaryMenteeId : '',
+    { enabled: Boolean(primaryMenteeId) },
   );
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const getTomorrowDateStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const minReviewDate = getTomorrowDateStr();
+  const todayDateStr = getTodayDateStr();
+
+  const [date, setDate] = useState(getTodayDateStr());
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [mode, setMode] = useState('Offline');
   const [category, setCategory] = useState('Academic');
@@ -268,7 +310,7 @@ function MeetingComposer({ onClose, onRecorded }) {
   const [studentConcerns, setStudentConcerns] = useState('');
   const [mentorSuggestions, setMentorSuggestions] = useState('');
   const [supportRequired, setSupportRequired] = useState('');
-  const [actionItems, setActionItems] = useState([]);
+  const [actionItems, setActionItems] = useState([newActionItem()]);
   const [progressSinceLastMeeting, setProgressSinceLastMeeting] = useState({
     achievements: '',
     pendingTasks: '',
@@ -277,6 +319,7 @@ function MeetingComposer({ onClose, onRecorded }) {
   const [mentorRemarks, setMentorRemarks] = useState('');
   const [studentRemarks, setStudentRemarks] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
+  const [reviewDateError, setReviewDateError] = useState(null);
   const [mentorSigned, setMentorSigned] = useState(true);
   const [studentSigned, setStudentSigned] = useState(false);
   const [photoProofs, setPhotoProofs] = useState([]);
@@ -284,6 +327,8 @@ function MeetingComposer({ onClose, onRecorded }) {
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const hasValidActionItem = actionItems.some((item) => item.task?.trim().length > 0);
 
   function toggleAgenda(item) {
     setAgenda((current) =>
@@ -352,33 +397,75 @@ function MeetingComposer({ onClose, onRecorded }) {
 
   async function submit(event) {
     event.preventDefault();
-    setSaving(true);
     setError(null);
+
+    if (selectedMenteeIds.length === 0) {
+      setError('Please select at least one student for this meeting.');
+      return;
+    }
+
+    if (!hasValidActionItem) {
+      setError('An action item is required. Please enter at least one action item task before saving the meeting.');
+      return;
+    }
+
+    if (nextReviewDate && nextReviewDate <= todayDateStr) {
+      setError('Next review date must be a future date (cannot be today or a past date).');
+      return;
+    }
+
+    setSaving(true);
     try {
-      await api(`/mentor/me/mentees/${menteeId}/meetings`, {
-        method: 'POST',
-        body: {
-          date,
-          durationMinutes: Number(durationMinutes),
-          mode,
-          category,
-          agenda,
-          agendaNotes,
-          topicsDiscussed,
-          studentConcerns,
-          mentorSuggestions,
-          supportRequired,
-          actionItems,
-          progressSinceLastMeeting,
-          mentorRemarks,
-          studentRemarks,
-          nextReviewDate,
-          mentorSigned,
-          studentSigned,
-          photoProofs,
-          geotag,
-        },
-      });
+      const validActionItemsList = actionItems.filter((item) => item.task?.trim());
+      const payload = {
+        date,
+        durationMinutes: Number(durationMinutes),
+        mode,
+        category,
+        agenda,
+        agendaNotes,
+        topicsDiscussed,
+        studentConcerns,
+        mentorSuggestions,
+        supportRequired,
+        actionItems: validActionItemsList,
+        progressSinceLastMeeting,
+        goalProgress,
+        mentorRemarks,
+        studentRemarks,
+        nextReviewDate,
+        mentorSigned,
+        studentSigned,
+        photoProofs,
+        geotag,
+      };
+
+      if (selectedMenteeIds.length === 1) {
+        await api(`/mentor/me/mentees/${selectedMenteeIds[0]}/meetings`, {
+          method: 'POST',
+          body: payload,
+        });
+      } else {
+        try {
+          await api('/mentor/me/meetings/batch', {
+            method: 'POST',
+            body: {
+              menteeIds: selectedMenteeIds,
+              ...payload,
+            },
+          });
+        } catch {
+          await Promise.all(
+            selectedMenteeIds.map((id) =>
+              api(`/mentor/me/mentees/${id}/meetings`, {
+                method: 'POST',
+                body: payload,
+              }),
+            ),
+          );
+        }
+      }
+
       onRecorded();
     } catch (submitError) {
       setError(submitError.message);
@@ -417,25 +504,192 @@ function MeetingComposer({ onClose, onRecorded }) {
                 <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting details</p>
                 <p className="mt-0.5 text-[11.5px] text-muted">These details appear in the meeting-log header.</p>
               </div>
-              <label className="block text-[12.5px] font-semibold text-muted-strong">
-                Mentee
-                <select
-                  className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink"
-                  value={menteeId}
-                  onChange={(event) => {
-                    setMenteeId(event.target.value);
-                  }}
-                  required
-                  disabled={loading}
-                >
-                  <option value="">Select a mentee</option>
-                  {roster?.mentees.map((mentee) => (
-                    <option key={mentee.id} value={mentee.id}>
-                      {mentee.rollNumber} - {mentee.name} - {mentee.batch}
-                    </option>
-                  ))}
-                </select>
-              </label>
+
+              {/* Student / Mentee Multi-Select with Checkboxes and Select All */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[12.5px] font-semibold text-muted-strong">
+                    Select Students / Mentees <span className="text-bad-ink">*</span>
+                  </label>
+                  <span className="text-[11.5px] font-medium text-muted">
+                    {selectedMenteeIds.length} of {menteesList.length} selected
+                  </span>
+                </div>
+
+                {/* Dropdown trigger */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    id="select-students-trigger"
+                    onClick={() => setStudentPickerOpen((open) => !open)}
+                    className="flex w-full items-center justify-between rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-2.5 text-left text-[13px] text-ink shadow-sm transition hover:border-brand-400 focus:border-brand-500 focus:outline-none"
+                    disabled={loading}
+                  >
+                    <span className="truncate">
+                      {selectedMenteeIds.length === 0 && (
+                        <span className="text-muted">Click to select students...</span>
+                      )}
+                      {selectedMenteeIds.length > 0 && isAllSelected && (
+                        <span className="font-semibold text-brand-700">
+                          ✓ All {menteesList.length} students selected
+                        </span>
+                      )}
+                      {selectedMenteeIds.length > 0 && !isAllSelected && (
+                        <span className="font-semibold text-ink">
+                          {selectedMenteeIds.length} student{selectedMenteeIds.length === 1 ? '' : 's'} selected
+                        </span>
+                      )}
+                    </span>
+                    <span className="ml-2 text-xs text-muted">
+                      {studentPickerOpen ? '▲ Close' : '▼ Select'}
+                    </span>
+                  </button>
+
+                  {/* Dropdown selection panel */}
+                  {studentPickerOpen && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-xl border border-line-strong bg-white p-3 shadow-xl">
+                      {/* Search box */}
+                      <input
+                        type="text"
+                        placeholder="Search student by name or roll number..."
+                        value={studentSearch}
+                        onChange={(event) => setStudentSearch(event.target.value)}
+                        className="w-full rounded-lg border border-line bg-canvas/60 px-3 py-1.5 text-[12px] text-ink placeholder-muted focus:border-brand-500 focus:bg-white focus:outline-none"
+                      />
+
+                      {/* Select all option */}
+                      <div className="mt-2 flex items-center justify-between border-b border-line pb-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-[12.5px] font-semibold text-ink hover:text-brand-700">
+                          <input
+                            type="checkbox"
+                            id="select-all-students-checkbox"
+                            checked={isAllSelected}
+                            onChange={toggleSelectAll}
+                            className="h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500 cursor-pointer"
+                          />
+                          <span>Select all ({menteesList.length} students)</span>
+                        </label>
+                        {selectedMenteeIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMenteeIds([])}
+                            className="text-[11.5px] font-medium text-muted hover:text-bad-ink"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Student list with checkboxes */}
+                      <div className="mt-2 max-h-48 space-y-0.5 overflow-y-auto pr-1">
+                        {menteesList
+                          .filter((m) =>
+                            !studentSearch ||
+                            `${m.name} ${m.rollNumber}`.toLowerCase().includes(studentSearch.toLowerCase()),
+                          )
+                          .map((mentee) => {
+                            const isChecked = selectedMenteeIds.includes(mentee.id);
+                            return (
+                              <label
+                                key={mentee.id}
+                                htmlFor={`student-checkbox-${mentee.id}`}
+                                className={`flex items-center gap-3 rounded-lg px-2.5 py-1.5 cursor-pointer select-none transition-colors ${
+                                  isChecked ? 'bg-brand-50 text-brand-900 font-medium' : 'hover:bg-canvas text-ink'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={`student-checkbox-${mentee.id}`}
+                                  checked={isChecked}
+                                  onChange={() => toggleMentee(mentee.id)}
+                                  className="h-4 w-4 rounded border-line-strong text-brand-600 focus:ring-brand-500 cursor-pointer"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-[12px] font-semibold text-ink">
+                                      {mentee.rollNumber}
+                                    </span>
+                                    <span className="truncate text-[12.5px]">
+                                      {mentee.name}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10.5px] text-muted">
+                                    {mentee.batch} · Attendance {mentee.attendance}%
+                                  </div>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        {menteesList.filter((m) =>
+                          !studentSearch ||
+                          `${m.name} ${m.rollNumber}`.toLowerCase().includes(studentSearch.toLowerCase()),
+                        ).length === 0 && (
+                          <p className="py-3 text-center text-xs text-muted">
+                            No students match "{studentSearch}".
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex justify-end border-t border-line pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setStudentPickerOpen(false)}
+                          className="rounded-lg bg-ink px-3.5 py-1 text-xs font-semibold text-white hover:bg-ink-soft"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected summary badges */}
+                {selectedMenteeIds.length > 0 && (
+                  <div className="pt-0.5">
+                    {isAllSelected ? (
+                      <div className="flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/80 px-3 py-1.5 text-[11.5px] text-brand-800">
+                        <span className="font-medium">
+                          All {menteesList.length} students selected for this session.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMenteeIds([])}
+                          className="font-semibold text-brand-700 hover:underline"
+                        >
+                          Deselect all
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {menteesList
+                          .filter((m) => selectedMenteeIds.includes(m.id))
+                          .slice(0, 5)
+                          .map((m) => (
+                            <span
+                              key={m.id}
+                              className="inline-flex items-center gap-1 rounded-md border border-line bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink"
+                            >
+                              <span>{m.rollNumber} ({m.name.split(' ')[0]})</span>
+                              <button
+                                type="button"
+                                onClick={() => toggleMentee(m.id)}
+                                className="text-muted hover:text-bad-ink"
+                                title="Remove student"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        {selectedMenteeIds.length > 5 && (
+                          <span className="text-[11px] font-medium text-muted">
+                            +{selectedMenteeIds.length - 5} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
                 <ChipGroup label="Mode" options={MEETING_MODES} value={mode} onChange={setMode} />
@@ -521,18 +775,30 @@ function MeetingComposer({ onClose, onRecorded }) {
             <section className="space-y-3 border-t border-line pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Action items</p>
-                  <p className="mt-0.5 text-[11.5px] text-muted">Add each agreed follow-up, including owner, date, and starting status.</p>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">
+                    Action items <span className="text-bad-ink font-bold">*</span>
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] text-muted">
+                    At least one action item task is required before the meeting can be saved.
+                  </p>
                 </div>
                 <Button type="button" size="sm" variant="secondary" onClick={() => setActionItems((items) => [...items, newActionItem()])}>
                   Add action item
                 </Button>
               </div>
+
+              {!hasValidActionItem && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-[12px] text-amber-800">
+                  ⚠️ <strong>Action item required:</strong> Please enter at least one task description below. The meeting cannot be saved without an action item.
+                </div>
+              )}
+
               {actionItems.map((item, index) => (
                 <div key={index} className="grid gap-3 rounded-xl border border-line bg-canvas/40 p-3 sm:grid-cols-6">
                   <TextField
                     className="sm:col-span-2"
-                    label="Task"
+                    label={`Task #${index + 1} *`}
+                    placeholder="e.g. Complete review assignment"
                     value={item.task}
                     onChange={(event) => updateActionItem(index, { task: event.target.value })}
                     required
@@ -565,13 +831,17 @@ function MeetingComposer({ onClose, onRecorded }) {
                     </select>
                   </label>
                   <div className="flex items-end">
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setActionItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
-                      Remove
-                    </Button>
+                    {actionItems.length > 1 && (
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setActionItems((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                        Remove
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
-              {!actionItems.length && <p className="text-[12px] text-muted">No action items recorded for this meeting.</p>}
+              {!actionItems.length && (
+                <p className="text-[12px] text-amber-700 font-medium">No action items added yet. Click &quot;Add action item&quot; above.</p>
+              )}
             </section>
 
             <section className="space-y-4 border-t border-line pt-4">
@@ -601,6 +871,61 @@ function MeetingComposer({ onClose, onRecorded }) {
               </div>
             </section>
 
+            <section className="space-y-3 border-t border-line pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">SMART goal progress</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted">Optional updates are shown in this meeting's goal-progress section.</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!primaryMenteeId || loadingMentee || !selectedMentee?.goals?.length}
+                  onClick={() => setGoalProgress((items) => [...items, newGoalProgress()])}
+                >
+                  Add goal update
+                </Button>
+              </div>
+              {!selectedMenteeIds.length && <p className="text-[12px] text-muted">Select students above to add their SMART-goal updates.</p>}
+              {goalProgress.map((item, index) => (
+                <div key={index} className="grid gap-3 rounded-xl border border-line bg-canvas/40 p-3 sm:grid-cols-6">
+                  <label className="block text-[12.5px] font-semibold text-muted-strong sm:col-span-2">
+                    Goal
+                    <select
+                      className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3 py-3 text-[13px] text-ink"
+                      value={item.goalId}
+                      onChange={(event) => updateGoalProgress(index, { goalId: event.target.value })}
+                      required
+                    >
+                      <option value="">Select a goal</option>
+                      {selectedMentee?.goals?.map((goal) => <option key={goal.id} value={goal.id}>{goal.text}</option>)}
+                    </select>
+                  </label>
+                  <TextField
+                    className="sm:col-span-2"
+                    label="Current status"
+                    value={item.currentStatus}
+                    onChange={(event) => updateGoalProgress(index, { currentStatus: event.target.value })}
+                    required
+                  />
+                  <TextField
+                    label="Progress (%)"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={item.progress}
+                    onChange={(event) => updateGoalProgress(index, { progress: Number(event.target.value) })}
+                    required
+                  />
+                  <div className="flex items-end">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setGoalProgress((items) => items.filter((_, itemIndex) => itemIndex !== index))}>
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </section>
 
             <section className="space-y-4 border-t border-line pt-4">
               <div>
@@ -621,12 +946,27 @@ function MeetingComposer({ onClose, onRecorded }) {
                   onChange={(event) => setStudentRemarks(event.target.value)}
                 />
               </div>
-              <TextField
-                label="Next review date"
-                type="date"
-                value={nextReviewDate}
-                onChange={(event) => setNextReviewDate(event.target.value)}
-              />
+              <div>
+                <TextField
+                  label="Next review date"
+                  hint="Only future dates can be entered (cannot be today or a past date)."
+                  type="date"
+                  min={minReviewDate}
+                  value={nextReviewDate}
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    setNextReviewDate(val);
+                    if (val && val <= todayDateStr) {
+                      setReviewDateError('Next review date must be a future date (cannot be today or a past date).');
+                    } else {
+                      setReviewDateError(null);
+                    }
+                  }}
+                />
+                {reviewDateError && (
+                  <p className="mt-1 text-[11.5px] font-semibold text-bad-ink">{reviewDateError}</p>
+                )}
+              </div>
               <div className="space-y-2 rounded-xl border border-line bg-canvas/50 p-3.5 text-[12px] text-muted-strong">
                 <label className="flex items-start gap-2.5">
                   <input className="mt-0.5" type="checkbox" checked={mentorSigned} onChange={(event) => setMentorSigned(event.target.checked)} required />
@@ -675,13 +1015,27 @@ function MeetingComposer({ onClose, onRecorded }) {
             {error && <p className="text-sm text-bad-ink">{error}</p>}
           </div>
 
-          <div className="flex shrink-0 gap-2 border-t border-line bg-white px-5 py-4">
-            <Button type="submit" size="sm" loading={saving}>
-              Save meeting
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
+          <div className="flex shrink-0 items-center justify-between border-t border-line bg-white px-5 py-4">
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                loading={saving}
+                disabled={saving || !hasValidActionItem || selectedMenteeIds.length === 0}
+              >
+                Save meeting
+              </Button>
+              <Button type="button" size="sm" variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+            </div>
+            {(!hasValidActionItem || selectedMenteeIds.length === 0) && (
+              <p className="text-[11.5px] font-medium text-amber-700">
+                {selectedMenteeIds.length === 0
+                  ? 'Select at least one student'
+                  : 'Action item required to save'}
+              </p>
+            )}
           </div>
         </form>
       </Card>

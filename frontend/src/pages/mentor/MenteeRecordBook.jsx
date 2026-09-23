@@ -179,7 +179,8 @@ export function MenteeRecordBook({ menteeId, onBack }) {
 
       {tab === 'meetings' && (
         <div className="space-y-5">
-          <MeetingLog meetings={data.meetings} />
+          <MeetingLog meetings={data.meetings} menteeName={data.identity.name} />
+          <GoalPanel goals={data.goals} />
         </div>
       )}
     </div>
