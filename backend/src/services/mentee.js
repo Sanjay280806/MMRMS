@@ -418,6 +418,7 @@ export function menteeToStudent(mentee) {
     goals,
     supportRequests: [],
     messages: [],
+    activities: [],
   };
 }
 

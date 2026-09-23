@@ -7,10 +7,7 @@ import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { ErrorBoundary } from '../../components/ui/ErrorBoundary.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import {
-  AcademicBackground,
-  Aspirations,
-} from '../../components/record/SectionOne.jsx';
+import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
   AttendanceMonitoring,
@@ -19,14 +16,12 @@ import {
   PerformanceTracker,
 } from '../../components/record/Academics.jsx';
 import {
-  CertificationTracker,
-  InternshipAndProject,
-  ParticipationRecord,
+  ActivitiesAndAchievements,
   PlacementReadiness,
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
-import { AddParticipation, AddCertification, AddInternshipProject } from './AddEntry.jsx';
+import { AddActivity } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { AnnouncementsHistory } from './AnnouncementsHistory.jsx';
 import { useResource } from '../../hooks/useResource.js';
@@ -51,10 +46,8 @@ const NAV_GROUPS = [
   {
     label: 'Growth',
     items: [
-      { key: 'participation', label: 'Participation Record' },
-      { key: 'certifications', label: 'Certifications' },
+      { key: 'activities', label: 'Activities & Achievements' },
       { key: 'placement', label: 'Placement Readiness' },
-      { key: 'internship', label: 'Internship & Project' },
     ],
   },
   {
@@ -73,10 +66,8 @@ const TITLES = {
   attendance: 'Attendance Monitoring',
   courses: 'Course Performance',
   arrears: 'Arrear Tracking',
-  participation: 'Participation Record',
-  certifications: 'Certification Tracker',
+  activities: 'Activities & Achievements',
   placement: 'Placement Readiness',
-  internship: 'Internship & Project',
   meetings: 'Mentor Meeting Log',
   contact: 'Contact Your Mentor',
   announcements: 'Announcements',
@@ -210,7 +201,7 @@ export default function StudentRecordBook() {
           <div className="bg-white rounded-xl shadow-xl border border-line-strong overflow-hidden flex flex-col">
             <div className="bg-indigo-600 px-4 py-2 flex justify-between items-center">
               <span className="text-white font-semibold text-sm">Announcement from {announcement.mentorName || 'Mentor'}</span>
-              <button 
+              <button
                 onClick={clearAnnouncement}
                 className="text-white/80 hover:text-white transition-colors p-1"
               >
@@ -227,15 +218,11 @@ export default function StudentRecordBook() {
 
       <ErrorBoundary resetKey={section}>
         <div className="animate-fadeRise space-y-5">
+          {/* Profile & Background — Academic Background only (no Career Aspirations) */}
           {section === 'profile' && (
-            <>
-              <div className="space-y-5">
-                <div>
-                  <AcademicBackground background={data.sectionOne.academicBackground} />
-                  <Aspirations aspirations={data.sectionOne.aspirations} />
-                </div>
-              </div>
-            </>
+            <div className="space-y-5">
+              <AcademicBackground background={data.sectionOne.academicBackground} />
+            </div>
           )}
 
           {section === 'performance' && (
@@ -251,34 +238,22 @@ export default function StudentRecordBook() {
           {section === 'courses' && <CoursePerformance coursePerformance={data.coursePerformance} />}
           {section === 'arrears' && <ArrearTracking arrears={data.arrears} />}
 
-          {section === 'participation' && (
+          {/* Activities & Achievements — unified growth section */}
+          {section === 'activities' && (
             <>
-              <AddParticipation
-                categories={data.participation.categories}
-                onAdd={(group, entry) =>
-                  mutate('participation', () =>
-                    api(`/student/me/participation/${group}`, { method: 'POST', body: entry }),
+              <AddActivity
+                onAdd={(entry) =>
+                  mutate('activity', () =>
+                    api('/student/me/activities', { method: 'POST', body: entry }),
                   )
                 }
-                saving={saving === 'participation'}
+                saving={saving === 'activity'}
               />
-              <ParticipationRecord participation={data.participation} />
+              <ActivitiesAndAchievements activities={data.activities ?? []} />
             </>
           )}
 
-          {section === 'certifications' && (
-            <>
-              <AddCertification
-                onAdd={(entry) =>
-                  mutate('certification', () =>
-                    api('/student/me/certifications', { method: 'POST', body: entry }),
-                  )
-                }
-                saving={saving === 'certification'}
-              />
-              <CertificationTracker certifications={data.certifications} />
-            </>
-          )}
+          {/* Placement Readiness — restored exactly as before */}
           {section === 'placement' && (
             <>
               <EvidencePanel
@@ -307,21 +282,6 @@ export default function StudentRecordBook() {
             </>
           )}
 
-          {section === 'internship' && (
-            <>
-              <AddInternshipProject
-                onAdd={(entry) =>
-                  mutate('internship', () =>
-                    api('/student/me/internship-projects', { method: 'POST', body: entry }),
-                  )
-                }
-                saving={saving === 'internship'}
-              />
-              <InternshipAndProject internshipAndProject={data.internshipAndProject} />
-            </>
-          )}
-
-
           {section === 'meetings' && (
             <MeetingLog
               meetings={data.meetings}
@@ -333,8 +293,6 @@ export default function StudentRecordBook() {
               }
             />
           )}
-
-
 
           {section === 'contact' && (
             <ContactMentor
