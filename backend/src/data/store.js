@@ -21,7 +21,7 @@ const clone = (value) => structuredClone(value);
 
 const users = USERS.map(({ password, ...rest }) => ({
   ...rest,
-  passwordHash: bcrypt.hashSync(password, 10),
+  passwordHash: bcrypt.hashSync(password, 12),
 }));
 
 const mentors = clone(MENTORS);

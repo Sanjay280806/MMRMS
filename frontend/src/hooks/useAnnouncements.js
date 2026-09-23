@@ -5,30 +5,47 @@ export function useAnnouncements() {
   const [announcement, setAnnouncement] = useState(null);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
+    let eventSource = null;
+    let cancelled = false;
 
-    const eventSource = new EventSource(`/api/announcements/stream?token=${token}`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'announcement') {
-          setAnnouncement(data);
-          // Play a sound when announcement is received
-          playNotificationSound();
+    const connect = () => {
+      const token = getToken();
+      if (!token) {
+        // Retry shortly if token is being initialized
+        if (!cancelled) {
+          const timeout = setTimeout(connect, 500);
+          return () => clearTimeout(timeout);
         }
-      } catch (e) {
-        console.error('Failed to parse SSE message', e);
+        return;
       }
+
+      eventSource = new EventSource(`/api/announcements/stream?token=${encodeURIComponent(token)}`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'announcement') {
+            setAnnouncement(data);
+            playNotificationSound();
+          }
+        } catch (e) {
+          console.error('Failed to parse SSE message', e);
+        }
+      };
+
+      eventSource.onerror = () => {
+        // EventSource will automatically retry connection
+      };
     };
 
-    eventSource.onerror = (error) => {
-      console.error('SSE Error:', error);
-    };
+    const cleanup = connect();
 
     return () => {
-      eventSource.close();
+      cancelled = true;
+      if (typeof cleanup === 'function') cleanup();
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, []);
 
@@ -37,12 +54,12 @@ export function useAnnouncements() {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       const audioCtx = new AudioContext();
-      
+
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
 
       oscillator.type = 'sine';
-      
+
       // Pitch envelope: sharp rise then slight drop
       oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.05);
