@@ -12,7 +12,6 @@ import { MentorDashboard } from './sections/MentorDashboard.jsx';
 import { Roster } from './sections/Roster.jsx';
 import { WatchList } from './sections/WatchList.jsx';
 import { ActionItemQueue } from './sections/ActionItemQueue.jsx';
-import { GoalsOverview } from './sections/GoalsOverview.jsx';
 import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
@@ -26,10 +25,8 @@ const TITLES = {
   mentees: 'My Mentees',
   attendance: 'Attendance Watch',
   arrears: 'Arrear Watch',
-  wellbeing: 'Well-being Watch',
   overdue: 'Overdue Meetings',
   actions: 'Action Items',
-  goals: 'SMART Goals',
   parents: 'Parent Interaction Log',
   reports: 'Term Reports',
   timeline: 'Activity Timeline',
@@ -117,7 +114,6 @@ export default function MentorConsole() {
       items: [
         { key: 'attendance', label: 'Attendance', badge: stats.attendanceShortfalls, badgeTone: 'rose' },
         { key: 'arrears', label: 'Arrears', badge: stats.standingArrears },
-        { key: 'wellbeing', label: 'Well-being', badge: stats.wellbeingConcerns, badgeTone: 'rose' },
         { key: 'overdue', label: 'Overdue Meetings', badge: stats.overdueMeetings, badgeTone: 'rose' },
       ],
     },
@@ -125,7 +121,6 @@ export default function MentorConsole() {
       label: 'Mentoring',
       items: [
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
-        { key: 'goals', label: 'SMART Goals' },
         { key: 'parents', label: 'Parent Log' },
         { key: 'announcements', label: 'Announcements' },
       ],
@@ -231,19 +226,6 @@ export default function MentorConsole() {
             />
           )}
 
-          {section === 'wellbeing' && (
-            <WatchList
-              section="Section 10"
-              title="Well-being Watch"
-              subtitle="Mentees with a flagged well-being aspect"
-              mentees={data.wellbeingWatch}
-              onOpen={openMentee}
-              metric={(m) => ({ label: 'Concerns', value: m.wellbeingConcerns, tone: m.wellbeingConcerns > 2 ? 'rose' : 'amber' })}
-              detail={(m) => `Last met ${m.lastMeeting}`}
-              emptyTitle="No well-being concerns flagged"
-            />
-          )}
-
           {section === 'overdue' && (
             <WatchList
               section="Section 12"
@@ -258,7 +240,7 @@ export default function MentorConsole() {
           )}
 
           {section === 'actions' && <ActionItemQueue onOpenMentee={openMentee} />}
-          {section === 'goals' && <GoalsOverview onOpenMentee={openMentee} />}
+
           {section === 'parents' && <ParentLog />}
           {section === 'announcements' && <Announcements />}
           {section === 'reports' && <Reports />}
@@ -334,7 +316,6 @@ function MeetingComposer({ onClose, onRecorded }) {
     pendingTasks: '',
     improvementObserved: '',
   });
-  const [goalProgress, setGoalProgress] = useState([]);
   const [mentorRemarks, setMentorRemarks] = useState('');
   const [studentRemarks, setStudentRemarks] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
@@ -357,12 +338,6 @@ function MeetingComposer({ onClose, onRecorded }) {
 
   function updateActionItem(index, patch) {
     setActionItems((items) => items.map((item, itemIndex) => (
-      itemIndex === index ? { ...item, ...patch } : item
-    )));
-  }
-
-  function updateGoalProgress(index, patch) {
-    setGoalProgress((items) => items.map((item, itemIndex) => (
       itemIndex === index ? { ...item, ...patch } : item
     )));
   }
