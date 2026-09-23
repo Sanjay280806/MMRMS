@@ -11,7 +11,8 @@ import 'dotenv/config';
 import { createApp } from './src/app.js';
 
 const app = createApp();
-const port = Number(process.env.PORT) || 4000;
+const rawPort = process.env.PORT;
+const port = (rawPort && rawPort !== '8080') ? Number(rawPort) : 4000;
 
 // Only listen on a port when running locally
 if (process.env.NODE_ENV !== 'production') {
@@ -20,5 +21,5 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// Export the app instance for Vercel Serverless execution
+// Export the app ibnstance for Vercel Serverless execution
 export default app;

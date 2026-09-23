@@ -12,7 +12,11 @@ export function AnnouncementsHistory() {
     async function fetchAnnouncements() {
       try {
         const res = await api('/announcements');
-        if (res.success) {
+        if (Array.isArray(res)) {
+          setHistory(res);
+        } else if (res?.data && Array.isArray(res.data)) {
+          setHistory(res.data);
+        } else if (res?.success && Array.isArray(res.data)) {
           setHistory(res.data);
         } else {
           setError('Failed to fetch announcements.');

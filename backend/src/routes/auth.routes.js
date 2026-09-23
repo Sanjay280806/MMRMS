@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ROLES, INSTITUTION } from '../data/seed.js';
 import { findUserByEmail, publicUser, verifyPassword } from '../data/store.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
+import { signRefreshToken } from '../lib/token.js';
 import { HttpError } from '../middleware/error.js';
 
 const router = Router();
@@ -25,11 +26,10 @@ router.post('/login', (req, res, next) => {
   const record = attempts.get(key);
 
   if (record?.lockedUntil > Date.now()) {
-    return res.status(423).json({
-      error: 'Account locked after too many failed attempts.',
+    return next(new HttpError(423, 'Account locked after too many failed attempts.', {
       lockedUntil: record.lockedUntil,
       retryInSeconds: Math.ceil((record.lockedUntil - Date.now()) / 1000),
-    });
+    }));
   }
 
   const user = findUserByEmail(email);
@@ -38,11 +38,10 @@ router.post('/login', (req, res, next) => {
     if (count >= MAX_ATTEMPTS) {
       const lockedUntil = Date.now() + LOCK_MS;
       attempts.set(key, { count, lockedUntil });
-      return res.status(423).json({
-        error: 'Account locked after too many failed attempts.',
+      return next(new HttpError(423, 'Account locked after too many failed attempts.', {
         lockedUntil,
         retryInSeconds: Math.ceil(LOCK_MS / 1000),
-      });
+      }));
     }
     attempts.set(key, { count, lockedUntil: 0 });
     return next(new HttpError(401, 'Invalid email or password. Please try again.'));
@@ -50,7 +49,25 @@ router.post('/login', (req, res, next) => {
 
   attempts.delete(key);
   const role = ROLES.find((r) => r.key === user.role);
-  res.json({ token: signToken(user), user: publicUser(user), role });
+  const accessToken = signToken(user);
+  const refreshToken = signRefreshToken(user);
+
+  const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+  res.cookie('mmrms_refresh', refreshToken, {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? 'none' : 'lax',
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  res.json({
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    user: publicUser(user),
+    role,
+  });
 });
 
 router.get('/me', requireAuth, (req, res) => {

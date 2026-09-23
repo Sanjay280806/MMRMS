@@ -7,10 +7,7 @@ import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Card } from '../../components/ui/Card.jsx';
 import { HealthDial, ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { HealthPanel } from '../../components/record/HealthPanel.jsx';
-import {
-  AcademicBackground,
-  Aspirations,
-} from '../../components/record/SectionOne.jsx';
+import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
   AttendanceMonitoring,
@@ -19,10 +16,8 @@ import {
   PerformanceTracker,
 } from '../../components/record/Academics.jsx';
 import {
-  CertificationTracker,
-  InternshipAndProject,
+  ActivitiesAndAchievements,
   ParentInteractionLog,
-  ParticipationRecord,
   PlacementReadiness,
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
@@ -131,11 +126,11 @@ export function MenteeRecordBook({ menteeId, onBack }) {
         <Tabs items={TABS} value={tab} onChange={setTab} size="sm" />
       </Card>
 
+      {/* Profile & Background — Academic Background only (Career Aspirations removed) */}
       {tab === 'profile' && (
         <div className="grid gap-5 lg:grid-cols-3">
           <div className="space-y-5 lg:col-span-2">
             <AcademicBackground background={data.sectionOne.academicBackground} />
-            <Aspirations aspirations={data.sectionOne.aspirations} />
           </div>
           <HealthPanel health={health} />
         </div>
@@ -157,12 +152,12 @@ export function MenteeRecordBook({ menteeId, onBack }) {
 
       {tab === 'growth' && (
         <div className="space-y-5">
-          <ParticipationRecord participation={data.participation} />
-          <CertificationTracker certifications={data.certifications} />
-          <div className="grid gap-5 lg:grid-cols-2">
-            <PlacementReadiness placementReadiness={data.placementReadiness} />
-            <InternshipAndProject internshipAndProject={data.internshipAndProject} />
-          </div>
+          {/* Unified Activities & Achievements — read-only for mentor */}
+          <ActivitiesAndAchievements activities={data.activities ?? []} />
+
+          {/* Placement Readiness — read-only for mentor (no onUpdate handler) */}
+          <PlacementReadiness placementReadiness={data.placementReadiness} />
+
           <EvidencePanel
             title="Placement Evidence"
             description="Documents submitted by the student for placement readiness."
@@ -179,7 +174,7 @@ export function MenteeRecordBook({ menteeId, onBack }) {
 
       {tab === 'meetings' && (
         <div className="space-y-5">
-          <MeetingLog meetings={data.meetings} />
+          <MeetingLog meetings={data.meetings} menteeName={data.identity.name} />
         </div>
       )}
     </div>

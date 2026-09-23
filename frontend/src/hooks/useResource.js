@@ -19,7 +19,8 @@ export function useResource(path, { enabled = true } = {}) {
     try {
       const payload = await api(path);
       if (id !== requestId.current) return;
-      setData(payload);
+      const resourceData = (payload && payload.success === true && payload.data !== undefined) ? payload.data : payload;
+      setData(resourceData);
       setError(null);
     } catch (err) {
       if (id === requestId.current) setError(err);

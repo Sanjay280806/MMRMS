@@ -120,11 +120,27 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
   if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 240) {
     return next(new HttpError(400, 'Meeting duration must be between 5 and 240 minutes'));
   }
+
+  // Meeting can only be saved if at least one action item is entered
+  const validActionItems = (actionItems ?? []).filter((item) => item?.task?.trim());
+  if (!validActionItems.length) {
+    return next(new HttpError(400, 'At least one action item is required to save the meeting'));
+  }
+
   if (actionItems && (!Array.isArray(actionItems) || actionItems.length > 10 || actionItems.some((item) =>
     !item?.task?.trim() || !['Student', 'Mentor'].includes(item.responsible) ||
     !ACTION_STATUSES.includes(item.status) || (item.targetDate !== '' && typeof item.targetDate !== 'string'),
   ))) {
     return next(new HttpError(400, 'Each action item needs a task, responsible person, target date, and status'));
+  }
+
+  // Next review date: strictly future dates only (no past dates or current date)
+  if (nextReviewDate?.trim()) {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (nextReviewDate.trim() <= todayStr) {
+      return next(new HttpError(400, 'Next review date must be a future date (cannot be today or a past date)'));
+    }
   }
   if (goalProgress && (!Array.isArray(goalProgress) || goalProgress.length > 10 || goalProgress.some((item) =>
     !item?.goalId?.trim() || !item?.currentStatus?.trim() || !Number.isInteger(item.progress) || item.progress < 0 || item.progress > 100,
@@ -189,6 +205,108 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
     })),
   });
   res.status(201).json(meeting);
+});
+
+/** Batch Section 12 meetings for multiple selected mentees */
+router.post('/me/meetings/batch', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const { menteeIds, ...meetingData } = req.body ?? {};
+  if (!Array.isArray(menteeIds) || !menteeIds.length) {
+    return next(new HttpError(400, 'Please select at least one mentee'));
+  }
+
+  const {
+    date,
+    durationMinutes,
+    mode,
+    category,
+    agenda,
+    agendaNotes,
+    topicsDiscussed,
+    studentConcerns,
+    mentorSuggestions,
+    supportRequired,
+    actionItems,
+    progressSinceLastMeeting,
+    goalProgress,
+    mentorRemarks,
+    studentRemarks,
+    nextReviewDate,
+    mentorSigned,
+    studentSigned,
+    photoProofs,
+    geotag,
+  } = meetingData;
+
+  if (!date?.trim() || !topicsDiscussed?.trim()) {
+    return next(new HttpError(400, 'Meeting date and topics discussed are required'));
+  }
+
+  const validActionItems = (actionItems ?? []).filter((item) => item?.task?.trim());
+  if (!validActionItems.length) {
+    return next(new HttpError(400, 'At least one action item is required to save the meeting'));
+  }
+
+  if (nextReviewDate?.trim()) {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (nextReviewDate.trim() <= todayStr) {
+      return next(new HttpError(400, 'Next review date must be a future date (cannot be today or a past date)'));
+    }
+  }
+
+  const createdMeetings = [];
+  for (const menteeId of menteeIds) {
+    const mentee = findMenteeById(menteeId);
+    if (!mentee || mentee.mentorId !== mentor.id) continue;
+    const meeting = addMentorMeeting(mentee.id, {
+      date: date.trim(),
+      duration: `${durationMinutes} min`,
+      mode,
+      topicsDiscussed: topicsDiscussed.trim(),
+      category,
+      agenda,
+      agendaNotes: agendaNotes?.trim() ?? '',
+      studentConcerns: studentConcerns?.trim() || 'None recorded.',
+      mentorSuggestions: mentorSuggestions?.trim() || 'None recorded.',
+      supportRequired: supportRequired?.trim() || 'None.',
+      progressSinceLastMeeting: {
+        achievements: progressSinceLastMeeting?.achievements?.trim() || 'None recorded.',
+        pendingTasks: progressSinceLastMeeting?.pendingTasks?.trim() || 'None.',
+        improvementObserved: progressSinceLastMeeting?.improvementObserved?.trim() || 'To be reviewed at the next meeting.',
+      },
+      goalProgress: (goalProgress ?? []).map((item) => ({
+        goalId: item.goalId.trim(),
+        currentStatus: item.currentStatus.trim(),
+        progress: item.progress,
+      })),
+      mentorRemarks: mentorRemarks?.trim() ?? '',
+      studentRemarks: studentRemarks?.trim() ?? '',
+      nextReviewDate: nextReviewDate?.trim() ?? '',
+      mentorSigned: mentorSigned === true,
+      studentSigned: studentSigned === true,
+      photoProofs: (photoProofs ?? []).map((photo) => ({
+        name: String(photo.name).trim().slice(0, 160),
+        contentType: photo.contentType,
+        dataUrl: photo.dataUrl,
+      })),
+      geotag: geotag ? {
+        latitude: Number(geotag.latitude.toFixed(6)),
+        longitude: Number(geotag.longitude.toFixed(6)),
+        accuracy: Number.isFinite(geotag.accuracy) ? Math.round(geotag.accuracy) : null,
+        capturedAt: geotag.capturedAt ?? new Date().toISOString(),
+      } : null,
+      actionItems: validActionItems.map((item) => ({
+        task: item.task.trim(),
+        responsible: item.responsible,
+        targetDate: item.targetDate || 'Not set',
+        status: item.status,
+      })),
+    });
+    createdMeetings.push(meeting);
+  }
+
+  res.status(201).json({ count: createdMeetings.length, meetings: createdMeetings });
 });
 
 router.get('/me/goals', (req, res) => {
