@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client.js';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import { Badge, HealthBadge } from '../../components/ui/Badge.jsx';
+import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -171,7 +171,7 @@ function CoordinatorDashboard({ data }) {
       <MentorTracker rows={data.mentors} compact />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
-    <StudentWatch title="Immediate attention" subtitle="Lowest health index across the year" rows={data.atRisk.slice(0, 8)} metric="health" />
+    <StudentWatch title="Immediate attention" subtitle="Students requiring immediate follow-up" rows={data.atRisk.slice(0, 8)} metric="health" />
   </>;
 }
 
@@ -179,7 +179,6 @@ function StudentWatch({ title, subtitle, rows, metric }) {
   return <SectionTable title={title} subtitle={subtitle} action={<Badge tone={rows.length ? 'rose' : 'green'}>{rows.length} student{rows.length === 1 ? '' : 's'}</Badge>}>
     <DataTable rows={rows} rowKey={(row) => row.id} empty={<EmptyState title="No follow-up needed" description="There are no students in this watch list." icon="✓" />} columns={[
       { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber}</p></div> },
-      { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
       { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
       { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
       { key: 'metric', header: metric === 'health' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? (metric === 'health' ? 'Review' : 'Attendance')}</Badge> },
@@ -197,13 +196,12 @@ function AcademicAndDiscipline({ data }) {
 }
 
 function MentorTracker({ rows, compact = false }) {
-  return <SectionTable title="Mentor Tracker" subtitle="Assigned learners, mentoring compliance, health and follow-up load">
+  return <SectionTable title="Mentor Tracker" subtitle="Assigned learners, mentoring compliance and follow-up load">
     <DataTable rows={rows} rowKey={(row) => row.id} columns={[
       { key: 'mentor', header: 'Mentor', render: (row) => <div><p className="font-medium">{row.name}</p><p className="text-[11.5px] text-muted">{row.staffCode}</p></div> },
       { key: 'assigned', header: 'Assigned', align: 'right' },
       { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
       { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
-      { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
     ]} />
   </SectionTable>;
 }
@@ -225,7 +223,6 @@ function StudentDirectory({ role }) {
         { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
         { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
         { key: 'mentor', header: 'Mentoring', align: 'right', render: (row) => `${row.meetingsHeld}/${row.meetingsDue}` },
-        { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
       ]} />
       <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[12px] text-muted">
         <span>{data.total} students · page {data.page} of {data.totalPages}</span>

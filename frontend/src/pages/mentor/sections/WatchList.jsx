@@ -1,5 +1,5 @@
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
 import { Button } from '../../../components/ui/Button.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
@@ -9,7 +9,7 @@ import { SectionTable } from '../../../components/ui/SectionCard.jsx';
  * One roster-wide watch list. `metric` names the column the list is sorted by,
  * so Attendance, Arrears, Well-being and Overdue Meetings share this component.
  */
-export function WatchList({ section, title, subtitle, mentees, onOpen, metric, detail, emptyTitle, showHealth = true }) {
+export function WatchList({ section, title, subtitle, mentees, onOpen, metric, detail, emptyTitle }) {
   return (
     <SectionTable
       section={section}
@@ -47,7 +47,6 @@ export function WatchList({ section, title, subtitle, mentees, onOpen, metric, d
               return <Badge tone={value.tone}>{value.value}</Badge>;
             },
           },
-          ...(showHealth ? [{ key: 'health', header: 'Health', align: 'right', render: (m) => <HealthBadge value={m.health} tone={m.healthTone} /> }] : []),
           { key: 'detail', header: 'Detail', align: 'right', render: (m) => <span className="text-[12px] text-muted">{detail(m)}</span> },
           {
             key: 'open',

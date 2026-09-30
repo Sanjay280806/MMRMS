@@ -1,16 +1,14 @@
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
 import { Button } from '../../../components/ui/Button.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
-import { SectionCard, SectionTable } from '../../../components/ui/SectionCard.jsx';
+import { SectionTable } from '../../../components/ui/SectionCard.jsx';
 import { StatTile } from '../../../components/ui/StatTile.jsx';
-import { RadarChart } from '../../../components/charts/RadarChart.jsx';
-import { HealthDimensions } from '../../../components/dashboard/HealthDimensions.jsx';
 
 /** The mentor's landing view: portfolio counts, then who needs attention. */
 export function MentorDashboard({ data, onOpenMentee }) {
-  const { stats, attention, cohortHealth, initialInteractionAlerts } = data;
+  const { stats, attention, initialInteractionAlerts } = data;
 
   return (
     <div className="space-y-5">
@@ -88,7 +86,7 @@ export function MentorDashboard({ data, onOpenMentee }) {
 
       <SectionTable
         title="Students Needing Attention"
-        subtitle="Ranked by health index · lowest first"
+        subtitle="Flagged mentees requiring follow-up"
         action={<Badge tone={attention.length ? 'rose' : 'green'} size="md">{attention.length} flagged</Badge>}
       >
         <DataTable
@@ -118,7 +116,6 @@ export function MentorDashboard({ data, onOpenMentee }) {
                 </div>
               ),
             },
-            { key: 'health', header: 'Health', align: 'right', render: (m) => <HealthBadge value={m.health} tone={m.healthTone} /> },
             { key: 'cgpa', header: 'CGPA', align: 'right', render: (m) => <span className="tnum">{m.cgpa.toFixed(1)}</span> },
             {
               key: 'attendance',
@@ -152,23 +149,6 @@ export function MentorDashboard({ data, onOpenMentee }) {
           ]}
         />
       </SectionTable>
-
-      <SectionCard
-        title="Cohort Health Index"
-        subtitle="Mean of each dimension across your mentees"
-        action={
-          <span className="tnum font-display text-[26px] font-semibold text-ink">
-            {cohortHealth.overall}
-          </span>
-        }
-      >
-        <div className="flex flex-col items-center gap-8 lg:flex-row lg:items-start">
-          <RadarChart dimensions={cohortHealth.dimensions} />
-          <div className="w-full flex-1">
-            <HealthDimensions dimensions={cohortHealth.dimensions} showWeights />
-          </div>
-        </div>
-      </SectionCard>
     </div>
   );
 }

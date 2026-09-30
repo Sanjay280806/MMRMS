@@ -2,7 +2,6 @@ import { Avatar } from '../ui/Avatar.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DefinitionList } from '../ui/DefinitionList.jsx';
-import { cx, tone as toneOf } from '../../lib/tone.js';
 
 /**
  * The record book's cover page, shown at the top of every signed-in view.
@@ -72,19 +71,7 @@ export function ProfileHeader({
   );
 }
 
-/** The health chip that sits in the header's `aside` slot. */
-export function HealthDial({ index, tone, label }) {
-  const t = toneOf(tone);
-  return (
-    <div className={cx('rounded-2xl px-6 py-4 text-center shadow-inner transition-all duration-300', t.bg, t.border, 'border')}>
-      <div className="flex items-baseline justify-center gap-1">
-        <span className={cx('tnum font-display text-[38px] font-semibold leading-none', t.text)}>
-          {index}
-        </span>
-        <span className="text-xs font-semibold text-muted-soft">/100</span>
-      </div>
-      <p className={cx('mt-1.5 text-[11.5px] font-semibold', t.text)}>{label}</p>
-      <p className="mt-0.5 text-[10px] uppercase tracking-[.07em] text-muted-soft">Health Index</p>
-    </div>
-  );
+/** The health chip that sits in the header's `aside` slot (disabled). */
+export function HealthDial() {
+  return null;
 }

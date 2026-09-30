@@ -222,12 +222,10 @@ export function buildReports(mentor) {
   const meetingsHeld = mentees.reduce((sum, mentee) => sum + mentee.meetingsHeld, 0);
   const meetingsPlanned = mentees.reduce((sum, mentee) => sum + mentee.meetingsDue, 0);
   const compliance = Math.round((meetingsHeld / (meetingsPlanned || 1)) * 100);
-  const average = Math.round(mentees.reduce((s, m) => s + m.health, 0) / (mentees.length || 1));
 
   return [
     { key: 'Meeting Compliance', value: `${compliance}%`, tone: compliance >= 80 ? 'green' : 'amber', note: `${meetingsHeld} of ${meetingsPlanned} meetings recorded` },
-    { key: 'Average Health Index', value: String(average), tone: 'ink', note: `Across ${mentees.length} tracked mentees` },
-    { key: 'Students Flagged', value: String(mentees.filter((m) => m.health < 70).length), tone: 'rose', note: 'Below the 70 health threshold' },
+    { key: 'Students Flagged', value: String(mentees.filter((m) => m.flagReason).length), tone: 'rose', note: 'Mentees requiring follow-up' },
     { key: 'Attendance Shortfalls', value: String(mentees.filter((m) => m.attendanceBelowRequirement).length), tone: 'amber', note: `Below the ${ATTENDANCE_REQUIREMENT}% requirement` },
     { key: 'Standing Arrears', value: String(mentees.reduce((s, m) => s + m.standingArrears, 0)), tone: 'indigo', note: 'Across the roster, Section 5' },
     { key: 'Well-being Concerns', value: String(mentees.filter((m) => m.wellbeingConcerns > 0).length), tone: 'amber', note: 'Students with a flagged aspect, Section 10' },

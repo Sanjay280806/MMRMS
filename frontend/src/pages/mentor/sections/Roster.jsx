@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
 import { SectionCard } from '../../../components/ui/SectionCard.jsx';
 import { Skeleton } from '../../../components/ui/Skeleton.jsx';
@@ -55,7 +55,6 @@ export function Roster({ onOpenMentee }) {
                     <p className="tnum truncate text-[11.5px] text-muted">{m.rollNumber}</p>
                     <p className="truncate text-[11.5px] text-muted">{m.meta}</p>
                   </div>
-                  <HealthBadge value={m.health} tone={m.healthTone} />
                 </div>
 
                 <dl className="mt-3.5 grid grid-cols-3 gap-2 border-t border-line pt-3">
