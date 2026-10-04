@@ -7,8 +7,10 @@ import {
   bulkUpsertFaculty,
   bulkUpsertMentees,
   findMenteeById,
+  findMentorById,
   findYearCoordinatorById,
   listAllMentees,
+  listMentees,
   listMentors,
   listUploadHistory,
   updateOdRequestStatus,
@@ -47,8 +49,8 @@ router.get('/me/overview', (req, res) => {
 });
 
 router.get('/me/students', (req, res) => {
-  currentCoordinator(req);
-  res.json(buildStudentDirectory(req.query));
+  const coordinator = currentCoordinator(req);
+  res.json(buildStudentDirectory(req.query, coordinator));
 });
 
 router.get('/me/students/:studentId', (req, res, next) => {
@@ -56,6 +58,35 @@ router.get('/me/students/:studentId', (req, res, next) => {
   const student = findMenteeById(req.params.studentId);
   if (!student) return next(new HttpError(404, 'Student not found in your year'));
   res.json(buildMenteeRecordBook(student));
+});
+
+router.get('/me/mentors/:mentorId', (req, res, next) => {
+  const coordinator = currentCoordinator(req);
+  const mentor = findMentorById(req.params.mentorId);
+  if (!mentor) return next(new HttpError(404, 'Mentor not found'));
+
+  const cohortFilter = coordinator.cohortId;
+  const allMentees = listMentees(mentor.id);
+  const mentees = cohortFilter && cohortFilter !== 'ALL'
+    ? allMentees.filter((m) => {
+        const prefix = cohortFilter.slice(0, 2).toUpperCase();
+        return m.rollNumber?.toUpperCase().startsWith(prefix) || m.section?.toLowerCase().includes(cohortFilter.toLowerCase());
+      })
+    : allMentees;
+
+  res.json({
+    mentor: {
+      id: mentor.id,
+      name: mentor.name,
+      email: mentor.email,
+      department: mentor.department,
+      designation: mentor.designation,
+      staffCode: mentor.staffCode,
+      cabin: mentor.cabin,
+    },
+    cohortId: coordinator.cohortId,
+    mentees: mentees.map(summariseMentee),
+  });
 });
 
 router.post('/me/events', (req, res, next) => {

@@ -114,6 +114,10 @@ export function findYearCoordinatorById(id) {
   return yearCoordinators.find((coordinator) => coordinator.id === id);
 }
 
+export function listYearCoordinators() {
+  return yearCoordinators;
+}
+
 export function findStudentById(id) {
   return students.get(id);
 }

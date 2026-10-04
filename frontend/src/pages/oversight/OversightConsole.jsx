@@ -20,7 +20,7 @@ const titles = {
   },
   coordinator: {
     dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset', risk: 'At-Risk Students',
-    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', operations: 'Events & OD Approvals',
+    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', operations: 'Year Events & Calendar',
     audit: 'Audit & Accreditation Readiness',
   },
 };
@@ -83,7 +83,7 @@ function OversightConsole({ role }) {
     ]
     : [
       { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }, { key: 'risk', label: 'At-Risk Students', badge: stats.atRisk, badgeTone: 'rose' }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'operations', label: 'Events & OD', badge: stats.pendingOd, badgeTone: 'rose' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'operations', label: 'Year Events', badge: stats.plannedEvents, badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -150,7 +150,7 @@ function profileFields(role, person, stats) {
   const yearFields = [
     { key: 'Programme', value: person.programme }, { key: 'Year', value: person.year }, { key: 'Email ID', value: person.email },
     { key: 'Mobile number', value: person.mobile }, { key: 'Room', value: person.room }, { key: 'Students tracked', value: String(stats.students) },
-    { key: 'Mentors monitored', value: String(stats.mentors) }, { key: 'Pending OD approvals', value: String(stats.pendingOd) },
+    { key: 'Mentors monitored', value: String(stats.mentors) }, { key: 'Planned year events', value: String(stats.plannedEvents) },
   ];
   return role === 'advisor' ? classFields : yearFields;
 }
@@ -198,7 +198,7 @@ function CoordinatorDashboard({ data, onNavigate }) {
       <StatTile label="Students tracked" value={stats.students} footer="2024 BCS consolidated dataset" />
       <StatTile label="Mentor compliance" value={stats.mentorCompliance} suffix="%" footer="Recorded mentoring sessions vs due" />
       <StatTile label="Students at risk" value={stats.atRisk} footer="Needs attendance or academic follow-up" tone={stats.atRisk ? 'rose' : 'green'} />
-      <StatTile label="Pending OD approvals" value={stats.pendingOd} footer={`${stats.plannedEvents} planned year activity(s)`} tone={stats.pendingOd ? 'amber' : 'green'} />
+      <StatTile label="Planned year events" value={stats.plannedEvents} footer="PTM, orientation & reviews" tone="indigo" />
     </div>
 
     {/* Batch Data Management & Quick Sync Action Card */}
@@ -305,7 +305,6 @@ function StudentDirectory({ role, onNavigate }) {
           { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
           { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
           { key: 'mentor', header: 'Mentoring', align: 'right', render: (row) => `${row.meetingsHeld}/${row.meetingsDue}` },
-          { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
         ]} />
         <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[12px] text-muted">
           <span>{data.total} students · page {data.page} of {data.totalPages}</span>
@@ -345,13 +344,6 @@ function CoordinatorOperations({ data, reload, composer, setComposer }) {
       <DataTable rows={data.events} rowKey={(row) => row.id} columns={[
         { key: 'title', header: 'Activity', render: (row) => <div><p className="font-medium">{row.title}</p><p className="text-[11.5px] text-muted">{row.notes}</p></div> },
         { key: 'date', header: 'Date', align: 'right' }, { key: 'type', header: 'Type', align: 'right', render: (row) => <Badge tone="indigo">{row.type}</Badge> }, { key: 'status', header: 'Status', align: 'right', render: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
-      ]} />
-    </SectionTable>
-    <SectionTable title="External Event / OD Approvals" subtitle="Approve or reject pending on-duty requests">
-      <DataTable rows={data.odRequests} rowKey={(row) => row.id} columns={[
-        { key: 'student', header: 'Student / event', render: (row) => <div><p className="font-medium">{row.student}</p><p className="text-[11.5px] text-muted">{row.rollNumber} · {row.event}</p></div> },
-        { key: 'dates', header: 'Dates', align: 'right', render: (row) => `${row.from} – ${row.to}` },
-        { key: 'status', header: 'Decision', align: 'right', render: (row) => row.status === 'Pending' ? <div className="flex justify-end gap-2"><StatusButton path={`/coordinator/me/od-requests/${row.id}`} status={row.status} next="Approved" onDone={reload} /><StatusButton path={`/coordinator/me/od-requests/${row.id}`} status={row.status} next="Rejected" onDone={reload} /></div> : <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
       ]} />
     </SectionTable>
   </div>;

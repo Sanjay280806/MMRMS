@@ -11,6 +11,7 @@ import studentRoutes from './routes/student.routes.js';
 import mentorRoutes from './routes/mentor.routes.js';
 import advisorRoutes from './routes/advisor.routes.js';
 import coordinatorRoutes from './routes/coordinator.routes.js';
+import hodRoutes from './routes/hod.routes.js';
 import announcementRoutes from './routes/announcement.routes.js';
 import { envelopeMiddleware } from './middleware/envelope.js';
 import { notFound, errorHandler } from './middleware/error.js';
@@ -51,6 +52,7 @@ export function createApp() {
   app.use('/api/mentor', mentorRoutes);
   app.use('/api/advisor', advisorRoutes);
   app.use('/api/coordinator', coordinatorRoutes);
+  app.use('/api/hod', hodRoutes);
   app.use('/api/announcements', announcementRoutes);
 
   app.use(notFound);

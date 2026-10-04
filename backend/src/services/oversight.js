@@ -39,14 +39,20 @@ function grievanceRows(students) {
 }
 
 /** Applies query filtering and pagination to a role-scoped student directory. */
-export function buildStudentDirectory(query = {}) {
+export function buildStudentDirectory(query = {}, coordinator = null) {
   const page = Math.max(1, Number(query.page) || 1);
   const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
   const search = String(query.student ?? query.search ?? '').trim().toLowerCase();
   const className = String(query.class ?? '').trim().toLowerCase();
   const year = String(query.year ?? '').trim();
+  const cohortFilter = coordinator?.cohortId || query.cohortId;
 
   const filtered = summaries()
+    .filter((student) => {
+      if (!cohortFilter || cohortFilter === 'ALL') return true;
+      const prefix = cohortFilter.slice(0, 2).toUpperCase();
+      return student.rollNumber?.toUpperCase().startsWith(prefix) || student.section?.toLowerCase().includes(cohortFilter.toLowerCase());
+    })
     .filter((student) => !search || `${student.name} ${student.rollNumber}`.toLowerCase().includes(search))
     .filter((student) => !className || student.section.toLowerCase() === className)
     .filter((student) => !year || String(student.year) === year || student.meta.includes(year))
@@ -118,7 +124,15 @@ export function buildAdvisorOverview(advisor) {
 }
 
 export function buildCoordinatorOverview(coordinator) {
-  const students = summaries();
+  const allStudents = summaries();
+  const cohortFilter = coordinator?.cohortId;
+  const students = cohortFilter && cohortFilter !== 'ALL'
+    ? allStudents.filter((student) => {
+        const prefix = cohortFilter.slice(0, 2).toUpperCase();
+        return student.rollNumber?.toUpperCase().startsWith(prefix) || student.section?.toLowerCase().includes(cohortFilter.toLowerCase());
+      })
+    : allStudents;
+
   const mentors = mentorTracker(students);
   const attendanceShortfalls = students.filter((student) => student.attendanceBelowRequirement);
   const atRisk = students.filter((student) => student.health < 70);
@@ -129,7 +143,12 @@ export function buildCoordinatorOverview(coordinator) {
 
   return {
     institution: INSTITUTION,
-    coordinator: { ...coordinator, initials: initials(coordinator.name) },
+    coordinator: {
+      ...coordinator,
+      initials: initials(coordinator.name),
+      cohortId: coordinator.cohortId || '24BCS',
+      cohortName: coordinator.cohortName || '2024 BCS',
+    },
     stats: {
       students: students.length,
       mentors: mentors.length,
