@@ -316,6 +316,7 @@ function MeetingComposer({ onClose, onRecorded }) {
     pendingTasks: '',
     improvementObserved: '',
   });
+  const [goalProgress, setGoalProgress] = useState([]);
   const [mentorRemarks, setMentorRemarks] = useState('');
   const [studentRemarks, setStudentRemarks] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
@@ -338,6 +339,12 @@ function MeetingComposer({ onClose, onRecorded }) {
 
   function updateActionItem(index, patch) {
     setActionItems((items) => items.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, ...patch } : item
+    )));
+  }
+
+  function updateGoalProgress(index, patch) {
+    setGoalProgress((items) => items.map((item, itemIndex) => (
       itemIndex === index ? { ...item, ...patch } : item
     )));
   }
