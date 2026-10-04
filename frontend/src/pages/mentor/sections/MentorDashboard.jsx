@@ -176,7 +176,7 @@ function WatchTile({ label, value, tone }) {
   return (
     <div className="rounded-card border border-line bg-white p-4 shadow-card">
       <div className="flex items-baseline gap-2">
-        <span className="tnum font-display text-[26px] font-semibold leading-none text-ink">{value}</span>
+        <span className="tnum font-display text-[26px] font-medium leading-none text-ink">{value}</span>
         <Badge tone={tone}>{label}</Badge>
       </div>
     </div>

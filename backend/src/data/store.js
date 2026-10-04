@@ -41,6 +41,31 @@ const grievances = clone(GRIEVANCES);
 const coordinatorEvents = clone(COORDINATOR_EVENTS);
 const odRequests = clone(OD_REQUESTS);
 
+const uploadHistory = [
+  {
+    id: 'up-1',
+    filename: '2024_BCS_Semester_5_Master_Data.xlsx',
+    mode: 'master',
+    totalRows: 40,
+    insertedCount: 40,
+    updatedCount: 0,
+    uploadedBy: 'Anitha P',
+    uploadedAt: '2026-07-02T10:30:00.000Z',
+    status: 'Completed',
+  },
+  {
+    id: 'up-2',
+    filename: 'MyCamu_July_Attendance_Dump.xlsx',
+    mode: 'attendance',
+    totalRows: 40,
+    insertedCount: 0,
+    updatedCount: 40,
+    uploadedBy: 'Anitha P',
+    uploadedAt: '2026-07-28T14:15:00.000Z',
+    status: 'Completed',
+  },
+];
+
 let sequence = 1000;
 const nextId = (prefix) => `${prefix}-${++sequence}`;
 
@@ -103,6 +128,249 @@ export function listAllMentees() {
 
 export function findMenteeById(id) {
   return mentees.find((m) => m.id === id);
+}
+
+export function listMentors() {
+  return mentors;
+}
+
+export function listUploadHistory() {
+  return uploadHistory;
+}
+
+export function addUploadLog(log) {
+  const entry = { id: nextId('up'), uploadedAt: new Date().toISOString(), status: 'Completed', ...log };
+  uploadHistory.unshift(entry);
+  return entry;
+}
+
+let cachedStudentPasswordHash = null;
+function getDefaultStudentPasswordHash() {
+  if (!cachedStudentPasswordHash) {
+    cachedStudentPasswordHash = bcrypt.hashSync('mmrms@2026', 10);
+  }
+  return cachedStudentPasswordHash;
+}
+
+export function bulkUpsertMentees(records = [], options = {}) {
+  let insertedCount = 0;
+  let updatedCount = 0;
+  const processed = [];
+
+  for (const item of records) {
+    const roll = String(item.rollNumber).trim().toUpperCase();
+    const existingIndex = mentees.findIndex((m) => m.rollNumber.toUpperCase() === roll);
+    const isExisting = existingIndex !== -1;
+    const current = isExisting ? mentees[existingIndex] : null;
+
+    const attendance = (item.attendance !== undefined && item.attendance !== null && item.attendance !== '')
+      ? item.attendance
+      : (current ? current.attendance : 85);
+
+    const gpa = (item.gpa !== undefined && item.gpa !== null && item.gpa !== '')
+      ? item.gpa
+      : (current ? current.gpa : 7.5);
+
+    const standingArrears = (item.standingArrears !== undefined && item.standingArrears !== null && item.standingArrears !== '')
+      ? item.standingArrears
+      : (current ? current.standingArrears : 0);
+
+    let flagReason = null;
+    let suggestedAction = null;
+    if (attendance < 70) {
+      flagReason = 'Low Attendance';
+      suggestedAction = 'Parent follow-up';
+    } else if (attendance < 75) {
+      flagReason = 'Attendance Shortage';
+      suggestedAction = 'Attendance plan';
+    } else if (standingArrears > 0) {
+      flagReason = 'Standing Arrear';
+      suggestedAction = 'Academic intervention';
+    }
+
+    if (isExisting) {
+      current.name = item.name || current.name;
+      current.year = item.year || current.year;
+      current.section = item.section || current.section;
+      current.gpa = gpa;
+      current.attendance = attendance;
+      current.standingArrears = standingArrears;
+      if (item.mentorId) current.mentorId = item.mentorId;
+      if (item.staffCode) current.staffCode = item.staffCode;
+      current.flagReason = flagReason;
+      current.suggestedAction = suggestedAction;
+
+      const profile = students.get(current.id);
+      if (profile) {
+        profile.identity.name = current.name;
+        profile.identity.section = current.section;
+      }
+
+      updatedCount++;
+      processed.push({ ...current, _action: 'updated' });
+    } else {
+      const newId = nextId('s');
+      const newMentee = {
+        id: newId,
+        staffCode: item.staffCode || 'KCT01763',
+        mentorId: item.mentorId || 'm-1',
+        mentorName: item.mentorName || 'Bharathi Priya',
+        rollNumber: roll,
+        name: item.name,
+        year: item.year || 3,
+        section: item.section || '2024 BCS',
+        gpa,
+        attendance,
+        standingArrears,
+        meetingsHeld: 0,
+        meetingsDue: 4,
+        readinessDone: 0,
+        wellbeingConcerns: 0,
+        lastMeeting: null,
+        flagReason,
+        suggestedAction,
+      };
+      mentees.push(newMentee);
+
+      const studentEmail = (item.email || `${roll.toLowerCase()}@kct.ac.in`).toLowerCase();
+      if (!findUserByEmail(studentEmail)) {
+        users.push({
+          id: nextId('u'),
+          role: 'student',
+          name: newMentee.name,
+          email: studentEmail,
+          passwordHash: getDefaultStudentPasswordHash(),
+          department: 'Computer Science and Engineering',
+          designation: `${newMentee.section} · Year ${newMentee.year}`,
+          studentId: newId,
+        });
+      }
+
+      insertedCount++;
+      processed.push({ ...newMentee, _action: 'inserted' });
+    }
+  }
+
+  for (const mentor of mentors) {
+    mentor.menteeCount = mentees.filter((m) => m.mentorId === mentor.id).length;
+  }
+
+  const logEntry = {
+    id: nextId('up'),
+    filename: options.filename || 'excel_upload.xlsx',
+    mode: options.mode || 'master',
+    totalRows: records.length,
+    insertedCount,
+    updatedCount,
+    uploadedBy: options.uploadedBy || 'Anitha P',
+    uploadedAt: new Date().toISOString(),
+    status: 'Completed',
+  };
+  uploadHistory.unshift(logEntry);
+
+  return {
+    success: true,
+    total: records.length,
+    insertedCount,
+    updatedCount,
+    log: logEntry,
+    processed,
+  };
+}
+
+export function bulkUpsertFaculty(records = [], options = {}) {
+  let insertedCount = 0;
+  let updatedCount = 0;
+  const processed = [];
+
+  for (const item of records) {
+    const code = String(item.staffCode).trim().toUpperCase();
+    const email = String(item.email).trim().toLowerCase();
+
+    const existingIndex = mentors.findIndex(
+      (m) => (m.staffCode && m.staffCode.toUpperCase() === code) ||
+             (m.email && m.email.toLowerCase() === email)
+    );
+
+    if (existingIndex !== -1) {
+      const current = mentors[existingIndex];
+      current.name = item.name || current.name;
+      current.designation = item.designation || current.designation;
+      current.department = item.department || current.department;
+      if (item.email) current.email = item.email;
+      if (item.staffCode) current.staffCode = item.staffCode;
+
+      const user = findUserByEmail(email) || users.find((u) => u.mentorId === current.id);
+      if (user) {
+        user.name = current.name;
+        user.designation = current.designation;
+        user.email = current.email;
+      }
+
+      updatedCount++;
+      processed.push({ ...current, _action: 'updated' });
+    } else {
+      const newId = `m-${mentors.length + 1}`;
+      const newMentor = {
+        id: newId,
+        staffCode: code,
+        name: item.name,
+        email: email || `${code.toLowerCase()}@kct.ac.in`,
+        mobile: item.mobile || '+91 98430 00000',
+        department: item.department || 'Computer Science and Engineering',
+        designation: item.designation || 'Mentor',
+        cabin: item.cabin || 'CSE Block · Faculty Cabin',
+        batches: ['2024-28 Batch'],
+        menteeCount: 0,
+        yearCoordinator: options.uploadedBy || 'Anitha P',
+      };
+      mentors.push(newMentor);
+
+      if (!findUserByEmail(newMentor.email)) {
+        users.push({
+          id: nextId('u'),
+          role: 'mentor',
+          name: newMentor.name,
+          email: newMentor.email,
+          passwordHash: getDefaultStudentPasswordHash(),
+          department: newMentor.department,
+          designation: newMentor.designation,
+          mentorId: newId,
+        });
+      }
+
+      insertedCount++;
+      processed.push({ ...newMentor, _action: 'inserted' });
+    }
+  }
+
+  for (const mentor of mentors) {
+    mentor.menteeCount = mentees.filter(
+      (m) => m.mentorId === mentor.id || (m.staffCode && mentor.staffCode && m.staffCode.toUpperCase() === mentor.staffCode.toUpperCase())
+    ).length;
+  }
+
+  const logEntry = {
+    id: nextId('up'),
+    filename: options.filename || 'faculty_upload.xlsx',
+    mode: 'faculty',
+    totalRows: records.length,
+    insertedCount,
+    updatedCount,
+    uploadedBy: options.uploadedBy || 'Anitha P',
+    uploadedAt: new Date().toISOString(),
+    status: 'Completed',
+  };
+  uploadHistory.unshift(logEntry);
+
+  return {
+    success: true,
+    total: records.length,
+    insertedCount,
+    updatedCount,
+    log: logEntry,
+    processed,
+  };
 }
 
 export function listClassMeetings() {

@@ -10,6 +10,7 @@ export function requireAuth(req, _res, next) {
   const header = req.headers.authorization ?? '';
   let token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token && req.query.token) token = req.query.token;
+  if (!token && req.cookies?.mmrms_token) token = req.cookies.mmrms_token;
   if (!token) return next(new HttpError(401, 'Missing bearer token', null, 'UNAUTHORIZED'));
 
   let payload;

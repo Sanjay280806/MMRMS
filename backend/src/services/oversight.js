@@ -4,6 +4,7 @@ import {
   listClassMeetings,
   listCoordinatorEvents,
   listGrievances,
+  listMentors,
   listOdRequests,
 } from '../data/store.js';
 import { healthIndex } from './health.js';
@@ -65,7 +66,7 @@ export function buildStudentDirectory(query = {}) {
 }
 
 function mentorTracker(students) {
-  return MENTORS.map((mentor) => {
+  return listMentors().map((mentor) => {
     const assigned = students.filter((student) => student.id && listAllMentees().find((raw) => raw.id === student.id)?.mentorId === mentor.id);
     const meetingsHeld = assigned.reduce((sum, student) => sum + student.meetingsHeld, 0);
     const meetingsDue = assigned.reduce((sum, student) => sum + student.meetingsDue, 0);

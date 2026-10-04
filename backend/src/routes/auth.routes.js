@@ -53,6 +53,13 @@ router.post('/login', (req, res, next) => {
   const refreshToken = signRefreshToken(user);
 
   const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+  res.cookie('mmrms_token', accessToken, {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? 'none' : 'lax',
+    path: '/',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
   res.cookie('mmrms_refresh', refreshToken, {
     httpOnly: true,
     secure: isHttps,

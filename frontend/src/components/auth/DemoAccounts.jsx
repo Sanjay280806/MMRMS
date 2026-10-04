@@ -3,6 +3,8 @@
  * request still goes through the real API.
  */
 const ACCOUNTS = [
+  { role: 'coordinator', email: 'anitha.p@kct.ac.in' },
+  { role: 'advisor', email: 'suganthi@kct.ac.in' },
   { role: 'mentor', email: 'bharathi.priya@kct.ac.in' },
   { role: 'student', email: 'abhinav.dinesh@kct.ac.in' },
 ];
