@@ -3,7 +3,9 @@ import {
   findMenteeById,
   findMentorById,
   listAllMentees,
+  listArchivedStaff,
   listCoordinatorEvents,
+  listEligibleFaculty,
   listMentees,
   listMentors,
   listOdRequests,
@@ -27,7 +29,8 @@ function summaries() {
 export function getCohortsSummary() {
   const students = summaries();
   const mentors = listMentors();
-  const coordinators = listYearCoordinators();
+  const allCoordinators = listYearCoordinators(true);
+  const activeCoordinators = listYearCoordinators(false);
 
   // Map known cohorts or extract from student roll numbers / sections
   const cohortMap = new Map();
@@ -68,8 +71,9 @@ export function getCohortsSummary() {
     .filter((c) => c.students.length > 0 || c.cohortId === '24BCS')
     .map((c) => {
       const cStudents = c.students;
-      const coordinator = coordinators.find((yc) => yc.cohortId === c.cohortId) || coordinators[0] || null;
-      
+      const coordinator = activeCoordinators.find((yc) => yc.cohortId?.toUpperCase() === c.cohortId?.toUpperCase()) || activeCoordinators[0] || null;
+      const previousCoordinators = allCoordinators.filter((yc) => yc.cohortId?.toUpperCase() === c.cohortId?.toUpperCase() && yc.archived);
+
       const distinctMentors = new Set(
         cStudents.map((s) => s.mentorId || s.mentor).filter(Boolean)
       );
@@ -86,8 +90,17 @@ export function getCohortsSummary() {
         cohortName: c.cohortName,
         year: c.year,
         yearCoordinator: coordinator ? coordinator.name : 'Unassigned',
+        coordinatorId: coordinator ? coordinator.id : null,
         coordinatorEmail: coordinator ? coordinator.email : '—',
         coordinatorRoom: coordinator ? coordinator.room : '—',
+        coordinatorMobile: coordinator ? coordinator.mobile : '—',
+        previousCoordinators: previousCoordinators.map((pc) => ({
+          id: pc.id,
+          name: pc.name,
+          email: pc.email,
+          archivedAt: pc.archivedAt,
+          archivedReason: pc.archivedReason,
+        })),
         totalStudents: cStudents.length,
         totalMentors: distinctMentors.size || (cStudents.length ? mentors.length : 0),
         avgAttendance: mean(cStudents.map((s) => s.attendance)),
@@ -107,9 +120,12 @@ export function getCohortsSummary() {
  */
 export function buildHodOverview() {
   const students = summaries();
-  const mentors = listMentors();
-  const coordinators = listYearCoordinators();
+  const mentors = listMentors(false);
+  const allMentors = listMentors(true);
+  const coordinators = listYearCoordinators(false);
   const cohorts = getCohortsSummary();
+  const eligibleFaculty = listEligibleFaculty();
+  const archivedStaff = listArchivedStaff();
 
   const atRiskStudents = students
     .filter((s) => s.health < 70 || s.attendanceBelowRequirement || s.standingArrears > 0)
@@ -182,6 +198,8 @@ export function buildHodOverview() {
       ...yc,
       initials: initials(yc.name),
     })),
+    eligibleFaculty,
+    archivedStaff,
     recentUploads: uploadHistory.slice(0, 5),
     recentEvents: events.slice(0, 5),
   };
@@ -190,8 +208,8 @@ export function buildHodOverview() {
 /**
  * Returns mentor list with mentee breakdown for HOD.
  */
-export function getHodMentors() {
-  const mentors = listMentors();
+export function getHodMentors(includeArchived = false) {
+  const mentors = listMentors(includeArchived);
   return mentors.map((m) => {
     const rawMentees = listMentees(m.id);
     const assigned = rawMentees.map(summariseMentee);
@@ -206,6 +224,10 @@ export function getHodMentors() {
       email: m.email,
       department: m.department,
       cabin: m.cabin,
+      status: m.status || (m.archived ? 'Archived' : 'Active'),
+      archived: Boolean(m.archived),
+      archivedAt: m.archivedAt || null,
+      archivedReason: m.archivedReason || null,
       assignedMentees: assigned.length,
       meetingsHeld,
       meetingsDue,

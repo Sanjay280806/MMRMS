@@ -114,8 +114,12 @@ export function findYearCoordinatorById(id) {
   return yearCoordinators.find((coordinator) => coordinator.id === id);
 }
 
-export function listYearCoordinators() {
-  return yearCoordinators;
+export function listYearCoordinators(includeArchived = false) {
+  return includeArchived ? yearCoordinators : yearCoordinators.filter((c) => !c.archived);
+}
+
+export function listArchivedYearCoordinators() {
+  return yearCoordinators.filter((c) => c.archived);
 }
 
 export function findStudentById(id) {
@@ -134,8 +138,341 @@ export function findMenteeById(id) {
   return mentees.find((m) => m.id === id);
 }
 
-export function listMentors() {
-  return mentors;
+export function listMentors(includeArchived = false) {
+  return includeArchived ? mentors : mentors.filter((m) => !m.archived);
+}
+
+export function listArchivedMentors() {
+  return mentors.filter((m) => m.archived);
+}
+
+export function listEligibleFaculty() {
+  const list = [];
+  const seenEmails = new Set();
+
+  // Active mentors
+  for (const m of mentors.filter((m) => !m.archived)) {
+    if (!seenEmails.has(m.email.toLowerCase())) {
+      seenEmails.add(m.email.toLowerCase());
+      list.push({
+        id: m.id,
+        staffCode: m.staffCode,
+        name: m.name,
+        email: m.email,
+        mobile: m.mobile,
+        department: m.department,
+        designation: m.designation,
+        cabin: m.cabin,
+        currentRole: 'Mentor',
+        menteeCount: m.menteeCount || 0,
+      });
+    }
+  }
+
+  // Active Class Advisors
+  for (const ca of classAdvisors.filter((ca) => !ca.archived)) {
+    if (!seenEmails.has(ca.email.toLowerCase())) {
+      seenEmails.add(ca.email.toLowerCase());
+      list.push({
+        id: ca.id,
+        staffCode: 'KCT-CA',
+        name: ca.name,
+        email: ca.email,
+        mobile: ca.mobile,
+        department: ca.department,
+        designation: ca.designation,
+        cabin: ca.room,
+        currentRole: 'Class Advisor',
+        menteeCount: 0,
+      });
+    }
+  }
+
+  // Pre-seed distinguished CSE faculty members for selection
+  const facultyRoster = [
+    { staffCode: 'KCT01880', name: 'Dr. Ramesh Kumar K', email: 'rameshkumar.k@kct.ac.in', mobile: '+91 98432 44101', department: 'Computer Science and Engineering', designation: 'Associate Professor', cabin: 'CSE Block · Room 302', currentRole: 'Faculty' },
+    { staffCode: 'KCT01892', name: 'Dr. Kavitha S', email: 'kavitha.s@kct.ac.in', mobile: '+91 98433 55202', department: 'Computer Science and Engineering', designation: 'Associate Professor', cabin: 'CSE Block · Room 304', currentRole: 'Faculty' },
+    { staffCode: 'KCT01915', name: 'Prof. Suresh M', email: 'suresh.m@kct.ac.in', mobile: '+91 98434 66303', department: 'Computer Science and Engineering', designation: 'Assistant Professor (SrG)', cabin: 'CSE Block · Room 218', currentRole: 'Faculty' },
+    { staffCode: 'KCT01930', name: 'Prof. Nithya R', email: 'nithya.r@kct.ac.in', mobile: '+91 98435 77404', department: 'Computer Science and Engineering', designation: 'Assistant Professor', cabin: 'CSE Block · Room 220', currentRole: 'Faculty' },
+  ];
+
+  for (const f of facultyRoster) {
+    if (!seenEmails.has(f.email.toLowerCase())) {
+      seenEmails.add(f.email.toLowerCase());
+      list.push({ ...f, id: f.staffCode, menteeCount: 0 });
+    }
+  }
+
+  return list;
+}
+
+export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discontinued / Reassigned' }) {
+  if (!cohortId) throw new Error('cohortId is required');
+  if (!newFaculty || !newFaculty.name || !newFaculty.email) {
+    throw new Error('New faculty name and institutional email are required');
+  }
+
+  const cId = String(cohortId).toUpperCase().trim();
+  const oldCoordinator = yearCoordinators.find((yc) => yc.cohortId?.toUpperCase() === cId && !yc.archived);
+
+  // Soft-delete / Archive the departing YC
+  if (oldCoordinator) {
+    oldCoordinator.status = 'Archived';
+    oldCoordinator.archived = true;
+    oldCoordinator.archivedAt = new Date().toISOString();
+    oldCoordinator.archivedReason = reason;
+
+    // Archive old YC user account
+    const oldUser = users.find(
+      (u) => (u.coordinatorId === oldCoordinator.id || (u.email?.toLowerCase() === oldCoordinator.email?.toLowerCase() && u.role === 'coordinator')) && !u.archived
+    );
+    if (oldUser) {
+      oldUser.archived = true;
+      oldUser.archivedAt = new Date().toISOString();
+      oldUser.archivedReason = reason;
+      oldUser.status = 'Archived';
+    }
+  }
+
+  // Create the new Year Coordinator record
+  const newYcId = nextId('yc');
+  const newEmail = String(newFaculty.email).toLowerCase().trim();
+  const cohortName = oldCoordinator?.cohortName || `${cId} BCS`;
+  const yearName = oldCoordinator?.year || 'II Year';
+  const programme = oldCoordinator?.programme || 'B.E. Computer Science and Engineering';
+
+  const newCoordinator = {
+    id: newYcId,
+    name: newFaculty.name.trim(),
+    email: newEmail,
+    mobile: newFaculty.mobile || '+91 98430 00000',
+    department: newFaculty.department || 'Computer Science and Engineering',
+    designation: newFaculty.designation || 'Year Coordinator',
+    year: yearName,
+    cohortId: cId,
+    cohortName,
+    programme,
+    room: newFaculty.room || newFaculty.cabin || 'CSE Block · Room 210',
+    status: 'Active',
+    archived: false,
+    assignedAt: new Date().toISOString(),
+    replacedCoordinator: oldCoordinator ? {
+      id: oldCoordinator.id,
+      name: oldCoordinator.name,
+      email: oldCoordinator.email,
+      archivedAt: oldCoordinator.archivedAt,
+      archivedReason: oldCoordinator.archivedReason,
+    } : null,
+  };
+
+  yearCoordinators.push(newCoordinator);
+
+  // Update or provision user account for new YC
+  let existingUser = users.find((u) => u.email.toLowerCase() === newEmail);
+  if (existingUser) {
+    existingUser.role = 'coordinator';
+    existingUser.coordinatorId = newYcId;
+    existingUser.cohortId = cId;
+    existingUser.archived = false;
+    existingUser.status = 'Active';
+    existingUser.designation = `Year Coordinator · ${cohortName}`;
+  } else {
+    existingUser = {
+      id: nextId('u'),
+      role: 'coordinator',
+      name: newCoordinator.name,
+      email: newEmail,
+      passwordHash: getDefaultStudentPasswordHash(),
+      department: newCoordinator.department,
+      designation: `Year Coordinator · ${cohortName}`,
+      coordinatorId: newYcId,
+      cohortId: cId,
+      archived: false,
+      status: 'Active',
+    };
+    users.push(existingUser);
+  }
+
+  // Historical records auditing guarantee:
+  // All historical events (coordinatorEvents) and upload logs (uploadHistory)
+  // stay intact with the original creator's attribution for auditing.
+  for (const advisor of classAdvisors) {
+    if (advisor.yearCoordinator === oldCoordinator?.name) {
+      advisor.yearCoordinator = newCoordinator.name;
+    }
+  }
+  for (const mentor of mentors) {
+    if (mentor.yearCoordinator === oldCoordinator?.name) {
+      mentor.yearCoordinator = newCoordinator.name;
+    }
+  }
+
+  return {
+    success: true,
+    cohortId: cId,
+    cohortName,
+    newCoordinator,
+    oldCoordinator: oldCoordinator ? {
+      id: oldCoordinator.id,
+      name: oldCoordinator.name,
+      email: oldCoordinator.email,
+      archivedAt: oldCoordinator.archivedAt,
+      archivedReason: oldCoordinator.archivedReason,
+    } : null,
+    message: `Cohort ${cohortName} reassigned to ${newCoordinator.name}. Historical records of previous coordinator remain intact for auditing.`,
+  };
+}
+
+export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = [], archiveDepartingMentor = true, reason = 'Discontinued / Reassigned' }) {
+  if (!departingMentorId) throw new Error('departingMentorId is required');
+  if (!targetMentorId) throw new Error('targetMentorId is required');
+  if (departingMentorId === targetMentorId) {
+    throw new Error('Departing mentor and target mentor cannot be the same faculty member');
+  }
+
+  const departing = mentors.find((m) => m.id === departingMentorId);
+  if (!departing) throw new Error(`Departing mentor "${departingMentorId}" not found`);
+
+  const target = mentors.find((m) => m.id === targetMentorId);
+  if (!target) throw new Error(`Target mentor "${targetMentorId}" not found`);
+
+  const allCurrentMentees = mentees.filter((m) => m.mentorId === departing.id);
+  const targetMenteeIds = Array.isArray(menteeIds) && menteeIds.length > 0
+    ? new Set(menteeIds.map(String))
+    : new Set(allCurrentMentees.map((m) => m.id));
+
+  const transferred = [];
+
+  for (const mentee of allCurrentMentees) {
+    if (!targetMenteeIds.has(mentee.id)) continue;
+
+    // Record audit trail of transfer
+    mentee.mentorTransferHistory ??= [];
+    mentee.mentorTransferHistory.unshift({
+      id: nextId('tr'),
+      fromMentorId: departing.id,
+      fromMentorName: departing.name,
+      toMentorId: target.id,
+      toMentorName: target.name,
+      transferredAt: new Date().toISOString(),
+      reason,
+    });
+
+    // Seamless preservation guarantee:
+    // Only the mentor reference is updated.
+    // ALL Section 12 meeting logs, SMART goals, attendance records,
+    // progress reviews, and notes are 100% PRESERVED.
+    mentee.mentorId = target.id;
+    mentee.mentorName = target.name;
+    mentee.staffCode = target.staffCode;
+
+    if (mentee.recordBook) {
+      mentee.recordBook.mentorId = target.id;
+      if (mentee.recordBook.identity) {
+        mentee.recordBook.identity.mentor = target.name;
+      }
+    }
+
+    // Also update student profile if active in memory
+    const studentProfile = students.get(mentee.id);
+    if (studentProfile) {
+      if (studentProfile.profile?.mentor) {
+        studentProfile.profile.mentor = {
+          id: target.id,
+          name: target.name,
+          staffCode: target.staffCode,
+          email: target.email,
+          mobile: target.mobile,
+          cabin: target.cabin,
+        };
+      }
+      if (studentProfile.identity) {
+        studentProfile.identity.mentor = target.name;
+      }
+      studentProfile.mentorTransferHistory = mentee.mentorTransferHistory;
+    }
+
+    transferred.push(mentee);
+  }
+
+  const remainingMentees = mentees.filter((m) => m.mentorId === departing.id);
+
+  if (archiveDepartingMentor || remainingMentees.length === 0) {
+    departing.status = 'Archived';
+    departing.archived = true;
+    departing.archivedAt = new Date().toISOString();
+    departing.archivedReason = reason;
+
+    // Archive user account
+    const mentorUser = users.find(
+      (u) => (u.mentorId === departing.id || (u.email?.toLowerCase() === departing.email?.toLowerCase() && u.role === 'mentor')) && !u.archived
+    );
+    if (mentorUser) {
+      mentorUser.archived = true;
+      mentorUser.archivedAt = new Date().toISOString();
+      mentorUser.archivedReason = reason;
+      mentorUser.status = 'Archived';
+    }
+  }
+
+  // Recalculate mentee counts
+  for (const m of mentors) {
+    m.menteeCount = mentees.filter((s) => s.mentorId === m.id).length;
+  }
+
+  return {
+    success: true,
+    departingMentor: {
+      id: departing.id,
+      name: departing.name,
+      staffCode: departing.staffCode,
+      archived: Boolean(departing.archived),
+      archivedAt: departing.archivedAt,
+      remainingMenteesCount: remainingMentees.length,
+    },
+    targetMentor: {
+      id: target.id,
+      name: target.name,
+      staffCode: target.staffCode,
+      totalMenteesCount: target.menteeCount,
+    },
+    transferredCount: transferred.length,
+    transferredMentees: transferred.map((m) => ({
+      id: m.id,
+      name: m.name,
+      rollNumber: m.rollNumber,
+      section: m.section,
+    })),
+    message: `Successfully reassigned ${transferred.length} mentees from ${departing.name} to ${target.name}. All progress logs and historical records are preserved.`,
+  };
+}
+
+export function listArchivedStaff() {
+  const archivedCoordinators = yearCoordinators
+    .filter((yc) => yc.archived)
+    .map((yc) => ({
+      ...yc,
+      role: 'Year Coordinator',
+      auditPreservedRecords: {
+        eventsCount: coordinatorEvents.filter((e) => e.owner === yc.name).length,
+        uploadLogsCount: uploadHistory.filter((u) => u.uploadedBy === yc.name).length,
+      },
+    }));
+
+  const archivedMentors = mentors
+    .filter((m) => m.archived)
+    .map((m) => ({
+      ...m,
+      role: 'Mentor',
+      auditPreservedRecords: {
+        totalHistoricalMentees: mentees.filter((s) => s.mentorTransferHistory?.some((t) => t.fromMentorId === m.id)).length,
+      },
+    }));
+
+  return {
+    coordinators: archivedCoordinators,
+    mentors: archivedMentors,
+  };
 }
 
 export function listUploadHistory() {

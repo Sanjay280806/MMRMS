@@ -47,6 +47,13 @@ router.post('/login', (req, res, next) => {
     return next(new HttpError(401, 'Invalid email or password. Please try again.'));
   }
 
+  if (user.archived) {
+    return next(new HttpError(403, 'This account has been archived. Access is disabled for discontinued staff.', {
+      archivedReason: user.archivedReason,
+      archivedAt: user.archivedAt,
+    }, 'ACCOUNT_ARCHIVED'));
+  }
+
   attempts.delete(key);
   const role = ROLES.find((r) => r.key === user.role);
   const accessToken = signToken(user);

@@ -12,12 +12,16 @@ import { ProgressBar } from '../../components/ui/ProgressBar.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { api } from '../../api/client.js';
+import { ReassignYcModal } from '../../components/reassignment/ReassignYcModal.jsx';
+import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
 
 export default function HodConsole() {
   const [section, setSection] = useState('overview');
   const [selectedCohort, setSelectedCohort] = useState(null);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [reassigningCohort, setReassigningCohort] = useState(null);
+  const [preselectedMentorReassignId, setPreselectedMentorReassignId] = useState(null);
 
   const { data, loading, error, reload } = useResource('/hod/me/overview');
 
@@ -166,6 +170,8 @@ export default function HodConsole() {
             selectedCohort={selectedCohort}
             onSelectCohort={setSelectedCohort}
             onOpenStudent={setSelectedStudentId}
+            onReassignYc={(cohort) => setReassigningCohort(cohort)}
+            archivedCoordinators={data.archivedStaff?.coordinators || []}
           />
         )}
 
@@ -175,6 +181,10 @@ export default function HodConsole() {
             selectedMentor={selectedMentor}
             onSelectMentor={setSelectedMentor}
             onOpenStudent={setSelectedStudentId}
+            preselectedMentorReassignId={preselectedMentorReassignId}
+            onClearPreselectedMentor={() => setPreselectedMentorReassignId(null)}
+            archivedMentors={data.archivedStaff?.mentors || []}
+            onSuccessReassign={() => reload()}
           />
         )}
 
@@ -185,6 +195,19 @@ export default function HodConsole() {
           />
         )}
       </div>
+
+      {/* Reassign Year Coordinator Modal */}
+      {reassigningCohort && (
+        <ReassignYcModal
+          cohort={reassigningCohort}
+          eligibleFaculty={data.eligibleFaculty || []}
+          onClose={() => setReassigningCohort(null)}
+          onSuccess={() => {
+            setReassigningCohort(null);
+            reload();
+          }}
+        />
+      )}
 
       {/* Student Record Book Modal */}
       {selectedStudentId && (
@@ -378,7 +401,14 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor, onOpenStudent }
 
 /* ── Section: Cohorts & Year Coordinators ────────────────────────────────── */
 
-function CohortsSection({ cohorts, selectedCohort, onSelectCohort, onOpenStudent }) {
+function CohortsSection({
+  cohorts,
+  selectedCohort,
+  onSelectCohort,
+  onOpenStudent,
+  onReassignYc,
+  archivedCoordinators = [],
+}) {
   const [cohortStudents, setCohortStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
@@ -400,7 +430,21 @@ function CohortsSection({ cohorts, selectedCohort, onSelectCohort, onOpenStudent
       <SectionTable
         title="Departmental Cohorts Directory"
         subtitle="Manage cohorts, assigned Year Coordinators, and batch-level metrics"
-        action={<Badge tone="indigo">{cohorts.length} Cohorts Active</Badge>}
+        action={
+          <div className="flex items-center gap-2">
+            <Badge tone="indigo">{cohorts.length} Cohorts Active</Badge>
+            {onReassignYc && (
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={() => onReassignYc(selectedCohort || cohorts[0])}
+                title="Reassign Year Coordinator for an active cohort"
+              >
+                ⚡ Reassign YC
+              </Button>
+            )}
+          </div>
+        }
       >
         <DataTable
           rows={cohorts}
@@ -424,6 +468,11 @@ function CohortsSection({ cohorts, selectedCohort, onSelectCohort, onOpenStudent
                 <div>
                   <p className="font-medium text-ink">{c.yearCoordinator}</p>
                   <p className="text-[11px] text-muted">{c.coordinatorEmail} · {c.coordinatorRoom}</p>
+                  {c.previousCoordinators?.length > 0 && (
+                    <span className="mt-0.5 inline-block text-[10px] text-muted-soft">
+                      {c.previousCoordinators.length} previous YC archived
+                    </span>
+                  )}
                 </div>
               ),
             },
@@ -458,17 +507,103 @@ function CohortsSection({ cohorts, selectedCohort, onSelectCohort, onOpenStudent
             },
             {
               key: 'action',
-              header: '',
+              header: 'Actions',
               align: 'right',
               render: (c) => (
-                <Button size="xs" variant={selectedCohort?.cohortId === c.cohortId ? 'primary' : 'secondary'}>
-                  {selectedCohort?.cohortId === c.cohortId ? 'Active' : 'Inspect Roster'}
-                </Button>
+                <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="xs"
+                    variant={selectedCohort?.cohortId === c.cohortId ? 'primary' : 'secondary'}
+                    onClick={() => loadCohortDetail(c)}
+                  >
+                    {selectedCohort?.cohortId === c.cohortId ? 'Active' : 'Inspect Roster'}
+                  </Button>
+                  {onReassignYc && (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => onReassignYc(c)}
+                      title="Reassign Year Coordinator for this cohort"
+                    >
+                      Reassign YC
+                    </Button>
+                  )}
+                </div>
               ),
             },
           ]}
         />
       </SectionTable>
+
+      {/* Archived Year Coordinators & Audit Trail */}
+      {archivedCoordinators.length > 0 && (
+        <SectionTable
+          title="Archived Year Coordinators & Succession Audit Trail"
+          subtitle="Departing coordinators whose login accounts have been soft-deleted while 100% of historical events, uploads, and records are preserved"
+          action={<Badge tone="amber">{archivedCoordinators.length} Archived Accounts</Badge>}
+        >
+          <DataTable
+            rows={archivedCoordinators}
+            rowKey={(yc) => yc.id}
+            columns={[
+              {
+                key: 'name',
+                header: 'Faculty Member',
+                render: (yc) => (
+                  <div>
+                    <p className="font-semibold text-ink">{yc.name}</p>
+                    <p className="text-[11px] text-muted">{yc.email} · {yc.room || yc.cabin}</p>
+                  </div>
+                ),
+              },
+              {
+                key: 'cohort',
+                header: 'Managed Cohort',
+                render: (yc) => (
+                  <div>
+                    <span className="font-medium text-ink">{yc.cohortName || yc.cohortId}</span>
+                    <p className="text-[11px] text-muted">{yc.programme || 'B.E. CSE'}</p>
+                  </div>
+                ),
+              },
+              {
+                key: 'archivedAt',
+                header: 'Archived On',
+                render: (yc) => (
+                  <span className="text-[12px] text-muted">
+                    {yc.archivedAt ? new Date(yc.archivedAt).toLocaleDateString() : 'Recent'}
+                  </span>
+                ),
+              },
+              {
+                key: 'reason',
+                header: 'Succession Reason',
+                render: (yc) => (
+                  <span className="text-[12px] text-muted-strong font-medium">
+                    {yc.archivedReason || 'Discontinued / Reassigned'}
+                  </span>
+                ),
+              },
+              {
+                key: 'records',
+                header: 'Audit Trail Preserved',
+                align: 'right',
+                render: (yc) => (
+                  <span className="text-[12px] text-good-ink font-semibold">
+                    {yc.auditPreservedRecords?.eventsCount || 0} events · {yc.auditPreservedRecords?.uploadLogsCount || 0} uploads
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Account Status',
+                align: 'right',
+                render: () => <Badge tone="amber">Archived (Soft-Deleted)</Badge>,
+              },
+            ]}
+          />
+        </SectionTable>
+      )}
 
       {/* Cohort Detail Student Roster */}
       {selectedCohort && (
@@ -552,8 +687,18 @@ function CohortsSection({ cohorts, selectedCohort, onSelectCohort, onOpenStudent
 
 /* ── Section: Mentors & Compliance Matrix ────────────────────────────────── */
 
-function MentorsSection({ mentors, selectedMentor, onSelectMentor, onOpenStudent }) {
-  const [activeTab, setActiveTab] = useState('list');
+function MentorsSection({
+  mentors,
+  selectedMentor,
+  onSelectMentor,
+  onOpenStudent,
+  preselectedMentorReassignId = null,
+  onClearPreselectedMentor,
+  archivedMentors = [],
+  onSuccessReassign,
+}) {
+  const [activeTab, setActiveTab] = useState(preselectedMentorReassignId ? 'reassignment' : 'list');
+  const [reassignMentorId, setReassignMentorId] = useState(preselectedMentorReassignId);
   const [mentorDetail, setMentorDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const { data: complianceData } = useResource('/hod/me/compliance');
@@ -571,9 +716,14 @@ function MentorsSection({ mentors, selectedMentor, onSelectMentor, onOpenStudent
     }
   }
 
+  function handleStartReassignment(mentorId) {
+    setReassignMentorId(mentorId);
+    setActiveTab('reassignment');
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-line pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-line pb-3">
         <Button
           size="sm"
           variant={activeTab === 'list' ? 'primary' : 'secondary'}
@@ -583,18 +733,135 @@ function MentorsSection({ mentors, selectedMentor, onSelectMentor, onOpenStudent
         </Button>
         <Button
           size="sm"
+          variant={activeTab === 'reassignment' ? 'primary' : 'secondary'}
+          onClick={() => setActiveTab('reassignment')}
+        >
+          ⚡ Mentor Reassignment Tool
+        </Button>
+        <Button
+          size="sm"
           variant={activeTab === 'matrix' ? 'primary' : 'secondary'}
           onClick={() => setActiveTab('matrix')}
         >
           Weekly Compliance Matrix
         </Button>
+        <Button
+          size="sm"
+          variant={activeTab === 'archived' ? 'primary' : 'secondary'}
+          onClick={() => setActiveTab('archived')}
+        >
+          Archived Faculty & Audit Log ({archivedMentors.length})
+        </Button>
       </div>
+
+      {activeTab === 'reassignment' && (
+        <MentorReassignmentTool
+          role="hod"
+          preselectedMentorId={reassignMentorId}
+          onCancel={() => {
+            setActiveTab('list');
+            if (onClearPreselectedMentor) onClearPreselectedMentor();
+          }}
+          onSuccess={() => {
+            if (onSuccessReassign) onSuccessReassign();
+          }}
+        />
+      )}
+
+      {activeTab === 'archived' && (
+        <SectionTable
+          title="Archived Mentors & Succession Audit Register"
+          subtitle="Mentors whose user accounts were archived upon discontinuing. 100% of historical Section 12 meeting logs, goals, and guidance remain intact."
+          action={<Badge tone="amber">{archivedMentors.length} Archived Mentors</Badge>}
+        >
+          {archivedMentors.length === 0 ? (
+            <EmptyState
+              title="No Archived Mentors"
+              description="All department faculty mentors are currently active."
+              icon="✓"
+            />
+          ) : (
+            <DataTable
+              rows={archivedMentors}
+              rowKey={(m) => m.id}
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Faculty Member',
+                  render: (m) => (
+                    <div>
+                      <p className="font-semibold text-ink">{m.name}</p>
+                      <p className="text-[11px] text-muted">{m.staffCode} · {m.email}</p>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'cabin',
+                  header: 'Department',
+                  render: (m) => (
+                    <div>
+                      <span className="text-[12.5px] text-ink">{m.department || 'CSE'}</span>
+                      <p className="text-[11px] text-muted">{m.cabin || 'CSE Block'}</p>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'archivedAt',
+                  header: 'Archived On',
+                  render: (m) => (
+                    <span className="text-[12px] text-muted">
+                      {m.archivedAt ? new Date(m.archivedAt).toLocaleDateString() : 'Recent'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'reason',
+                  header: 'Succession Reason',
+                  render: (m) => (
+                    <span className="text-[12px] text-muted-strong font-medium">
+                      {m.archivedReason || 'Faculty Discontinued / Reassigned'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'transferred',
+                  header: 'Audit Transfer Log',
+                  align: 'right',
+                  render: (m) => (
+                    <span className="text-[12px] font-semibold text-good-ink">
+                      {m.auditPreservedRecords?.totalHistoricalMentees || 0} mentees transferred
+                    </span>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Audit Status',
+                  align: 'right',
+                  render: () => <Badge tone="amber">Archived (Logs Preserved)</Badge>,
+                },
+              ]}
+            />
+          )}
+        </SectionTable>
+      )}
 
       {activeTab === 'list' && (
         <SectionTable
           title="Faculty Mentors Directory"
           subtitle="Department mentors, assigned mentee counts, and review compliance"
-          action={<Badge tone="indigo">{mentors.length} Faculty Mentors</Badge>}
+          action={
+            <div className="flex items-center gap-2">
+              <Badge tone="indigo">{mentors.length} Faculty Mentors</Badge>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={() => setActiveTab('reassignment')}
+                title="Open Mentor Reassignment Tool"
+              >
+                ⚡ Reassign Mentees
+              </Button>
+            </div>
+          }
         >
           <DataTable
             rows={mentors}
@@ -654,12 +921,22 @@ function MentorsSection({ mentors, selectedMentor, onSelectMentor, onOpenStudent
               },
               {
                 key: 'action',
-                header: '',
+                header: 'Actions',
                 align: 'right',
                 render: (m) => (
-                  <Button size="xs" variant={selectedMentor?.id === m.id ? 'primary' : 'secondary'}>
-                    View Mentees
-                  </Button>
+                  <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Button size="xs" variant={selectedMentor?.id === m.id ? 'primary' : 'secondary'} onClick={() => openMentorMentees(m)}>
+                      View
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => handleStartReassignment(m.id)}
+                      title="Bulk-reassign this mentor's mentees to another faculty member"
+                    >
+                      Reassign
+                    </Button>
+                  </div>
                 ),
               },
             ]}

@@ -12,6 +12,7 @@ import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { StatTile } from '../../components/ui/StatTile.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { ExcelUploadSection } from './ExcelUploadSection.jsx';
+import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
 
 const titles = {
   advisor: {
@@ -20,7 +21,7 @@ const titles = {
   },
   coordinator: {
     dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset', risk: 'At-Risk Students',
-    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', operations: 'Year Events & Calendar',
+    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', reassignment: 'Mentor Reassignment Tool', operations: 'Year Events & Calendar',
     audit: 'Audit & Accreditation Readiness',
   },
 };
@@ -83,7 +84,7 @@ function OversightConsole({ role }) {
     ]
     : [
       { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }, { key: 'risk', label: 'At-Risk Students', badge: stats.atRisk, badgeTone: 'rose' }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'operations', label: 'Year Events', badge: stats.plannedEvents, badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'operations', label: 'Year Events', badge: stats.plannedEvents, badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -169,7 +170,8 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
   if (section === 'upload') return <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />;
   if (section === 'students') return <StudentDirectory role="coordinator" onNavigate={navigate} />;
   if (section === 'risk') return <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />;
-  if (section === 'mentors') return <MentorTracker rows={data.mentors} />;
+  if (section === 'mentors') return <MentorTracker rows={data.mentors} onNavigate={navigate} />;
+  if (section === 'reassignment') return <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />;
   if (section === 'operations') return <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />;
   return <AuditPanel rows={data.audit} tracker={data.academicTracker} />;
 }
@@ -253,16 +255,28 @@ function AcademicAndDiscipline({ data }) {
   </>;
 }
 
-function MentorTracker({ rows, compact = false }) {
-  return <SectionTable title="Mentor Tracker" subtitle="Assigned learners, mentoring compliance, health and follow-up load">
-    <DataTable rows={rows} rowKey={(row) => row.id} columns={[
-      { key: 'mentor', header: 'Mentor', render: (row) => <div><p className="font-medium">{row.name}</p><p className="text-[11.5px] text-muted">{row.staffCode}</p></div> },
-      { key: 'assigned', header: 'Assigned', align: 'right' },
-      { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
-      { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
-      { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
-    ]} />
-  </SectionTable>;
+function MentorTracker({ rows, compact = false, onNavigate }) {
+  return (
+    <SectionTable
+      title="Mentor Tracker"
+      subtitle="Assigned learners, mentoring compliance, health and follow-up load"
+      action={
+        !compact && onNavigate && (
+          <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
+            ⚡ Mentor Reassignment Tool
+          </Button>
+        )
+      }
+    >
+      <DataTable rows={rows} rowKey={(row) => row.id} columns={[
+        { key: 'mentor', header: 'Mentor', render: (row) => <div><p className="font-medium">{row.name}</p><p className="text-[11.5px] text-muted">{row.staffCode}</p></div> },
+        { key: 'assigned', header: 'Assigned', align: 'right' },
+        { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
+        { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
+        { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
+      ]} />
+    </SectionTable>
+  );
 }
 
 function StudentDirectory({ role, onNavigate }) {

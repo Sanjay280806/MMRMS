@@ -13,6 +13,7 @@ import {
   listMentees,
   listMentors,
   listUploadHistory,
+  reassignMentor,
   updateOdRequestStatus,
 } from '../data/store.js';
 import { buildMenteeRecordBook } from '../services/mentee.js';
@@ -87,6 +88,28 @@ router.get('/me/mentors/:mentorId', (req, res, next) => {
     cohortId: coordinator.cohortId,
     mentees: mentees.map(summariseMentee),
   });
+});
+
+router.post('/me/mentors/reassign', (req, res, next) => {
+  currentCoordinator(req);
+  const { departingMentorId, targetMentorId, menteeIds, archiveDepartingMentor, reason } = req.body ?? {};
+
+  if (!departingMentorId || !targetMentorId) {
+    return next(new HttpError(400, 'Both departing mentor and target mentor are required'));
+  }
+
+  try {
+    const result = reassignMentor({
+      departingMentorId,
+      targetMentorId,
+      menteeIds: menteeIds || [],
+      archiveDepartingMentor: archiveDepartingMentor !== false,
+      reason: reason?.trim() || 'Mentor Discontinued / Reassigned by Year Coordinator',
+    });
+    res.json(result);
+  } catch (err) {
+    next(new HttpError(400, err.message));
+  }
 });
 
 router.post('/me/events', (req, res, next) => {
