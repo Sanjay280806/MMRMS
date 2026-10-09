@@ -23,22 +23,22 @@ export const INSTITUTION = {
 /** Roles recognised by the sign-in screen, in institutional workflow order. */
 export const ROLES = [
   {
-    key: 'coordinator',
-    name: 'Year Coordinator',
-    short: 'Programme coordination',
+    key: 'hod',
+    name: 'Head of Department',
+    short: 'Department oversight',
     description:
-      'Monitor year-wise progress, mentoring compliance, institutional events, OD approvals, and audit-ready evidence.',
-    target: '/coordinator',
-    targetLabel: 'Coordinator View',
+      'Executive department-wide leadership — oversee all cohorts, Year Coordinators, faculty mentors, and student welfare.',
+    target: '/hod',
+    targetLabel: 'HOD Executive View',
   },
   {
-    key: 'advisor',
-    name: 'Class Advisor',
-    short: 'Class care and coordination',
+    key: 'coordinator',
+    name: 'Year Coordinator',
+    short: 'Cohort-level coordination',
     description:
-      'Monitor class performance, attendance, discipline, grievances, parent communication, and class meetings.',
-    target: '/advisor',
-    targetLabel: 'Class Advisor Console',
+      'Monitor cohort-wise progress, mentoring compliance, institutional events, bulk Excel/ERP upload, and student progress.',
+    target: '/coordinator',
+    targetLabel: 'Coordinator View',
   },
   {
     key: 'mentor',
@@ -58,11 +58,21 @@ export const ROLES = [
     target: '/student',
     targetLabel: 'Student Record Book',
   },
+  {
+    key: 'advisor',
+    name: 'Class Advisor',
+    short: 'Class care and coordination',
+    description:
+      'Monitor class performance, attendance, discipline, grievances, parent communication, and class meetings.',
+    target: '/advisor',
+    targetLabel: 'Class Advisor Console',
+  },
 ];
 
 /** Demo accounts. Every password is `mmrms@2026` — hashed at boot in store.js. */
 export const USERS = [
-  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Year Coordinator · 2024 BCS', coordinatorId: 'yc-1' },
+  { id: 'u-hod', role: 'hod', name: 'Dr. HOD CSE', email: 'hod.cse@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Professor & Head of Department' },
+  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Year Coordinator · 2024 BCS', coordinatorId: 'yc-1', cohortId: '24BCS' },
   { id: 'u-advisor', role: 'advisor', name: 'Suganthi', email: 'suganthi@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Class Advisor · 2024 BCS', advisorId: 'ca-1' },
   { id: 'u-mentor-1', role: 'mentor', name: 'Bharathi Priya', email: 'bharathi.priya@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-1' },
   { id: 'u-mentor-2', role: 'mentor', name: 'Asmitha Shree', email: 'asmitha.shree@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-2' },
@@ -122,6 +132,8 @@ export const YEAR_COORDINATORS = [
     department: 'Computer Science and Engineering',
     designation: 'Year Coordinator',
     year: 'III Year',
+    cohortId: '24BCS',
+    cohortName: '2024 BCS',
     programme: 'B.E. Computer Science and Engineering',
     room: 'CSE Block · Room 210',
   },

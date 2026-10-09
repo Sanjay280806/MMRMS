@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx';
 import StudentRecordBook from './pages/student/StudentRecordBook.jsx';
 import MentorConsole from './pages/mentor/MentorConsole.jsx';
 import { AdvisorConsole, CoordinatorConsole } from './pages/oversight/OversightConsole.jsx';
+import HodConsole from './pages/hod/HodConsole.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
@@ -49,6 +50,15 @@ export default function App() {
         element={
           <RequireRole role="coordinator">
             <CoordinatorConsole />
+          </RequireRole>
+        }
+      />
+
+      <Route
+        path="/hod/*"
+        element={
+          <RequireRole role="hod">
+            <HodConsole />
           </RequireRole>
         }
       />

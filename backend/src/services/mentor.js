@@ -7,7 +7,7 @@ import {
 import { dimensionList, healthIndex, scoreTone } from './health.js';
 import { computeDimensions, decorateGoals, formatBatch, initials, standingArrearCount } from './student.js';
 import { menteeToStudent } from './mentee.js';
-import { listMentees } from '../data/store.js';
+import { listMentees, listMentors } from '../data/store.js';
 
 const FLAG_TONE = {
   'Low Attendance': 'amber',
@@ -53,9 +53,11 @@ export function summariseMentee(mentee) {
     healthTone: scoreTone(index),
     dimensions: dims,
 
-    cgpa: Number(
-      (student.performance.reduce((s, p) => s + p.gpa, 0) / (student.performance.length || 1)).toFixed(1),
-    ),
+    cgpa: mentee.gpa !== undefined
+      ? Number(Number(mentee.gpa).toFixed(1))
+      : Number(
+        (student.performance.reduce((s, p) => s + p.gpa, 0) / (student.performance.length || 1)).toFixed(1),
+      ),
     attendance: mentee.attendance,
     attendanceBelowRequirement: mentee.attendance < ATTENDANCE_REQUIREMENT,
     shortageCount: shortageSubjects.length,
@@ -74,6 +76,9 @@ export function summariseMentee(mentee) {
     flagTone: mentee.flagReason ? FLAG_TONE[mentee.flagReason] ?? 'slate' : null,
     suggestedAction: mentee.suggestedAction ?? null,
     initialInteractionOverdue: initialInteractionOverdue(mentee),
+    mentorId: mentee.mentorId,
+    mentorName: mentee.mentorName || (mentee.mentorId ? listMentors().find(m => m.id === mentee.mentorId)?.name : null) || 'Bharathi Priya',
+    staffCode: mentee.staffCode,
   };
 }
 

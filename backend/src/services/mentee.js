@@ -35,7 +35,11 @@ const ORDINAL = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 const seedOf = (name) => (name.charCodeAt(0) + name.length) % 3;
 
 export function menteeToStudent(mentee) {
-  if (mentee.recordBook) return structuredClone(mentee.recordBook);
+  if (mentee.recordBook) {
+    const book = structuredClone(mentee.recordBook);
+    book.mentorId = mentee.mentorId;
+    return book;
+  }
 
   const seed = seedOf(mentee.name);
   const semester = mentee.year * 2 - 1;
