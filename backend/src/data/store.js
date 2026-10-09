@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import {
   CLASS_ADVISORS,
   CLASS_MEETINGS,
+  CONCERNS,
   COORDINATOR_EVENTS,
   GRIEVANCES,
   MENTEES,
@@ -38,6 +39,7 @@ const classAdvisors = clone(CLASS_ADVISORS);
 const yearCoordinators = clone(YEAR_COORDINATORS);
 const classMeetings = clone(CLASS_MEETINGS);
 const grievances = clone(GRIEVANCES);
+const concerns = clone(CONCERNS);
 const coordinatorEvents = clone(COORDINATOR_EVENTS);
 const odRequests = clone(OD_REQUESTS);
 
@@ -739,6 +741,83 @@ export function updateGrievanceStatus(id, status) {
   if (!grievance) return null;
   grievance.status = status;
   return grievance;
+}
+
+/* ── student concerns lifecycle (Q6) ─────────────────────────────────── */
+
+export function listConcerns(filter = {}) {
+  let list = concerns;
+  if (filter.studentId) {
+    list = list.filter((c) => c.studentId === filter.studentId);
+  }
+  if (filter.mentorId) {
+    list = list.filter((c) => c.mentorId === filter.mentorId);
+  }
+  if (filter.status) {
+    list = list.filter((c) => c.status === filter.status);
+  }
+  return list;
+}
+
+export function findConcernById(id) {
+  return concerns.find((c) => c.id === id);
+}
+
+export function addConcern({ studentId, category, priority, subject, description }) {
+  const student = findStudentById(studentId) || findMenteeById(studentId);
+  const mentorId = student?.mentorId || student?.profile?.mentor?.id || 'm-1';
+  const mentor = findMentorById(mentorId);
+
+  const record = {
+    id: nextId('cn'),
+    studentId,
+    studentName: student?.identity?.name || student?.name || 'Student',
+    rollNumber: student?.identity?.rollNumber || student?.rollNumber || '—',
+    mentorId,
+    mentorName: mentor?.name || 'Bharathi Priya',
+    category: category || 'Academic',
+    priority: priority || 'Medium',
+    subject: subject.trim(),
+    description: (description || '').trim(),
+    status: 'OPEN',
+    raisedAt: new Date().toISOString(),
+    resolution: null,
+    resolvedAt: null,
+    resolvedBy: null,
+    evidence: [],
+    acknowledgedAt: null,
+    studentFeedback: null,
+  };
+
+  concerns.unshift(record);
+  return record;
+}
+
+export function resolveConcern(id, { mentorId, resolution, evidence = [] }) {
+  const concern = concerns.find((c) => c.id === id);
+  if (!concern) return null;
+  const mentor = findMentorById(mentorId);
+
+  concern.status = 'RESOLVED';
+  concern.resolution = resolution.trim();
+  concern.resolvedAt = new Date().toISOString();
+  concern.resolvedBy = mentor?.name || concern.mentorName;
+  if (Array.isArray(evidence) && evidence.length > 0) {
+    concern.evidence = normalizeEvidenceFiles(evidence);
+  }
+  return concern;
+}
+
+export function acknowledgeConcern(id, { studentId, feedback = '' }) {
+  const concern = concerns.find((c) => c.id === id);
+  if (!concern) return null;
+
+  concern.status = 'CLOSED';
+  concern.acknowledgedAt = new Date().toISOString();
+  if (feedback?.trim()) {
+    concern.studentFeedback = feedback.trim();
+  }
+  return concern;
 }
 
 export function listCoordinatorEvents() {

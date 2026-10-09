@@ -1,7 +1,15 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
-import { addMentorMeeting, findMenteeById, findMentorById, listMentees } from '../data/store.js';
+import {
+  addMentorMeeting,
+  findConcernById,
+  findMenteeById,
+  findMentorById,
+  listConcerns,
+  listMentees,
+  resolveConcern,
+} from '../data/store.js';
 import {
   buildActionItemQueue,
   buildGoalOverview,
@@ -327,6 +335,50 @@ router.get('/me/reports', (req, res) => {
 
 router.get('/me/timeline', (req, res) => {
   res.json(mentorTimeline(currentMentor(req)));
+});
+
+/* ── Student Concerns Management (Q6) ────────────────────────────────── */
+
+router.get('/me/concerns', (req, res) => {
+  const mentor = currentMentor(req);
+  const status = req.query.status;
+  const filter = { mentorId: mentor.id };
+  if (status) filter.status = status;
+  const concernsList = listConcerns(filter);
+  res.json({
+    concerns: concernsList,
+    stats: {
+      total: listConcerns({ mentorId: mentor.id }).length,
+      open: listConcerns({ mentorId: mentor.id, status: 'OPEN' }).length,
+      resolved: listConcerns({ mentorId: mentor.id, status: 'RESOLVED' }).length,
+      closed: listConcerns({ mentorId: mentor.id, status: 'CLOSED' }).length,
+    },
+  });
+});
+
+router.patch('/me/concerns/:id/resolve', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const { resolution, evidence } = req.body ?? {};
+
+  if (!resolution?.trim()) {
+    return next(new HttpError(400, 'A resolution explanation is required'));
+  }
+
+  const concern = findConcernById(req.params.id);
+  if (!concern) {
+    return next(new HttpError(404, 'Concern not found'));
+  }
+  if (concern.mentorId !== mentor.id) {
+    return next(new HttpError(403, 'You are not the assigned mentor for this concern'));
+  }
+
+  const updated = resolveConcern(req.params.id, {
+    mentorId: mentor.id,
+    resolution: resolution.trim(),
+    evidence: Array.isArray(evidence) ? evidence : [],
+  });
+
+  res.json(updated);
 });
 
 export default router;

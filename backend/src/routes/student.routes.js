@@ -2,15 +2,18 @@ import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
 import {
+  acknowledgeConcern,
   acknowledgeGoal,
   addActivity,
   addCertification,
+  addConcern,
   addEvidence,
   addInternshipProject,
   addMessage,
   addParticipation,
   addSupportRequest,
   findStudentById,
+  listConcerns,
   updateActionItem,
   updateReadiness,
   updateSelfAssessment,
@@ -20,6 +23,9 @@ import { buildStudentRecordBook } from '../services/student.js';
 import { ACTIVITY_AREAS } from '../services/student.js';
 import {
   ACTION_STATUSES,
+  CONCERN_CATEGORIES,
+  CONCERN_PRIORITIES,
+  CONCERN_STATUSES,
   EXTRA_CURRICULAR_CATEGORIES,
   READINESS_ITEMS,
   READINESS_STATUSES,
@@ -309,6 +315,70 @@ router.post('/me/messages', (req, res, next) => {
   const text = req.body?.text?.trim();
   if (!text) return next(new HttpError(400, 'Message text is required'));
   res.status(201).json(addMessage(student.id, text));
+});
+
+/* ── Concerns lifecycle (Q6) ─────────────────────────────────────────── */
+
+router.get('/me/concerns', (req, res) => {
+  const student = currentStudent(req);
+  const concernsList = listConcerns({ studentId: student.id });
+  const pendingAcknowledgment = concernsList.filter((c) => c.status === 'RESOLVED');
+  res.json({
+    concerns: concernsList,
+    stats: {
+      total: concernsList.length,
+      open: concernsList.filter((c) => c.status === 'OPEN').length,
+      resolvedPendingAcknowledgment: pendingAcknowledgment.length,
+      closed: concernsList.filter((c) => c.status === 'CLOSED').length,
+    },
+    categories: CONCERN_CATEGORIES,
+    priorities: CONCERN_PRIORITIES,
+  });
+});
+
+router.post('/me/concerns', (req, res, next) => {
+  const student = currentStudent(req);
+  const { category, priority, subject, description } = req.body ?? {};
+
+  if (!subject?.trim()) {
+    return next(new HttpError(400, 'Please enter a concern subject'));
+  }
+  oneOf(category ?? 'Academic', CONCERN_CATEGORIES, 'Category');
+  oneOf(priority ?? 'Medium', CONCERN_PRIORITIES, 'Priority');
+
+  const concern = addConcern({
+    studentId: student.id,
+    category: category ?? 'Academic',
+    priority: priority ?? 'Medium',
+    subject: subject.trim(),
+    description: (description || '').trim(),
+  });
+
+  res.status(201).json(concern);
+});
+
+router.post('/me/concerns/:id/acknowledge', (req, res, next) => {
+  const student = currentStudent(req);
+  const { feedback } = req.body ?? {};
+
+  const concern = listConcerns().find((c) => c.id === req.params.id);
+  if (!concern) {
+    return next(new HttpError(404, 'Concern not found'));
+  }
+  if (concern.studentId !== student.id) {
+    return next(new HttpError(403, 'You can only acknowledge concerns raised by yourself'));
+  }
+  if (concern.status !== 'RESOLVED') {
+    return next(
+      new HttpError(
+        400,
+        `Cannot acknowledge concern with status "${concern.status}". Only RESOLVED concerns can be acknowledged.`,
+      ),
+    );
+  }
+
+  const updated = acknowledgeConcern(req.params.id, { studentId: student.id, feedback });
+  res.json(updated);
 });
 
 export default router;

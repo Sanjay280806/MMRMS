@@ -7,7 +7,6 @@ const ACCOUNTS = [
   { role: 'coordinator', email: 'anitha.p@kct.ac.in' },
   { role: 'mentor', email: 'bharathi.priya@kct.ac.in' },
   { role: 'student', email: 'abhinav.dinesh@kct.ac.in' },
-  { role: 'advisor', email: 'suganthi@kct.ac.in' },
 ];
 
 const PASSWORD = 'mmrms@2026';

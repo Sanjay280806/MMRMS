@@ -13,6 +13,7 @@ import { StatTile } from '../../components/ui/StatTile.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { ExcelUploadSection } from './ExcelUploadSection.jsx';
 import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
+import { MentorDashboardModal } from '../../components/oversight/MentorDashboardModal.jsx';
 
 const titles = {
   advisor: {
@@ -166,14 +167,27 @@ function AdvisorSections({ section, data, reload, composer, setComposer }) {
 }
 
 function CoordinatorSections({ section, data, reload, composer, setComposer, navigate }) {
-  if (section === 'dashboard') return <CoordinatorDashboard data={data} onNavigate={navigate} />;
-  if (section === 'upload') return <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />;
-  if (section === 'students') return <StudentDirectory role="coordinator" onNavigate={navigate} />;
-  if (section === 'risk') return <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />;
-  if (section === 'mentors') return <MentorTracker rows={data.mentors} onNavigate={navigate} />;
-  if (section === 'reassignment') return <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />;
-  if (section === 'operations') return <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />;
-  return <AuditPanel rows={data.audit} tracker={data.academicTracker} />;
+  const [inspectingMentorId, setInspectingMentorId] = useState(null);
+
+  return (
+    <>
+      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} />}
+      {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
+      {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
+      {section === 'risk' && <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />}
+      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} />}
+      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
+      {section === 'operations' && <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />}
+      {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
+
+      {inspectingMentorId && (
+        <MentorDashboardModal
+          mentorId={inspectingMentorId}
+          onClose={() => setInspectingMentorId(null)}
+        />
+      )}
+    </>
+  );
 }
 
 function AdvisorDashboard({ data }) {
@@ -193,7 +207,7 @@ function AdvisorDashboard({ data }) {
   </>;
 }
 
-function CoordinatorDashboard({ data, onNavigate }) {
+function CoordinatorDashboard({ data, onNavigate, onInspectMentor }) {
   const { stats } = data;
   return <>
     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -227,7 +241,7 @@ function CoordinatorDashboard({ data, onNavigate }) {
     </div>
 
     <div className="grid gap-5 xl:grid-cols-2">
-      <MentorTracker rows={data.mentors} compact />
+      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
     <StudentWatch title="Immediate attention" subtitle="Lowest health index across the year" rows={data.atRisk.slice(0, 8)} metric="health" />
@@ -255,7 +269,7 @@ function AcademicAndDiscipline({ data }) {
   </>;
 }
 
-function MentorTracker({ rows, compact = false, onNavigate }) {
+function MentorTracker({ rows, compact = false, onNavigate, onInspectMentor }) {
   return (
     <SectionTable
       title="Mentor Tracker"
@@ -268,13 +282,44 @@ function MentorTracker({ rows, compact = false, onNavigate }) {
         )
       }
     >
-      <DataTable rows={rows} rowKey={(row) => row.id} columns={[
-        { key: 'mentor', header: 'Mentor', render: (row) => <div><p className="font-medium">{row.name}</p><p className="text-[11.5px] text-muted">{row.staffCode}</p></div> },
-        { key: 'assigned', header: 'Assigned', align: 'right' },
-        { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
-        { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
-        { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
-      ]} />
+      <DataTable
+        rows={rows}
+        rowKey={(row) => row.id}
+        onRowClick={(row) => onInspectMentor?.(row.id)}
+        columns={[
+          {
+            key: 'mentor',
+            header: 'Mentor',
+            render: (row) => (
+              <div>
+                <p className="font-semibold text-brand-700 hover:underline">{row.name}</p>
+                <p className="text-[11.5px] text-muted">{row.staffCode}</p>
+              </div>
+            ),
+          },
+          { key: 'assigned', header: 'Assigned', align: 'right' },
+          { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
+          { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
+          { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (row) => (
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onInspectMentor?.(row.id);
+                }}
+              >
+                Inspect
+              </Button>
+            ),
+          },
+        ]}
+      />
     </SectionTable>
   );
 }

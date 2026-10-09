@@ -18,7 +18,7 @@ import {
 } from '../data/store.js';
 import { buildMenteeRecordBook } from '../services/mentee.js';
 import { buildCoordinatorOverview, buildStudentDirectory } from '../services/oversight.js';
-import { summariseMentee } from '../services/mentor.js';
+import { buildMentorOverview, summariseMentee } from '../services/mentor.js';
 import {
   generateStudentExportWorkbook,
   generateTemplateWorkbook,
@@ -87,7 +87,15 @@ router.get('/me/mentors/:mentorId', (req, res, next) => {
     },
     cohortId: coordinator.cohortId,
     mentees: mentees.map(summariseMentee),
+    dashboard: buildMentorOverview(mentor),
   });
+});
+
+router.get('/me/mentors/:mentorId/dashboard', (req, res, next) => {
+  currentCoordinator(req);
+  const mentor = findMentorById(req.params.mentorId);
+  if (!mentor) return next(new HttpError(404, 'Mentor not found'));
+  res.json(buildMentorOverview(mentor));
 });
 
 router.post('/me/mentors/reassign', (req, res, next) => {

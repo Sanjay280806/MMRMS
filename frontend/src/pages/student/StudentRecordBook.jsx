@@ -24,6 +24,7 @@ import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { AddActivity } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { AnnouncementsHistory } from './AnnouncementsHistory.jsx';
+import { AcknowledgeConcernModal } from '../../components/concerns/AcknowledgeConcernModal.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { useAnnouncements } from '../../hooks/useAnnouncements.js';
 
@@ -76,7 +77,9 @@ const TITLES = {
 export default function StudentRecordBook() {
   const [section, setSection] = useState('profile');
   const [saving, setSaving] = useState(null);
+  const [acknowledgingConcern, setAcknowledgingConcern] = useState(null);
   const { data, loading, error, reload, setData } = useResource('/student/me/record-book');
+  const { data: concernsData, reload: reloadConcerns } = useResource('/student/me/concerns');
   const { announcement, clearAnnouncement } = useAnnouncements();
 
   /** Every write refetches the book so derived figures stay truthful. */
@@ -121,6 +124,7 @@ export default function StudentRecordBook() {
   const { identity } = data;
   const openActions = data.meetings.openActionItems.length;
   const awaitingGoals = data.goals.filter((g) => g.needsAcknowledgement).length;
+  const pendingAcknowledgment = concernsData?.concerns?.filter((c) => c.status === 'RESOLVED') || [];
 
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -131,8 +135,9 @@ export default function StudentRecordBook() {
           : item.key === 'goals' ? awaitingGoals
             : item.key === 'arrears' ? data.performance.standingArrears
               : item.key === 'wellbeing' ? data.wellbeing.concerns
-                : 0,
-      badgeTone: item.key === 'arrears' ? 'rose' : 'indigo',
+                : item.key === 'contact' ? pendingAcknowledgment.length
+                  : 0,
+      badgeTone: item.key === 'arrears' || item.key === 'contact' ? 'rose' : 'indigo',
     })),
   }));
 
@@ -218,6 +223,35 @@ export default function StudentRecordBook() {
 
       <ErrorBoundary resetKey={section}>
         <div className="animate-fadeRise space-y-5">
+          {/* Global Action Required Banner: Resolved Concerns Awaiting Student Acknowledgment */}
+          {pendingAcknowledgment.length > 0 && section !== 'contact' && (
+            <div className="rounded-xl border border-brand-300 bg-brand-500/10 p-4 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white shadow-xs">
+                    !
+                  </span>
+                  <div>
+                    <p className="text-[13px] font-bold text-brand-900">
+                      {pendingAcknowledgment.length === 1
+                        ? 'Action Required: Your mentor resolved your concern'
+                        : `Action Required: ${pendingAcknowledgment.length} concerns resolved by mentor`}
+                    </p>
+                    <p className="text-xs text-brand-700">
+                      &quot;{pendingAcknowledgment[0].subject}&quot; has been resolved by {pendingAcknowledgment[0].resolvedBy || 'your mentor'}. Please review the resolution and evidence to confirm closure.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setAcknowledgingConcern(pendingAcknowledgment[0])}
+                >
+                  Review & Acknowledge
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Profile & Background — Academic Background only (no Career Aspirations) */}
           {section === 'profile' && (
             <div className="space-y-5">
@@ -316,6 +350,19 @@ export default function StudentRecordBook() {
           {section === 'announcements' && <AnnouncementsHistory />}
         </div>
       </ErrorBoundary>
+
+      {/* Concern Review & Acknowledgment Modal (Q6) */}
+      {acknowledgingConcern && (
+        <AcknowledgeConcernModal
+          concern={acknowledgingConcern}
+          onClose={() => setAcknowledgingConcern(null)}
+          onAcknowledged={() => {
+            setAcknowledgingConcern(null);
+            reloadConcerns();
+            reload();
+          }}
+        />
+      )}
     </ConsoleLayout>
   );
 }
