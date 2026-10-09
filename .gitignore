@@ -3,6 +3,5 @@ dist/
 .env
 *.log
 .DS_Store
-dummy.zip
 dummy/
 sample_uploads/
