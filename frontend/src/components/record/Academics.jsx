@@ -147,7 +147,7 @@ export function CoursePerformance({ coursePerformance }) {
     <SectionTable
       section="Section 4"
       title="Course Performance"
-      subtitle={`CIA 1, CIA 2 and Model marks out of ${coursePerformance.markScale}, with attendance per subject`}
+      subtitle={`CIA 1 and CIA 2 marks out of ${coursePerformance.markScale}, with attendance per subject`}
     >
       <DataTable
         rows={coursePerformance.rows}
@@ -166,13 +166,6 @@ export function CoursePerformance({ coursePerformance }) {
           },
           { key: 'cia1', header: 'CIA 1', align: 'right', render: (r) => <Mark value={r.cia1} /> },
           { key: 'cia2', header: 'CIA 2', align: 'right', render: (r) => <Mark value={r.cia2} /> },
-          { key: 'model', header: 'Model', align: 'right', render: (r) => <Mark value={r.model} /> },
-          {
-            key: 'average',
-            header: 'Avg',
-            align: 'right',
-            render: (r) => <span className="tnum font-semibold">{r.average}</span>,
-          },
           {
             key: 'attendance',
             header: 'Attendance',
@@ -185,12 +178,6 @@ export function CoursePerformance({ coursePerformance }) {
                   {r.attendance}%
                 </span>
               ),
-          },
-          {
-            key: 'status',
-            header: 'Status',
-            align: 'right',
-            render: (r) => <Badge tone={r.statusTone}>{r.status}</Badge>,
           },
         ]}
       />

@@ -38,8 +38,6 @@ const NAV_GROUPS = [
   {
     label: 'Academics',
     items: [
-      { key: 'performance', label: 'Performance Tracker' },
-      { key: 'attendance', label: 'Attendance Monitoring' },
       { key: 'courses', label: 'Course Performance' },
       { key: 'arrears', label: 'Arrear Tracking' },
     ],
@@ -63,8 +61,6 @@ const NAV_GROUPS = [
 
 const TITLES = {
   profile: 'Profile & Academic Background',
-  performance: 'Academic Performance Tracker',
-  attendance: 'Attendance Monitoring',
   courses: 'Course Performance',
   arrears: 'Arrear Tracking',
   activities: 'Activities & Achievements',
@@ -259,17 +255,18 @@ export default function StudentRecordBook() {
             </div>
           )}
 
-          {section === 'performance' && (
-            <div className="grid gap-5 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <PerformanceTracker performance={data.performance} />
+          {section === 'courses' && (
+            <div className="space-y-5">
+              <CoursePerformance coursePerformance={data.coursePerformance} />
+              <AttendanceMonitoring attendance={data.attendance} />
+              <div className="grid gap-5 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <PerformanceTracker performance={data.performance} />
+                </div>
+                <CgpaTarget performance={data.performance} />
               </div>
-              <CgpaTarget performance={data.performance} />
             </div>
           )}
-
-          {section === 'attendance' && <AttendanceMonitoring attendance={data.attendance} />}
-          {section === 'courses' && <CoursePerformance coursePerformance={data.coursePerformance} />}
           {section === 'arrears' && <ArrearTracking arrears={data.arrears} />}
 
           {/* Activities & Achievements — unified growth section */}

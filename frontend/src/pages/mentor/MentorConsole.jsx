@@ -220,6 +220,7 @@ export default function MentorConsole() {
               subtitle="Mentees carrying standing arrears"
               mentees={data.arrearWatch}
               onOpen={openMentee}
+              showHealth={false}
               metric={(m) => ({ label: 'Arrears', value: m.standingArrears, tone: 'rose' })}
               detail={(m) => `CGPA ${m.cgpa} · ${m.meetingsHeld} of ${m.meetingsDue} meetings held`}
               emptyTitle="No standing arrears"
@@ -233,6 +234,7 @@ export default function MentorConsole() {
               subtitle="Mentees whose review cycle has slipped"
               mentees={data.meetingWatch}
               onOpen={openMentee}
+              showHealth={false}
               metric={(m) => ({ label: 'Overdue', value: m.meetingsOverdue, tone: 'rose' })}
               detail={(m) => `${m.meetingsHeld} of ${m.meetingsDue} held · last met ${m.lastMeeting}`}
               emptyTitle="Every review is up to date"
