@@ -10,38 +10,74 @@ import { SectionCard } from '../ui/SectionCard.jsx';
 import { Button } from '../ui/Button.jsx';
 import { cx, tone as toneOf } from '../../lib/tone.js';
 
-/** Month abbreviation → 1-based number. Matches the "DD Mon YYYY" format used by all existing meeting records. */
+/** Month abbreviation → 1-based number. Matches both short and full month names. */
 const MONTH_NUM = {
   Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
   Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+  January: 1, February: 2, March: 3, April: 4, June: 6,
+  July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
 };
 
 /**
- * Parses a display-format meeting date ("22 Jul 2026") into a YYYYMMDD integer
- * for reliable inclusive-range comparison. Returns null if the format is not recognised.
+ * Robust date parser converting any date string (ISO YYYY-MM-DD, DD-MM-YYYY,
+ * "22 Jul 2026", "22-Jul-2026", etc.) into a comparable integer YYYYMMDD.
  */
-function parseMeetingDate(dateStr) {
+function parseAnyDateToNumber(dateStr) {
   if (!dateStr) return null;
-  const parts = String(dateStr).trim().split(/\s+/);
-  if (parts.length !== 3) return null;
-  const [d, mon, y] = parts;
-  const m = MONTH_NUM[mon];
-  if (!m) return null;
-  const day = parseInt(d, 10);
-  const year = parseInt(y, 10);
-  if (!Number.isFinite(day) || !Number.isFinite(year)) return null;
-  return year * 10000 + m * 100 + day;
+  const str = String(dateStr).trim();
+  if (!str) return null;
+
+  // 1. ISO format: YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10);
+    const d = parseInt(isoMatch[3], 10);
+    return y * 10000 + m * 100 + d;
+  }
+
+  // 2. Day-Month-Year: DD-MM-YYYY or DD/MM/YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10);
+    const y = parseInt(dmyMatch[3], 10);
+    return y * 10000 + m * 100 + d;
+  }
+
+  // 3. DD Mon YYYY (e.g. "22 Jul 2026", "22-Jul-2026")
+  const cleaned = str.replace(/[-/]/g, ' ');
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 3) {
+    let [dPart, mPart, yPart] = parts;
+    if (dPart.length === 4 && yPart.length <= 2) {
+      [yPart, mPart, dPart] = [dPart, mPart, yPart];
+    }
+    const monKey = mPart.charAt(0).toUpperCase() + mPart.slice(1).toLowerCase();
+    const monShort = monKey.slice(0, 3);
+    const m = MONTH_NUM[monKey] || MONTH_NUM[monShort];
+    const d = parseInt(dPart, 10);
+    const y = parseInt(yPart, 10);
+    if (m && Number.isFinite(d) && Number.isFinite(y)) {
+      return y * 10000 + m * 100 + d;
+    }
+  }
+
+  // 4. JS Date fallback
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.getFullYear() * 10000 + (parsed.getMonth() + 1) * 100 + parsed.getDate();
+  }
+
+  return null;
 }
 
-/**
- * Converts a native date-input value ("YYYY-MM-DD") to a YYYYMMDD integer
- * so it can be compared directly with parseMeetingDate results.
- */
+function parseMeetingDate(dateStr) {
+  return parseAnyDateToNumber(dateStr);
+}
+
 function parseInputDate(isoStr) {
-  if (!isoStr) return null;
-  const [y, m, d] = isoStr.split('-').map(Number);
-  if (!y || !m || !d) return null;
-  return y * 10000 + m * 100 + d;
+  return parseAnyDateToNumber(isoStr);
 }
 
 /**
@@ -375,6 +411,296 @@ async function downloadMeetingReport(meeting, menteeName) {
 }
 
 /**
+ * Generates and triggers a consolidated PDF download containing multiple meeting records.
+ * Useful for reviewing all meetings or meetings within a selected date range.
+ *
+ * @param {Array<object>} meetingsList - array of meeting records
+ * @param {string} menteeName - the mentee's full name
+ * @param {string} filterRangeText - descriptive string of the active filter
+ */
+async function downloadConsolidatedReport(meetingsList, menteeName, filterRangeText = '') {
+  if (!meetingsList || !meetingsList.length) return;
+
+  const menteeSlug = String(menteeName || 'Mentee').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+  const filename = `MMRMS_Consolidated_Meeting_Report_${menteeSlug}_${Date.now()}.pdf`;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const logoInfo = await getKsiLogoDataUrl();
+
+  const addSectionHeading = (title) => {
+    if (y > 255) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(30, 41, 59);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentWidth, 6.5, 'F');
+    doc.text(title, margin + 3, y + 4.5);
+    y += 8.5;
+  };
+
+  // 1. Header with KSI Logo
+  if (logoInfo && logoInfo.dataUrl) {
+    const logoWidth = 45;
+    const logoHeight = (logoInfo.height / logoInfo.width) * logoWidth;
+    doc.addImage(logoInfo.dataUrl, 'JPEG', margin, y, logoWidth, logoHeight);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin + logoWidth + 6, y + 5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin + logoWidth + 6, y + 10);
+
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('CONSOLIDATED MENTORING MEETINGS REPORT', margin + logoWidth + 6, y + 16);
+
+    y += Math.max(logoHeight, 18) + 4;
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin, y + 5);
+    doc.setFontSize(9.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin, y + 10);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42);
+    doc.text('CONSOLIDATED MENTORING MEETINGS REPORT', margin, y + 16);
+    y += 22;
+  }
+
+  // Divider Line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 5;
+
+  // Overview Table
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      1: { cellWidth: 53 },
+      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+      3: { cellWidth: 53 },
+    },
+    body: [
+      ['Mentee Name', menteeName || '—', 'Meetings Count', `${meetingsList.length} meeting(s)`],
+      [
+        'Report Period',
+        filterRangeText || 'All Recorded Meetings',
+        'Generated On',
+        new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      ],
+    ],
+  });
+  y = doc.lastAutoTable.finalY + 5;
+
+  // Summary Table of Included Meetings
+  addSectionHeading('Summary of Included Meetings');
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    theme: 'striped',
+    headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    columns: [
+      { header: '#', dataKey: 'number' },
+      { header: 'Date', dataKey: 'date' },
+      { header: 'Mode', dataKey: 'mode' },
+      { header: 'Duration', dataKey: 'duration' },
+      { header: 'Category', dataKey: 'category' },
+      { header: 'Agenda', dataKey: 'agenda' },
+      { header: 'Actions', dataKey: 'actions' },
+      { header: 'Status', dataKey: 'status' },
+    ],
+    body: meetingsList.map((m) => ({
+      number: `Mtg ${m.number}`,
+      date: m.date || '—',
+      mode: m.mode || '—',
+      duration: m.duration || '—',
+      category: m.category || '—',
+      agenda: (m.agenda || []).join(', ') || '—',
+      actions: m.actionSummary
+        ? `${m.actionSummary.closed}/${m.actionSummary.total}`
+        : `${(m.actionItems || []).length} items`,
+      status: m.signed ? 'Signed ✓' : 'Pending',
+    })),
+  });
+  y = doc.lastAutoTable.finalY + 6;
+
+  // Detailed Log for Each Meeting
+  for (let i = 0; i < meetingsList.length; i++) {
+    const meeting = meetingsList[i];
+
+    if (y > 230 || i > 0) {
+      doc.addPage();
+      y = margin;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Meeting #${meeting.number} — ${meeting.date || 'Date not recorded'}`, margin, y + 4);
+    y += 7;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
+      columnStyles: {
+        0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 35 },
+        1: { cellWidth: 55 },
+        2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 35 },
+        3: { cellWidth: 57 },
+      },
+      body: [
+        ['Mode', String(meeting.mode ?? '—'), 'Duration', String(meeting.duration ?? '—')],
+        ['Category', String(meeting.category ?? '—'), 'Next Review Date', String(meeting.nextReviewDate ?? '—')],
+        ['Mentor Signed', meeting.mentorSigned ? 'Signed ✓' : 'Pending', 'Student Signed', meeting.studentSigned ? 'Signed ✓' : 'Pending'],
+      ],
+    });
+    y = doc.lastAutoTable.finalY + 4;
+
+    addSectionHeading(`Meeting #${meeting.number} — Agenda & Scope`);
+    const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
+      ? meeting.agenda.map((a) => `• ${a}`).join('\n')
+      : '• No agenda items listed.';
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(51, 65, 85);
+    const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
+    doc.text(agendaLines, margin + 2, y);
+    y += agendaLines.length * 3.8 + 4;
+
+    addSectionHeading(`Meeting #${meeting.number} — Minutes of Meeting`);
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
+      columnStyles: {
+        0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+        1: { cellWidth: contentWidth - 38 },
+      },
+      body: [
+        ['Topics Discussed', meeting.topicsDiscussed || '—'],
+        ['Student Concerns', meeting.studentConcerns || '—'],
+        ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
+        ['Support Required', meeting.supportRequired || '—'],
+      ],
+    });
+    y = doc.lastAutoTable.finalY + 4;
+
+    const prog = meeting.progressSinceLastMeeting || {};
+    if (prog.achievements || prog.pendingTasks || prog.improvementObserved) {
+      addSectionHeading(`Meeting #${meeting.number} — Progress Since Last Meeting`);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
+        columnStyles: {
+          0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+          1: { cellWidth: contentWidth - 38 },
+        },
+        body: [
+          ['Achievements', prog.achievements || '—'],
+          ['Pending Tasks', prog.pendingTasks || '—'],
+          ['Improvement Observed', prog.improvementObserved || '—'],
+        ],
+      });
+      y = doc.lastAutoTable.finalY + 4;
+    }
+
+    const actionItems = meeting.actionItems || [];
+    if (actionItems.length > 0) {
+      addSectionHeading(`Meeting #${meeting.number} — Action Items (${actionItems.length})`);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        theme: 'striped',
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columns: [
+          { header: '#', dataKey: 'idx' },
+          { header: 'Task', dataKey: 'task' },
+          { header: 'Responsible', dataKey: 'responsible' },
+          { header: 'Target Date', dataKey: 'targetDate' },
+          { header: 'Status', dataKey: 'status' },
+        ],
+        body: actionItems.map((item, idx) => ({
+          idx: idx + 1,
+          task: item.task || '—',
+          responsible: item.responsible || '—',
+          targetDate: item.targetDate || '—',
+          status: item.status || '—',
+        })),
+      });
+      y = doc.lastAutoTable.finalY + 4;
+    }
+
+    if (meeting.mentorRemarks || meeting.studentRemarks) {
+      addSectionHeading(`Meeting #${meeting.number} — Remarks`);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
+        columnStyles: {
+          0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
+          1: { cellWidth: contentWidth - 38 },
+        },
+        body: [
+          ['Mentor Remarks', meeting.mentorRemarks || '—'],
+          ['Student Remarks', meeting.studentRemarks || '—'],
+        ],
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    }
+  }
+
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 287, pageWidth - margin, 287);
+
+    doc.text('Kumaraguru School of Innovation — MMRMS Consolidated Meeting Report', margin, 291);
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 291, { align: 'right' });
+  }
+
+  doc.save(filename);
+}
+
+/**
  * Section 12 — the Mentor Meeting Log. Each meeting renders as the printed
  * minutes: header, agenda, discussion, action items, progress, goal progress,
  * remarks, next review and the signature line.
@@ -424,6 +750,27 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
     setAppliedStart('');
     setAppliedEnd('');
     setFilterError('');
+  }
+
+  const [isFilteredState, setIsFilteredState] = useState(false);
+  const [downloadingConsolidated, setDownloadingConsolidated] = useState(false);
+  const [consolidatedError, setConsolidatedError] = useState(null);
+
+  async function handleDownloadConsolidated() {
+    if (!filteredRows.length) return;
+    setDownloadingConsolidated(true);
+    setConsolidatedError(null);
+    try {
+      const rangeText = (appliedStart || appliedEnd)
+        ? `From ${appliedStart || 'earliest'} to ${appliedEnd || 'latest'}`
+        : 'All Recorded Meetings';
+      await downloadConsolidatedReport(filteredRows, menteeName, rangeText);
+    } catch (err) {
+      console.error('[MeetingLog] consolidated download failed:', err);
+      setConsolidatedError('Failed to generate consolidated report. Please try again.');
+    } finally {
+      setDownloadingConsolidated(false);
+    }
   }
 
   const isFiltered = Boolean(appliedStart || appliedEnd);
@@ -498,7 +845,7 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 id="meeting-filter-apply"
                 variant="secondary"
@@ -517,12 +864,33 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
                   Clear
                 </Button>
               )}
+              {filteredRows.length > 0 && (
+                <Button
+                  id="download-consolidated-report"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleDownloadConsolidated}
+                  disabled={downloadingConsolidated}
+                >
+                  {downloadingConsolidated
+                    ? 'Generating PDF…'
+                    : isFiltered
+                      ? `↓ Download Consolidated Report (${filteredRows.length})`
+                      : `↓ Download Consolidated Report`}
+                </Button>
+              )}
             </div>
           </div>
 
           {filterError && (
             <p role="alert" className="mt-2 text-[11.5px] font-semibold text-bad-ink">
               {filterError}
+            </p>
+          )}
+
+          {consolidatedError && (
+            <p role="alert" className="mt-2 text-[11.5px] font-semibold text-bad-ink">
+              {consolidatedError}
             </p>
           )}
 

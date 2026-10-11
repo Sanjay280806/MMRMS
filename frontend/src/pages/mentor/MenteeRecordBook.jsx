@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
@@ -35,8 +35,15 @@ const TABS = [
  * component the student sees — read-only here, since the student owns their
  * own entries and the mentor records theirs during a meeting.
  */
-export function MenteeRecordBook({ menteeId, onBack }) {
-  const [tab, setTab] = useState('profile');
+export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [menteeId, initialTab]);
+
   const { data, loading, error } = useResource(`/mentor/me/mentees/${menteeId}`);
 
   if (error) {

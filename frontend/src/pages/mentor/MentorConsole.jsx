@@ -61,17 +61,20 @@ function fileToDataUrl(file) {
 export default function MentorConsole() {
   const [section, setSection] = useState('dashboard');
   const [menteeId, setMenteeId] = useState(null);
+  const [menteeInitialTab, setMenteeInitialTab] = useState('profile');
   const [recordingMeeting, setRecordingMeeting] = useState(false);
   const { data, loading, error, reload } = useResource('/mentor/me/overview');
 
-  function openMentee(id) {
+  function openMentee(id, tab = 'profile') {
     setMenteeId(id);
+    setMenteeInitialTab(tab);
     setSection('mentees');
   }
 
   function navigate(key) {
     setSection(key);
     setMenteeId(null);
+    setMenteeInitialTab('profile');
   }
 
   if (error) {
@@ -194,9 +197,9 @@ export default function MentorConsole() {
 
           {section === 'mentees' &&
             (menteeId ? (
-              <MenteeRecordBook menteeId={menteeId} onBack={() => setMenteeId(null)} />
+              <MenteeRecordBook menteeId={menteeId} initialTab={menteeInitialTab} onBack={() => setMenteeId(null)} />
             ) : (
-              <Roster onOpenMentee={setMenteeId} />
+              <Roster onOpenMentee={(id) => openMentee(id, 'profile')} />
             ))}
 
           {section === 'attendance' && (
@@ -205,7 +208,7 @@ export default function MentorConsole() {
               title="Attendance Watch"
               subtitle={`Mentees below the ${75}% requirement, lowest first`}
               mentees={data.attendanceWatch}
-              onOpen={openMentee}
+              onOpen={(id) => openMentee(id, 'academics')}
               showHealth={false}
               metric={(m) => ({ label: 'Attendance', value: `${m.attendance}%`, tone: m.health < 50 ? 'rose' : 'amber' })}
               detail={(m) => `${m.shortageCount} subject${m.shortageCount === 1 ? '' : 's'} below requirement`}
@@ -219,7 +222,7 @@ export default function MentorConsole() {
               title="Arrear Watch"
               subtitle="Mentees carrying standing arrears"
               mentees={data.arrearWatch}
-              onOpen={openMentee}
+              onOpen={(id) => openMentee(id, 'academics')}
               showHealth={false}
               metric={(m) => ({ label: 'Arrears', value: m.standingArrears, tone: 'rose' })}
               detail={(m) => `CGPA ${m.cgpa} · ${m.meetingsHeld} of ${m.meetingsDue} meetings held`}
@@ -233,7 +236,7 @@ export default function MentorConsole() {
               title="Overdue Meetings"
               subtitle="Mentees whose review cycle has slipped"
               mentees={data.meetingWatch}
-              onOpen={openMentee}
+              onOpen={(id) => openMentee(id, 'meetings')}
               showHealth={false}
               metric={(m) => ({ label: 'Overdue', value: m.meetingsOverdue, tone: 'rose' })}
               detail={(m) => `${m.meetingsHeld} of ${m.meetingsDue} held · last met ${m.lastMeeting}`}
@@ -241,7 +244,7 @@ export default function MentorConsole() {
             />
           )}
 
-          {section === 'actions' && <ActionItemQueue onOpenMentee={openMentee} />}
+          {section === 'actions' && <ActionItemQueue onOpenMentee={(id) => openMentee(id, 'meetings')} />}
 
           {section === 'parents' && <ParentLog />}
           {section === 'announcements' && <Announcements />}
