@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
+import { Button } from '../../../components/ui/Button.jsx';
+import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
-import { SectionCard } from '../../../components/ui/SectionCard.jsx';
+import { SectionTable } from '../../../components/ui/SectionCard.jsx';
 import { Skeleton } from '../../../components/ui/Skeleton.jsx';
 import { Tabs } from '../../../components/ui/Tabs.jsx';
 import { useResource } from '../../../hooks/useResource.js';
+import { cx } from '../../../lib/tone.js';
 
 const SORTS = [
   { value: 'risk', label: 'By risk' },
@@ -14,79 +17,119 @@ const SORTS = [
   { value: 'name', label: 'A–Z' },
 ];
 
-/** The roster. Selecting a card opens that mentee's record book. */
+/** The roster. Selecting a student opens that mentee's record book. */
 export function Roster({ onOpenMentee }) {
   const [sort, setSort] = useState('risk');
   const { data, loading, error } = useResource(`/mentor/me/mentees?sort=${sort}`);
 
   return (
-    <SectionCard
+    <SectionTable
       title="My Mentees"
       subtitle={data ? `${data.total} students · select one to open their record book` : 'Loading roster…'}
       action={<Tabs size="sm" items={SORTS} value={sort} onChange={setSort} />}
     >
-      {error && <EmptyState title="Couldn't load the roster" description={error.message} icon="!" />}
+      {error && (
+        <div className="p-5">
+          <EmptyState title="Couldn't load the roster" description={error.message} icon="!" />
+        </div>
+      )}
 
       {loading && !data && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-3 p-5">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-40 rounded-xl" />
+            <Skeleton key={i} className="h-14 rounded-lg" />
           ))}
         </div>
       )}
 
-      {data?.mentees.length === 0 && (
-        <EmptyState title="No mentees assigned" description="Your coordinator assigns mentees each term." />
-      )}
-
-      {data?.mentees.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data.mentees.map((m, i) => (
-            <li key={m.id}>
-              <button
-                type="button"
-                onClick={() => onOpenMentee(m.id)}
-                className="focus-ring flex h-full w-full flex-col rounded-xl border border-line bg-white p-4 text-left transition hover:border-brand-300 hover:shadow-card"
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar initials={m.initials} seed={i} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold text-ink">{m.name}</p>
-                    <p className="tnum truncate text-[11.5px] text-muted">{m.rollNumber}</p>
-                    <p className="truncate text-[11.5px] text-muted">{m.meta}</p>
+      {data?.mentees && (
+        <DataTable
+          rows={data.mentees}
+          rowKey={(m) => m.id}
+          onRowClick={(m) => onOpenMentee(m.id)}
+          empty={<EmptyState title="No mentees assigned" description="Your coordinator assigns mentees each term." />}
+          columns={[
+            {
+              key: 'name',
+              header: 'Student',
+              render: (m, i) => (
+                <div className="flex items-center gap-3">
+                  <Avatar initials={m.initials} seed={i} size="sm" />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{m.name}</p>
+                    <p className="tnum truncate text-[11.5px] text-muted">
+                      {m.rollNumber} · {m.meta}
+                    </p>
                   </div>
-                  <HealthBadge value={m.health} tone={m.healthTone} />
                 </div>
-
-                <dl className="mt-3.5 grid grid-cols-3 gap-2 border-t border-line pt-3">
-                  <Metric label="CGPA" value={m.cgpa.toFixed(1)} />
-                  <Metric
-                    label="Attendance"
-                    value={`${m.attendance}%`}
-                    tone={m.attendanceBelowRequirement ? 'text-bad-ink' : undefined}
-                  />
-                  <Metric
-                    label="Arrears"
-                    value={m.standingArrears}
-                    tone={m.standingArrears ? 'text-bad-ink' : undefined}
-                  />
-                </dl>
-
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              ),
+            },
+            {
+              key: 'cgpa',
+              header: 'CGPA',
+              align: 'right',
+              render: (m) => <span className="tnum font-semibold">{m.cgpa.toFixed(1)}</span>,
+            },
+            {
+              key: 'attendance',
+              header: 'Attendance',
+              align: 'right',
+              render: (m) => (
+                <Badge tone={m.attendanceBelowRequirement ? 'rose' : 'green'}>
+                  {m.attendance}%
+                </Badge>
+              ),
+            },
+            {
+              key: 'arrears',
+              header: 'Arrears',
+              align: 'right',
+              render: (m) => (
+                <span className={cx('tnum font-medium', m.standingArrears ? 'font-semibold text-bad-ink' : 'text-muted-soft')}>
+                  {m.standingArrears}
+                </span>
+              ),
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (m) => (
+                <div className="flex flex-wrap items-center gap-1.5">
                   {m.flagReason && <Badge tone={m.flagTone}>{m.flagReason}</Badge>}
                   {m.meetingsOverdue > 0 && <Badge tone="rose">{m.meetingsOverdue} overdue</Badge>}
+                  {!m.flagReason && !m.meetingsOverdue && (
+                    <span className="text-[12px] text-muted-soft">On track</span>
+                  )}
                 </div>
-
-                <div className="mt-auto flex items-center justify-between border-t border-line pt-3 text-[11.5px]">
-                  <span className="tnum text-muted">Last met {m.lastMeeting}</span>
-                  <span className="font-semibold text-brand-500">Open record book →</span>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
+              ),
+            },
+            {
+              key: 'lastMeeting',
+              header: 'Last Met',
+              align: 'right',
+              render: (m) => <span className="tnum text-[12px] text-muted">{m.lastMeeting}</span>,
+            },
+            {
+              key: 'open',
+              header: '',
+              align: 'right',
+              render: (m) => (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenMentee(m.id);
+                  }}
+                >
+                  Open
+                </Button>
+              ),
+            },
+          ]}
+        />
       )}
-    </SectionCard>
+    </SectionTable>
   );
 }
 

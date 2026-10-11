@@ -1,17 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Card } from '../../components/ui/Card.jsx';
-import { HealthDial, ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import { HealthPanel } from '../../components/record/HealthPanel.jsx';
+import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
   AttendanceMonitoring,
-  CgpaTarget,
   CoursePerformance,
   PerformanceTracker,
 } from '../../components/record/Academics.jsx';
@@ -37,8 +35,15 @@ const TABS = [
  * component the student sees — read-only here, since the student owns their
  * own entries and the mentor records theirs during a meeting.
  */
-export function MenteeRecordBook({ menteeId, onBack }) {
-  const [tab, setTab] = useState('profile');
+export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [menteeId, initialTab]);
+
   const { data, loading, error } = useResource(`/mentor/me/mentees/${menteeId}`);
 
   if (error) {
@@ -77,7 +82,6 @@ export function MenteeRecordBook({ menteeId, onBack }) {
         meta={`${identity.rollNumber} · Register No. ${identity.registerNumber} · ${identity.batch}`}
         seed={identity.name.length}
         defaultOpen={false}
-        aside={<HealthDial index={health.index} tone={health.tone} label={health.label} />}
         stats={[
           { label: 'CGPA ', value: data.performance.cgpa, tone: 'indigo' },
           { label: 'Attendance ', value: `${data.attendance.current}%`, tone: data.attendance.tone },
@@ -126,27 +130,19 @@ export function MenteeRecordBook({ menteeId, onBack }) {
         <Tabs items={TABS} value={tab} onChange={setTab} size="sm" />
       </Card>
 
-      {/* Profile & Background — Academic Background only (Career Aspirations removed) */}
+      {/* Profile & Background — Academic Background only (Career Aspirations and Health Index removed) */}
       {tab === 'profile' && (
-        <div className="grid gap-5 lg:grid-cols-3">
-          <div className="space-y-5 lg:col-span-2">
-            <AcademicBackground background={data.sectionOne.academicBackground} />
-          </div>
-          <HealthPanel health={health} />
+        <div className="space-y-5">
+          <AcademicBackground background={data.sectionOne.academicBackground} />
         </div>
       )}
 
       {tab === 'academics' && (
         <div className="space-y-5">
-          <div className="grid gap-5 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <PerformanceTracker performance={data.performance} />
-            </div>
-            <CgpaTarget performance={data.performance} />
-          </div>
-          <AttendanceMonitoring attendance={data.attendance} />
           <CoursePerformance coursePerformance={data.coursePerformance} />
+          <AttendanceMonitoring attendance={data.attendance} />
           <ArrearTracking arrears={data.arrears} />
+          <PerformanceTracker performance={data.performance} />
         </div>
       )}
 
