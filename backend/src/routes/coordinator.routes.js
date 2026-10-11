@@ -13,6 +13,7 @@ import {
   listMentees,
   listMentors,
   listUploadHistory,
+  assignStudentsToMentor,
   reassignMentor,
   updateOdRequestStatus,
 } from '../data/store.js';
@@ -33,8 +34,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB limit
 });
 
-const EVENT_TYPES = ['PTM', 'Orientation', 'Review', 'Other'];
-const EVENT_STATUSES = ['Planned', 'Scheduled', 'Completed', 'Cancelled'];
+// const EVENT_TYPES = ['PTM', 'Orientation', 'Review', 'Other'];
+// const EVENT_STATUSES = ['Planned', 'Scheduled', 'Completed', 'Cancelled'];
 const OD_STATUSES = ['Approved', 'Rejected'];
 
 router.use(requireAuth, requireRole('coordinator'));
@@ -120,6 +121,30 @@ router.post('/me/mentors/reassign', (req, res, next) => {
   }
 });
 
+router.post('/me/mentors/assign', (req, res, next) => {
+  currentCoordinator(req);
+  const { mentorId, menteeIds } = req.body ?? {};
+
+  if (!mentorId) {
+    return next(new HttpError(400, 'Mentor ID is required'));
+  }
+  if (!Array.isArray(menteeIds) || menteeIds.length === 0) {
+    return next(new HttpError(400, 'At least one student must be selected for assignment'));
+  }
+
+  try {
+    const result = assignStudentsToMentor({
+      mentorId,
+      menteeIds,
+    });
+    res.json(result);
+  } catch (err) {
+    next(new HttpError(400, err.message));
+  }
+});
+
+// ── Year Events (Commented out) ─────────────────────────────────────────────
+/*
 router.post('/me/events', (req, res, next) => {
   const coordinator = currentCoordinator(req);
   const { type, title, date, status, notes } = req.body ?? {};
@@ -137,6 +162,7 @@ router.post('/me/events', (req, res, next) => {
     }),
   );
 });
+*/
 
 router.patch('/me/od-requests/:requestId', (req, res, next) => {
   const coordinator = currentCoordinator(req);

@@ -325,6 +325,85 @@ export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discon
   };
 }
 
+export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
+  if (!mentorId) throw new Error('mentorId is required');
+  const target = mentors.find((m) => m.id === mentorId);
+  if (!target) throw new Error(`Target mentor "${mentorId}" not found`);
+
+  if (!Array.isArray(menteeIds) || menteeIds.length === 0) {
+    throw new Error('At least one student must be selected for assignment');
+  }
+
+  const assigned = [];
+  const targetMenteeSet = new Set(menteeIds.map(String));
+
+  for (const mentee of mentees) {
+    if (!targetMenteeSet.has(mentee.id)) continue;
+
+    const oldMentor = mentors.find((m) => m.id === mentee.mentorId);
+
+    if (mentee.mentorId && mentee.mentorId !== target.id) {
+      mentee.mentorTransferHistory ??= [];
+      mentee.mentorTransferHistory.unshift({
+        id: nextId('tr'),
+        fromMentorId: oldMentor?.id || mentee.mentorId,
+        fromMentorName: oldMentor?.name || 'Previous Mentor',
+        toMentorId: target.id,
+        toMentorName: target.name,
+        transferredAt: new Date().toISOString(),
+        reason: 'Assigned by Year Coordinator',
+      });
+    }
+
+    mentee.mentorId = target.id;
+    mentee.mentorName = target.name;
+    mentee.staffCode = target.staffCode;
+
+    if (mentee.recordBook) {
+      mentee.recordBook.mentorId = target.id;
+      if (mentee.recordBook.identity) {
+        mentee.recordBook.identity.mentor = target.name;
+      }
+    }
+
+    const studentProfile = students.get(mentee.id);
+    if (studentProfile) {
+      if (studentProfile.profile?.mentor) {
+        studentProfile.profile.mentor = {
+          id: target.id,
+          name: target.name,
+          staffCode: target.staffCode,
+          email: target.email,
+          mobile: target.mobile,
+          cabin: target.cabin,
+        };
+      }
+      if (studentProfile.identity) {
+        studentProfile.identity.mentor = target.name;
+      }
+      studentProfile.mentorTransferHistory = mentee.mentorTransferHistory;
+    }
+
+    assigned.push(mentee);
+  }
+
+  for (const m of mentors) {
+    m.menteeCount = mentees.filter((s) => s.mentorId === m.id).length;
+  }
+
+  return {
+    success: true,
+    mentor: {
+      id: target.id,
+      name: target.name,
+      staffCode: target.staffCode,
+      menteeCount: target.menteeCount,
+    },
+    assignedCount: assigned.length,
+    assignedMentees: assigned.map((m) => ({ id: m.id, name: m.name, rollNumber: m.rollNumber })),
+  };
+}
+
 export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = [], archiveDepartingMentor = true, reason = 'Discontinued / Reassigned' }) {
   if (!departingMentorId) throw new Error('departingMentorId is required');
   if (!targetMentorId) throw new Error('targetMentorId is required');
