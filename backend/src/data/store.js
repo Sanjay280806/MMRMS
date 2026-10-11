@@ -85,7 +85,18 @@ function normalizeEvidenceFiles(files = []) {
 /* ── users ─────────────────────────────────────────────────────────────── */
 
 export function findUserByEmail(email) {
-  return users.find((u) => u.email.toLowerCase() === String(email).toLowerCase().trim());
+  const norm = String(email).toLowerCase().trim();
+  const direct = users.find((u) => u.email.toLowerCase() === norm);
+  if (direct) return direct;
+
+  // Seamless alias support for demo mentors
+  if (norm === 'bharathi.priya@kct.ac.in' || norm === 'bharathipriya.c.cse@kct.ac.in') {
+    return users.find((u) => u.mentorId === 'm-1') || users.find((u) => u.email.toLowerCase().includes('bharathi'));
+  }
+  if (norm === 'asmitha.shree@kct.ac.in' || norm === 'asmithashree.r.cse@kct.ac.in') {
+    return users.find((u) => u.mentorId === 'm-2') || users.find((u) => u.email.toLowerCase().includes('asmitha'));
+  }
+  return null;
 }
 
 export function findUserById(id) {
@@ -141,7 +152,17 @@ export function findMenteeById(id) {
 }
 
 export function listMentors(includeArchived = false) {
-  return includeArchived ? mentors : mentors.filter((m) => !m.archived);
+  const list = includeArchived ? mentors : mentors.filter((m) => !m.archived);
+  const seen = new Set();
+  const deduped = [];
+  for (const m of list) {
+    const key = (m.staffCode || m.email || m.id).toUpperCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(m);
+    }
+  }
+  return deduped;
 }
 
 export function listArchivedMentors() {
@@ -368,6 +389,7 @@ export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
 
     const studentProfile = students.get(mentee.id);
     if (studentProfile) {
+      studentProfile.mentorId = target.id;
       if (studentProfile.profile?.mentor) {
         studentProfile.profile.mentor = {
           id: target.id,
@@ -404,7 +426,45 @@ export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
   };
 }
 
-export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = [], archiveDepartingMentor = true, reason = 'Discontinued / Reassigned' }) {
+export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-deleted by Year Coordinator') {
+  const mentor = mentors.find((m) => m.id === mentorId);
+  if (!mentor) throw new Error(`Mentor "${mentorId}" not found`);
+  mentor.archived = Boolean(softDelete);
+  mentor.status = softDelete ? 'Archived' : 'Active';
+  if (softDelete) {
+    mentor.archivedAt = new Date().toISOString();
+    mentor.archivedReason = reason;
+  } else {
+    mentor.archivedAt = null;
+    mentor.archivedReason = null;
+  }
+  const mentorUser = users.find(
+    (u) => (u.mentorId === mentor.id || (u.email?.toLowerCase() === mentor.email?.toLowerCase() && u.role === 'mentor'))
+  );
+  if (mentorUser) {
+    mentorUser.archived = Boolean(softDelete);
+    mentorUser.status = softDelete ? 'Archived' : 'Active';
+    if (softDelete) {
+      mentorUser.archivedAt = mentor.archivedAt;
+      mentorUser.archivedReason = reason;
+    } else {
+      mentorUser.archivedAt = null;
+      mentorUser.archivedReason = null;
+    }
+  }
+  return {
+    success: true,
+    mentor: {
+      id: mentor.id,
+      name: mentor.name,
+      staffCode: mentor.staffCode,
+      archived: mentor.archived,
+      status: mentor.status,
+    },
+  };
+}
+
+export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = [], archiveDepartingMentor = false, reason = 'Discontinued / Reassigned' }) {
   if (!departingMentorId) throw new Error('departingMentorId is required');
   if (!targetMentorId) throw new Error('targetMentorId is required');
   if (departingMentorId === targetMentorId) {
@@ -457,6 +517,7 @@ export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = 
     // Also update student profile if active in memory
     const studentProfile = students.get(mentee.id);
     if (studentProfile) {
+      studentProfile.mentorId = target.id;
       if (studentProfile.profile?.mentor) {
         studentProfile.profile.mentor = {
           id: target.id,
@@ -476,9 +537,17 @@ export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = 
     transferred.push(mentee);
   }
 
+  // Seamlessly update open concerns for transferred mentees to the target mentor
+  for (const concern of concerns) {
+    if (targetMenteeIds.has(concern.studentId) && concern.status !== 'CLOSED') {
+      concern.mentorId = target.id;
+      concern.mentorName = target.name;
+    }
+  }
+
   const remainingMentees = mentees.filter((m) => m.mentorId === departing.id);
 
-  if (archiveDepartingMentor || remainingMentees.length === 0) {
+  if (Boolean(archiveDepartingMentor)) {
     departing.status = 'Archived';
     departing.archived = true;
     departing.archivedAt = new Date().toISOString();
@@ -494,6 +563,9 @@ export function reassignMentor({ departingMentorId, targetMentorId, menteeIds = 
       mentorUser.archivedReason = reason;
       mentorUser.status = 'Archived';
     }
+  } else {
+    departing.status = 'Active';
+    departing.archived = false;
   }
 
   // Recalculate mentee counts
@@ -708,10 +780,12 @@ export function bulkUpsertFaculty(records = [], options = {}) {
   for (const item of records) {
     const code = String(item.staffCode).trim().toUpperCase();
     const email = String(item.email).trim().toLowerCase();
+    const name = String(item.name).trim().toLowerCase();
 
     const existingIndex = mentors.findIndex(
       (m) => (m.staffCode && m.staffCode.toUpperCase() === code) ||
-             (m.email && m.email.toLowerCase() === email)
+             (m.email && m.email.toLowerCase() === email) ||
+             (m.name && m.name.toLowerCase() === name)
     );
 
     if (existingIndex !== -1) {
@@ -721,12 +795,16 @@ export function bulkUpsertFaculty(records = [], options = {}) {
       current.department = item.department || current.department;
       if (item.email) current.email = item.email;
       if (item.staffCode) current.staffCode = item.staffCode;
+      current.archived = false;
+      current.status = 'Active';
 
       const user = findUserByEmail(email) || users.find((u) => u.mentorId === current.id);
       if (user) {
         user.name = current.name;
         user.designation = current.designation;
         user.email = current.email;
+        user.archived = false;
+        user.status = 'Active';
       }
 
       updatedCount++;

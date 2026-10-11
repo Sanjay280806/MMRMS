@@ -171,11 +171,11 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
 
   return (
     <>
-      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} />}
+      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
       {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
       {section === 'risk' && <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />}
-      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} />}
+      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
       {section === 'operations' && <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />}
       {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
@@ -207,7 +207,7 @@ function AdvisorDashboard({ data }) {
   </>;
 }
 
-function CoordinatorDashboard({ data, onNavigate, onInspectMentor }) {
+function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
   const { stats } = data;
   return <>
     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
@@ -241,7 +241,7 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor }) {
     </div>
 
     <div className="grid gap-5 xl:grid-cols-2">
-      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} />
+      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
     <StudentWatch title="Immediate attention" subtitle="Lowest health index across the year" rows={data.atRisk.slice(0, 8)} metric="health" />
@@ -269,32 +269,120 @@ function AcademicAndDiscipline({ data }) {
   </>;
 }
 
-function MentorTracker({ rows, compact = false, onNavigate, onInspectMentor }) {
+function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
+  const [filter, setFilter] = useState('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  async function handleToggleSoftDelete(mentor, shouldSoftDelete) {
+    setActionLoadingId(mentor.id);
+    setStatusMessage(null);
+    try {
+      await api(`/coordinator/me/mentors/${mentor.id}/soft-delete`, {
+        method: 'POST',
+        body: {
+          softDelete: shouldSoftDelete,
+          reason: shouldSoftDelete ? 'Soft-deleted by Year Coordinator' : 'Restored by Year Coordinator',
+        },
+      });
+      setConfirmDeleteId(null);
+      setStatusMessage(`${mentor.name} was successfully ${shouldSoftDelete ? 'soft-deleted' : 'restored'}.`);
+      if (onReload) onReload();
+    } catch (err) {
+      setStatusMessage(`Error: ${err.message || 'Operation failed'}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  const activeCount = rows.filter((r) => !r.archived).length;
+  const archivedCount = rows.filter((r) => r.archived).length;
+
+  const filteredRows = rows.filter((r) => {
+    if (filter === 'active') return !r.archived;
+    if (filter === 'archived') return r.archived;
+    return true;
+  });
+
   return (
     <SectionTable
       title="Mentor Tracker"
-      subtitle="Assigned learners, mentoring compliance, health and follow-up load"
+      subtitle="Assigned learners, mentoring compliance, and faculty status"
       action={
-        !compact && onNavigate && (
-          <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
-            ⚡ Mentor Reassignment Tool
-          </Button>
-        )
+        <div className="flex flex-wrap items-center gap-2">
+          {!compact && (
+            <div className="flex items-center rounded-lg border border-line bg-surface-subtle p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'all' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                All ({rows.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('active')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'active' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('archived')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'archived' ? 'bg-white shadow-xs text-bad-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                Soft-Deleted ({archivedCount})
+              </button>
+            </div>
+          )}
+          {!compact && onNavigate && (
+            <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
+              ⚡ Mentor Reassignment Tool
+            </Button>
+          )}
+        </div>
       }
     >
+      {statusMessage && (
+        <div className="border-b border-line bg-brand-50/60 px-4 py-2 text-[12px] font-medium text-brand-900 flex justify-between items-center">
+          <span>{statusMessage}</span>
+          <button type="button" onClick={() => setStatusMessage(null)} className="text-muted hover:text-ink">✕</button>
+        </div>
+      )}
       <DataTable
-        rows={rows}
+        rows={filteredRows}
         rowKey={(row) => row.id}
         onRowClick={(row) => onInspectMentor?.(row.id)}
+        empty={<EmptyState title="No mentors found" description="No faculty matching the selected filter." icon="✓" />}
         columns={[
           {
             key: 'mentor',
             header: 'Mentor',
             render: (row) => (
               <div>
-                <p className="font-semibold text-brand-700 hover:underline">{row.name}</p>
-                <p className="text-[11.5px] text-muted">{row.staffCode}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-brand-700 hover:underline">{row.name}</p>
+                  {row.archived && <Badge tone="rose" size="xs">Soft-Deleted</Badge>}
+                </div>
+                <p className="text-[11.5px] text-muted">{row.staffCode} · {row.designation}</p>
               </div>
+            ),
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            align: 'center',
+            render: (row) => (
+              <Badge tone={row.archived ? 'rose' : 'green'} size="xs">
+                {row.archived ? 'Soft-Deleted' : 'Active'}
+              </Badge>
             ),
           },
           { key: 'assigned', header: 'Assigned', align: 'right' },
@@ -306,16 +394,55 @@ function MentorTracker({ rows, compact = false, onNavigate, onInspectMentor }) {
             header: '',
             align: 'right',
             render: (row) => (
-              <Button
-                size="xs"
-                variant="secondary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onInspectMentor?.(row.id);
-                }}
-              >
-                Inspect
-              </Button>
+              <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onInspectMentor?.(row.id)}
+                >
+                  Inspect
+                </Button>
+                {confirmDeleteId === row.id ? (
+                  <div className="flex items-center gap-1 rounded-lg bg-bad-surface/60 p-1 border border-bad-line">
+                    <span className="text-[11px] font-bold text-bad-ink px-1">Soft Delete?</span>
+                    <Button
+                      size="xs"
+                      variant="danger"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => handleToggleSoftDelete(row, true)}
+                    >
+                      Yes
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => setConfirmDeleteId(null)}
+                    >
+                      No
+                    </Button>
+                  </div>
+                ) : (
+                  row.archived ? (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => handleToggleSoftDelete(row, false)}
+                    >
+                      Restore
+                    </Button>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => setConfirmDeleteId(row.id)}
+                    >
+                      Soft Delete
+                    </Button>
+                  )
+                )}
+              </div>
             ),
           },
         ]}

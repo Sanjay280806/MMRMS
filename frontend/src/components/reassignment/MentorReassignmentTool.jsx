@@ -19,7 +19,7 @@ export function MentorReassignmentTool({
   const [mentees, setMentees] = useState([]);
   const [selectedMenteeIds, setSelectedMenteeIds] = useState(new Set());
   const [loadingMentees, setLoadingMentees] = useState(false);
-  const [archiveDepartingMentor, setArchiveDepartingMentor] = useState(true);
+  const [archiveDepartingMentor, setArchiveDepartingMentor] = useState(false);
   const [reason, setReason] = useState('Mentor Discontinued / Faculty Succession');
   const [searchTerm, setSearchTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -185,10 +185,13 @@ export function MentorReassignmentTool({
               <strong>{successInfo.departingMentor?.name}</strong> to{' '}
               <strong>{successInfo.targetMentor?.name}</strong>.
             </p>
-            {successInfo.departingMentor?.archived && (
-              <p className="mt-1 text-[12px] text-muted">
-                Departing mentor account for {successInfo.departingMentor?.name} has been{' '}
-                <span className="font-semibold text-bad-ink">Archived (soft-deleted)</span>. Historical records remain intact for audits.
+            {successInfo.departingMentor?.archived ? (
+              <p className="mt-2 text-[12.5px] font-medium text-bad-ink">
+                Departing mentor account for {successInfo.departingMentor?.name} has been <span className="font-semibold underline">soft-deleted (archived)</span> as requested.
+              </p>
+            ) : (
+              <p className="mt-2 text-[12.5px] font-medium text-good-ink">
+                Departing mentor {successInfo.departingMentor?.name} remains <span className="font-semibold underline">Active</span> in the faculty directory with {successInfo.departingMentor?.menteeCount ?? 0} mentees (not soft-deleted).
               </p>
             )}
 
@@ -301,21 +304,6 @@ export function MentorReassignmentTool({
               </div>
             </div>
 
-            {/* Seamless Preservation Highlight */}
-            <div className="rounded-2xl border border-indigo-200 bg-brand-50/60 p-4 text-[12.5px] text-indigo-950">
-              <div className="flex items-start gap-2.5">
-                <span className="text-lg">🛡️</span>
-                <div>
-                  <h4 className="font-semibold text-brand-900">Seamless Historical Data & Progress Preservation</h4>
-                  <p className="mt-0.5 text-indigo-800 leading-relaxed text-[12px]">
-                    Only the mentor link is updated on the selected students. All <strong>Section 12 meeting logs</strong>,
-                    SMART goals, student concerns, recommendations, attendance records, and previous action items
-                    remain <strong>100% intact</strong> and instantly accessible to the incoming mentor for ongoing guidance.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Mentees Bulk Selection Table */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -423,20 +411,28 @@ export function MentorReassignmentTool({
 
             {/* Options: Archiving and Reason */}
             <div className="rounded-2xl border border-line bg-surface-subtle p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[12.5px] font-bold text-ink">
+                  Soft Delete Option (Departing Mentor)
+                </span>
+                <Badge tone={archiveDepartingMentor ? 'rose' : 'slate'} size="xs">
+                  {archiveDepartingMentor ? 'Soft delete departing mentor' : 'Keep active (default)'}
+                </Badge>
+              </div>
+
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={archiveDepartingMentor}
                   onChange={(e) => setArchiveDepartingMentor(e.target.checked)}
-                  className="mt-0.5 rounded border-line text-brand-600 focus:ring-brand-500"
+                  className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
                 />
                 <div>
                   <span className="text-[13px] font-semibold text-ink block">
-                    Archive Departing Mentor Account (Soft-Delete)
+                    Soft delete departing mentor account (Archive account)
                   </span>
-                  <span className="text-[11.5px] text-muted block leading-relaxed">
-                    Disables sign-in access for the departing mentor while permanently retaining their name on past
-                    signed meeting minutes, attendance logs, and institutional accreditation records.
+                  <span className="text-[11.5px] text-muted block leading-relaxed mt-0.5">
+                    <strong>Note:</strong> Not all mentors whose mentees are changed will be soft deleted. Only if you check this option will this departing mentor be soft deleted (archived). If unchecked, the mentor remains active in the faculty directory with 0 or remaining mentees.
                   </span>
                 </div>
               </label>
