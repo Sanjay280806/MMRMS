@@ -15,6 +15,7 @@ import {
   listUploadHistory,
   assignStudentsToMentor,
   reassignMentor,
+  setMentorSoftDelete,
   updateOdRequestStatus,
 } from '../data/store.js';
 import { buildMenteeRecordBook } from '../services/mentee.js';
@@ -85,6 +86,7 @@ router.get('/me/mentors/:mentorId', (req, res, next) => {
       designation: mentor.designation,
       staffCode: mentor.staffCode,
       cabin: mentor.cabin,
+      archived: Boolean(mentor.archived),
     },
     cohortId: coordinator.cohortId,
     mentees: mentees.map(summariseMentee),
@@ -112,7 +114,7 @@ router.post('/me/mentors/reassign', (req, res, next) => {
       departingMentorId,
       targetMentorId,
       menteeIds: menteeIds || [],
-      archiveDepartingMentor: archiveDepartingMentor !== false,
+      archiveDepartingMentor: Boolean(archiveDepartingMentor),
       reason: reason?.trim() || 'Mentor Discontinued / Reassigned by Year Coordinator',
     });
     res.json(result);
@@ -137,6 +139,17 @@ router.post('/me/mentors/assign', (req, res, next) => {
       mentorId,
       menteeIds,
     });
+    res.json(result);
+  } catch (err) {
+    next(new HttpError(400, err.message));
+  }
+});
+
+router.post('/me/mentors/:mentorId/soft-delete', (req, res, next) => {
+  currentCoordinator(req);
+  const { softDelete = true, reason } = req.body ?? {};
+  try {
+    const result = setMentorSoftDelete(req.params.mentorId, Boolean(softDelete), reason);
     res.json(result);
   } catch (err) {
     next(new HttpError(400, err.message));
