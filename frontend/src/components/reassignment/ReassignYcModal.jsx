@@ -1,8 +1,21 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../api/client.js';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
+import { Avatar } from '../ui/Avatar.jsx';
 import { TextField, SelectField, TextArea } from '../ui/Field.jsx';
+
+function getInitials(name) {
+  if (!name) return 'YC';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSuccess }) {
   const [facultyList, setFacultyList] = useState(eligibleFaculty || []);
@@ -22,8 +35,36 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
   const [error, setError] = useState(null);
   const [successResult, setSuccessResult] = useState(null);
 
+  // Lock body scroll and handle ESC key
   useEffect(() => {
-    if ((!facultyList || facultyList.length === 0)) {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !submitting) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose, submitting]);
+
+  // Sync eligible faculty list and select first by default
+  useEffect(() => {
+    if (eligibleFaculty && eligibleFaculty.length > 0 && facultyList.length === 0) {
+      setFacultyList(eligibleFaculty);
+      if (!selectedFacultyId) {
+        setSelectedFacultyId(eligibleFaculty[0].id || eligibleFaculty[0].staffCode);
+      }
+    }
+  }, [eligibleFaculty]);
+
+  useEffect(() => {
+    if (!facultyList || facultyList.length === 0) {
       api('/hod/me/faculty/eligible')
         .then((res) => {
           if (Array.isArray(res)) {
@@ -38,6 +79,8 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
       setSelectedFacultyId(facultyList[0].id || facultyList[0].staffCode);
     }
   }, [facultyList, selectedFacultyId]);
+
+  if (!cohort) return null;
 
   const selectedFacultyObj = facultyList.find(
     (f) => String(f.id) === String(selectedFacultyId) || String(f.staffCode) === String(selectedFacultyId)
@@ -58,7 +101,7 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
       newFacultyData = {
         name: selectedFacultyObj.name,
         email: selectedFacultyObj.email,
-        mobile: selectedFacultyObj.mobile,
+        mobile: selectedFacultyObj.mobile || '+91 98430 00000',
         room: selectedFacultyObj.cabin || selectedFacultyObj.room || 'CSE Block · Room 210',
         designation: 'Year Coordinator',
         department: selectedFacultyObj.department || 'Computer Science and Engineering',
@@ -103,29 +146,49 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeRise">
-      <div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-line bg-surface p-6 sm:p-8 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-line pb-4">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) {
+          onClose();
+        }
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reassign-yc-modal-title"
+    >
+      <div
+        style={{ backgroundColor: '#ffffff', color: '#12131A' }}
+        className="relative flex flex-col w-full max-w-xl max-h-[90vh] rounded-2xl border border-line-strong shadow-2xl overflow-hidden animate-slideUp"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Fixed Header */}
+        <div
+          style={{ backgroundColor: '#f8f9fc' }}
+          className="flex items-start justify-between border-b border-line px-6 py-4 shrink-0"
+        >
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-brand-700">
+              <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-brand-700">
                 Cohort Governance
               </span>
-              <Badge tone="indigo">Cohort {cohort.cohortId}</Badge>
+              <Badge tone="indigo">{cohort.cohortId}</Badge>
             </div>
-            <h2 className="mt-1.5 text-xl font-bold text-ink">
+            <h2 id="reassign-yc-modal-title" className="mt-1 text-lg font-bold text-ink">
               Reassign Year Coordinator
             </h2>
-            <p className="text-[12.5px] text-muted">
-              {cohort.cohortName} ({cohort.year}) · Seamless succession with permanent audit preservation
+            <p className="text-[12px] text-muted">
+              {cohort.cohortName} ({cohort.year})
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-muted hover:bg-surface-subtle hover:text-ink transition-colors"
+            disabled={submitting}
+            className="rounded-full p-1.5 text-muted hover:bg-black/5 hover:text-ink transition-colors"
+            title="Close dialog"
+            aria-label="Close dialog"
           >
             ✕
           </button>
@@ -133,8 +196,8 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
 
         {/* Success View */}
         {successResult ? (
-          <div className="my-8 rounded-2xl border border-good-line bg-good-surface/30 p-6 text-center animate-badgePop">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-good-surface text-2xl font-bold text-good-ink">
+          <div style={{ backgroundColor: '#ffffff' }} className="p-6 sm:p-8 text-center animate-badgePop">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-good-tint text-2xl font-bold text-good-ink">
               ✓
             </div>
             <h3 className="text-base font-bold text-ink">
@@ -143,211 +206,242 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
             <p className="mt-1 text-[13px] text-muted-strong">
               <strong>{successResult.newCoordinator?.name}</strong> is now the active Year Coordinator for {cohort.cohortName}.
             </p>
-            <div className="mt-4 rounded-xl border border-good-line/60 bg-white p-3.5 text-left text-[12px] space-y-1.5">
+            <div className="mt-5 rounded-xl border border-good/30 bg-good-tint/60 p-4 text-left text-[12px] space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted">Previous Coordinator:</span>
-                <span className="font-semibold text-ink">{successResult.oldCoordinator?.name || cohort.yearCoordinator} (Archived)</span>
+                <span className="font-semibold text-ink">
+                  {successResult.oldCoordinator?.name || cohort.yearCoordinator} (Archived)
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted">New Coordinator:</span>
-                <span className="font-semibold text-brand-600">{successResult.newCoordinator?.name} (Active)</span>
+                <span className="font-semibold text-brand-600">
+                  {successResult.newCoordinator?.name} (Active)
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted">Auditing Trail:</span>
-                <span className="font-medium text-good-ink">100% historical logs and events preserved</span>
+                <span className="text-muted">Audit Compliance:</span>
+                <span className="font-medium text-good-ink">Historical events & uploads preserved</span>
               </div>
             </div>
-            <div className="mt-5">
+            <div className="mt-6">
               <Button size="sm" variant="primary" onClick={onClose}>
                 Done
               </Button>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="mt-5 space-y-5">
-            {error && (
-              <div className="rounded-xl border border-bad-line bg-bad-surface/40 p-3.5 text-[12.5px] font-medium text-bad-ink">
-                ⚠️ {error}
-              </div>
-            )}
-
-            {/* Current YC Status Box */}
-            <div className="rounded-2xl border border-line bg-surface-subtle p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11.5px] font-semibold uppercase tracking-wider text-muted-soft">
-                  Current Year Coordinator
-                </span>
-                <Badge tone="amber">Will be Archived</Badge>
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-ink">{cohort.yearCoordinator}</h4>
-                  <p className="text-[12px] text-muted">
-                    {cohort.coordinatorEmail || 'coordinator@kct.ac.in'} · {cohort.coordinatorRoom || 'CSE Block'}
-                  </p>
+          <form
+            onSubmit={handleSubmit}
+            style={{ backgroundColor: '#ffffff' }}
+            className="flex flex-col flex-1 min-h-0"
+          >
+            {/* Scrollable Form Body */}
+            <div
+              style={{ backgroundColor: '#ffffff' }}
+              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+            >
+              {error && (
+                <div className="rounded-xl border border-bad/30 bg-bad-tint p-3 text-[12.5px] font-medium text-bad-ink">
+                  ⚠️ {error}
                 </div>
-                <div className="text-right text-[11px] text-muted">
-                  <span>Enrolled Cohort</span>
-                  <p className="font-semibold text-ink">{cohort.totalStudents || 0} students</p>
+              )}
+
+              {/* Current Coordinator Summary Card */}
+              <div
+                style={{ backgroundColor: '#f8f9fc' }}
+                className="rounded-xl border border-line p-3.5 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar initials={getInitials(cohort.yearCoordinator)} size="sm" seed={2} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-soft">
+                        Current:
+                      </span>
+                      <span className="font-bold text-ink text-sm truncate">
+                        {cohort.yearCoordinator}
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-muted truncate">
+                      {cohort.coordinatorEmail || 'coordinator@kct.ac.in'} · {cohort.coordinatorRoom || 'CSE Block'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <Badge tone="amber" size="xs">Will be Archived</Badge>
+                  <p className="text-[11px] text-muted-soft mt-0.5">{cohort.totalStudents || 0} students</p>
                 </div>
               </div>
-            </div>
 
-            {/* Mandatory Accreditation Policy Notice */}
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4 text-[12px] text-indigo-950">
-              <div className="flex items-start gap-2.5">
-                <span className="text-base">🛡️</span>
-                <div className="space-y-1">
-                  <p className="font-semibold">Institutional Audit & Accreditation Integrity</p>
-                  <p className="leading-relaxed text-indigo-800">
-                    When the coordinator departs, their login account is marked as <strong>Archived (soft-deleted)</strong>.
-                    All historical events, MyCamu/Excel uploads, and review logs created by this coordinator remain
-                    <strong> permanently intact</strong> for NBA/NAAC audit compliance. The new Year Coordinator gains
-                    instant access to the cohort dataset upon assignment.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Selection Mode Toggle */}
-            <div className="space-y-2">
-              <label className="text-[12.5px] font-semibold text-muted-strong block">
-                Select Succession Mode
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedFacultyMode('existing')}
-                  className={`flex-1 rounded-xl border p-3 text-left transition-all ${
-                    selectedFacultyMode === 'existing'
-                      ? 'border-brand-500 bg-brand-50/60 shadow-inner ring-2 ring-brand-500/20'
-                      : 'border-line bg-white hover:border-brand-200'
-                  }`}
+              {/* Succession Mode Segmented Switch */}
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-muted-strong block">
+                  Succession Mode
+                </label>
+                <div
+                  style={{ backgroundColor: '#f1f3f8' }}
+                  className="flex rounded-xl p-1 border border-line"
                 >
-                  <span className="text-[12.5px] font-bold text-ink block">
-                    Choose from Department Faculty
-                  </span>
-                  <span className="text-[11px] text-muted block mt-0.5">
-                    Select an active professor, mentor, or advisor
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFacultyMode('new')}
-                  className={`flex-1 rounded-xl border p-3 text-left transition-all ${
-                    selectedFacultyMode === 'new'
-                      ? 'border-brand-500 bg-brand-50/60 shadow-inner ring-2 ring-brand-500/20'
-                      : 'border-line bg-white hover:border-brand-200'
-                  }`}
-                >
-                  <span className="text-[12.5px] font-bold text-ink block">
-                    Enter New Faculty Member
-                  </span>
-                  <span className="text-[11px] text-muted block mt-0.5">
-                    Onboard incoming faculty or transferred staff
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFacultyMode('existing')}
+                    style={
+                      selectedFacultyMode === 'existing'
+                        ? { backgroundColor: '#ffffff', color: '#12131A' }
+                        : { backgroundColor: 'transparent', color: '#6B7280' }
+                    }
+                    className={`flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all ${
+                      selectedFacultyMode === 'existing'
+                        ? 'shadow-sm border border-line-strong'
+                        : 'hover:text-ink'
+                    }`}
+                  >
+                    Choose Existing Faculty
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFacultyMode('new')}
+                    style={
+                      selectedFacultyMode === 'new'
+                        ? { backgroundColor: '#ffffff', color: '#12131A' }
+                        : { backgroundColor: 'transparent', color: '#6B7280' }
+                    }
+                    className={`flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all ${
+                      selectedFacultyMode === 'new'
+                        ? 'shadow-sm border border-line-strong'
+                        : 'hover:text-ink'
+                    }`}
+                  >
+                    + Enter New Faculty
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Existing Faculty Dropdown */}
-            {selectedFacultyMode === 'existing' && (
-              <div className="space-y-3">
+              {/* Mode: Existing Faculty */}
+              {selectedFacultyMode === 'existing' && (
+                <div className="space-y-3">
+                  <SelectField
+                    label="Select New Faculty Member"
+                    value={selectedFacultyId}
+                    onChange={(e) => setSelectedFacultyId(e.target.value)}
+                    hint="Eligible faculty members from CSE department"
+                  >
+                    {facultyList.map((f) => (
+                      <option key={f.id || f.staffCode} value={f.id || f.staffCode}>
+                        {f.name} ({f.staffCode || f.id}) — {f.designation} [{f.email}]
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  {selectedFacultyObj && (
+                    <div
+                      style={{ backgroundColor: '#eef2ff' }}
+                      className="rounded-xl border border-brand-200 p-3.5 text-[12px]"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-semibold text-brand-900">Preview Assigned Profile</span>
+                        <Badge tone="brand" size="xs">Selected YC</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-muted-strong">
+                        <div>
+                          <span className="text-muted">Name:</span>{' '}
+                          <strong className="text-ink">{selectedFacultyObj.name}</strong>
+                        </div>
+                        <div>
+                          <span className="text-muted">Staff Code:</span>{' '}
+                          <span className="font-mono font-medium text-ink">{selectedFacultyObj.staffCode}</span>
+                        </div>
+                        <div className="truncate">
+                          <span className="text-muted">Email:</span>{' '}
+                          <span className="text-ink">{selectedFacultyObj.email}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted">Cabin:</span>{' '}
+                          <span className="text-ink">{selectedFacultyObj.cabin || selectedFacultyObj.room || 'CSE Block'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mode: Manual New Faculty Fields */}
+              {selectedFacultyMode === 'new' && (
+                <div
+                  style={{ backgroundColor: '#f8f9fc' }}
+                  className="grid gap-3 sm:grid-cols-2 rounded-xl border border-line p-3.5"
+                >
+                  <TextField
+                    label="Faculty Full Name"
+                    required
+                    placeholder="e.g. Dr. Kavitha Sundaram"
+                    value={customFaculty.name}
+                    onChange={(e) => setCustomFaculty({ ...customFaculty, name: e.target.value })}
+                  />
+                  <TextField
+                    label="Institutional Email"
+                    required
+                    type="email"
+                    placeholder="kavitha.s@kct.ac.in"
+                    value={customFaculty.email}
+                    onChange={(e) => setCustomFaculty({ ...customFaculty, email: e.target.value })}
+                  />
+                  <TextField
+                    label="Contact Mobile"
+                    placeholder="+91 98430 00000"
+                    value={customFaculty.mobile}
+                    onChange={(e) => setCustomFaculty({ ...customFaculty, mobile: e.target.value })}
+                  />
+                  <TextField
+                    label="Cabin / Room"
+                    placeholder="CSE Block · Room 210"
+                    value={customFaculty.room}
+                    onChange={(e) => setCustomFaculty({ ...customFaculty, room: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {/* Reassignment Reason & Notes */}
+              <div className="space-y-3 pt-1">
                 <SelectField
-                  label="Select New Faculty Member"
-                  value={selectedFacultyId}
-                  onChange={(e) => setSelectedFacultyId(e.target.value)}
-                  hint="Faculty members from CSE department eligible for Year Coordinator leadership"
+                  label="Reassignment Category / Justification"
+                  value={reasonCategory}
+                  onChange={(e) => setReasonCategory(e.target.value)}
                 >
-                  {facultyList.map((f) => (
-                    <option key={f.id || f.staffCode} value={f.id || f.staffCode}>
-                      {f.name} ({f.staffCode || f.id}) — {f.designation} [{f.email}]
-                    </option>
-                  ))}
+                  <option value="Departmental Administrative Rotation">Departmental Administrative Rotation</option>
+                  <option value="Faculty Resignation / Superannuation">Faculty Resignation / Superannuation</option>
+                  <option value="Faculty Sabbatical / Extended Leave">Faculty Sabbatical / Extended Leave</option>
+                  <option value="Administrative Reallocation of Duties">Administrative Reallocation of Duties</option>
+                  <option value="Other Institutional Reason">Other Institutional Reason</option>
                 </SelectField>
 
-                {selectedFacultyObj && (
-                  <div className="rounded-xl border border-line bg-surface-subtle p-3 text-[12px] space-y-1">
-                    <p className="font-semibold text-ink">Preview Assigned Profile:</p>
-                    <div className="grid grid-cols-2 gap-2 text-muted">
-                      <div>Name: <span className="font-medium text-ink">{selectedFacultyObj.name}</span></div>
-                      <div>Staff Code: <span className="font-mono text-ink">{selectedFacultyObj.staffCode}</span></div>
-                      <div>Email: <span className="text-ink">{selectedFacultyObj.email}</span></div>
-                      <div>Cabin: <span className="text-ink">{selectedFacultyObj.cabin || 'CSE Block'}</span></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Manual New Faculty Fields */}
-            {selectedFacultyMode === 'new' && (
-              <div className="grid gap-3 sm:grid-cols-2 rounded-2xl border border-line p-4 bg-surface-subtle/50">
-                <TextField
-                  label="Faculty Full Name"
-                  required
-                  placeholder="e.g. Dr. Kavitha Sundaram"
-                  value={customFaculty.name}
-                  onChange={(e) => setCustomFaculty({ ...customFaculty, name: e.target.value })}
-                />
-                <TextField
-                  label="Institutional Email"
-                  required
-                  type="email"
-                  placeholder="kavitha.s@kct.ac.in"
-                  value={customFaculty.email}
-                  onChange={(e) => setCustomFaculty({ ...customFaculty, email: e.target.value })}
-                />
-                <TextField
-                  label="Contact Mobile"
-                  placeholder="+91 98430 00000"
-                  value={customFaculty.mobile}
-                  onChange={(e) => setCustomFaculty({ ...customFaculty, mobile: e.target.value })}
-                />
-                <TextField
-                  label="Cabin / Room"
-                  placeholder="CSE Block · Room 210"
-                  value={customFaculty.room}
-                  onChange={(e) => setCustomFaculty({ ...customFaculty, room: e.target.value })}
+                <TextArea
+                  label="Audit Remarks & Succession Notes (Optional)"
+                  rows={2}
+                  placeholder="Institutional notes on cohort handover and responsibilities…"
+                  value={reasonNotes}
+                  onChange={(e) => setReasonNotes(e.target.value)}
                 />
               </div>
-            )}
-
-            {/* Reassignment Reason & Audit Notes */}
-            <div className="space-y-3">
-              <SelectField
-                label="Reassignment Category / Justification"
-                value={reasonCategory}
-                onChange={(e) => setReasonCategory(e.target.value)}
-              >
-                <option value="Departmental Administrative Rotation">Departmental Administrative Rotation</option>
-                <option value="Faculty Resignation / Superannuation">Faculty Resignation / Superannuation</option>
-                <option value="Faculty Sabbatical / Extended Leave">Faculty Sabbatical / Extended Leave</option>
-                <option value="Administrative Reallocation of Duties">Administrative Reallocation of Duties</option>
-                <option value="Other Institutional Reason">Other Institutional Reason</option>
-              </SelectField>
-
-              <TextArea
-                label="Audit Remarks & Succession Notes (Optional)"
-                rows={2}
-                placeholder="Institutional notes on cohort handover and responsibilities…"
-                value={reasonNotes}
-                onChange={(e) => setReasonNotes(e.target.value)}
-              />
             </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+            {/* Fixed Footer Actions */}
+            <div
+              style={{ backgroundColor: '#f8f9fc' }}
+              className="flex items-center justify-end gap-3 border-t border-line px-6 py-4 shrink-0"
+            >
               <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
                 Cancel
               </Button>
               <Button type="submit" variant="primary" disabled={submitting}>
-                {submitting ? 'Reassigning & Archiving…' : 'Confirm Reassignment & Archive Old YC'}
+                {submitting ? 'Reassigning Coordinator…' : 'Confirm & Assign Coordinator'}
               </Button>
             </div>
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
