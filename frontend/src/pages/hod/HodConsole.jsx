@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { StatTile } from '../../components/ui/StatTile.jsx';
 import { SectionCard, SectionTable } from '../../components/ui/SectionCard.jsx';
@@ -326,6 +327,9 @@ function CohortsSection({
     try {
       const res = await api(`/hod/me/cohorts/${cohort.cohortId}`);
       setCohortStudents(res.students || []);
+      if (res.cohort) {
+        onSelectCohort(res.cohort);
+      }
     } catch {
       setCohortStudents([]);
     } finally {
@@ -519,9 +523,21 @@ function CohortsSection({
           title={`Students in ${selectedCohort.cohortName} (${selectedCohort.cohortId})`}
           subtitle={`Year Coordinator: ${selectedCohort.yearCoordinator} · Showing ${cohortStudents.length} enrolled students`}
           action={
-            <Button size="xs" variant="secondary" onClick={() => onSelectCohort(null)}>
-              ✕ Close Roster
-            </Button>
+            <div className="flex items-center gap-2">
+              {onReassignYc && (
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onReassignYc(selectedCohort)}
+                  title="Reassign Year Coordinator for this cohort"
+                >
+                  ⚡ Reassign YC
+                </Button>
+              )}
+              <Button size="xs" variant="secondary" onClick={() => onSelectCohort(null)}>
+                ✕ Close Roster
+              </Button>
+            </div>
           }
         >
           {loadingStudents ? (
@@ -893,9 +909,33 @@ function MentorsSection({
 function StudentRecordModal({ studentId, onClose }) {
   const { data: record, loading, error } = useResource(`/hod/me/students/${studentId}`);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = orig;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{ backgroundColor: '#ffffff', color: '#12131A' }}
+        className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-line bg-white p-6 shadow-2xl animate-slideUp text-ink"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600">
@@ -966,6 +1006,7 @@ function StudentRecordModal({ studentId, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
