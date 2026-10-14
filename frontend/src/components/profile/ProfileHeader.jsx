@@ -2,7 +2,6 @@ import { Avatar } from '../ui/Avatar.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DefinitionList } from '../ui/DefinitionList.jsx';
-import { cx, tone as toneOf } from '../../lib/tone.js';
 
 /**
  * The record book's cover page, shown at the top of every signed-in view.

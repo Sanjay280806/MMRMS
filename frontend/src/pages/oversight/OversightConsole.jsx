@@ -244,7 +244,7 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
       <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
-    <StudentWatch title="Immediate attention" subtitle="Lowest health index across the year" rows={data.atRisk.slice(0, 8)} metric="health" />
+    <StudentWatch title="Immediate attention" subtitle="Students requiring immediate follow-up" rows={data.atRisk.slice(0, 8)} metric="health" />
   </>;
 }
 
@@ -252,7 +252,6 @@ function StudentWatch({ title, subtitle, rows, metric }) {
   return <SectionTable title={title} subtitle={subtitle} action={<Badge tone={rows.length ? 'rose' : 'green'}>{rows.length} student{rows.length === 1 ? '' : 's'}</Badge>}>
     <DataTable rows={rows} rowKey={(row) => row.id} empty={<EmptyState title="No follow-up needed" description="There are no students in this watch list." icon="✓" />} columns={[
       { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber}</p></div> },
-      { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
       { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
       { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
       { key: 'metric', header: metric === 'health' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? (metric === 'health' ? 'Review' : 'Attendance')}</Badge> },
@@ -268,6 +267,7 @@ function AcademicAndDiscipline({ data }) {
     </SectionCard>
   </>;
 }
+
 
 function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
   const [filter, setFilter] = useState('all');
@@ -459,6 +459,7 @@ function StudentDirectory({ role, onNavigate }) {
   const { data, loading, error } = useResource(`/${role}/me/students?${query}`);
 
   function updateSearch(value) { setSearch(value); setPage(1); }
+
   return (
     <SectionTable
       title="Student Directory"

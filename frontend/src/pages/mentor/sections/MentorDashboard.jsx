@@ -1,5 +1,5 @@
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
 import { Button } from '../../../components/ui/Button.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
@@ -8,7 +8,7 @@ import { StatTile } from '../../../components/ui/StatTile.jsx';
 
 /** The mentor's landing view: portfolio counts, then who needs attention. */
 export function MentorDashboard({ data, onOpenMentee }) {
-  const { stats, attention, cohortHealth, initialInteractionAlerts } = data;
+  const { stats, attention, initialInteractionAlerts } = data;
 
   return (
     <div className="space-y-5">
@@ -85,7 +85,7 @@ export function MentorDashboard({ data, onOpenMentee }) {
 
       <SectionTable
         title="Students Needing Attention"
-        subtitle="Ranked by health index · lowest first"
+        subtitle="Flagged mentees requiring follow-up"
         action={<Badge tone={attention.length ? 'rose' : 'green'} size="md">{attention.length} flagged</Badge>}
       >
         <DataTable
@@ -115,7 +115,6 @@ export function MentorDashboard({ data, onOpenMentee }) {
                 </div>
               ),
             },
-            { key: 'health', header: 'Health', align: 'right', render: (m) => <HealthBadge value={m.health} tone={m.healthTone} /> },
             { key: 'cgpa', header: 'CGPA', align: 'right', render: (m) => <span className="tnum">{m.cgpa.toFixed(1)}</span> },
             {
               key: 'attendance',
