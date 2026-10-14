@@ -71,11 +71,6 @@ export function ProfileHeader({
   );
 }
 
-<<<<<<< HEAD
-/** The health chip that sits in the header's `aside` slot (disabled). */
-export function HealthDial() {
-  return null;
-=======
 /** The health chip that sits in the header's `aside` slot. */
 export function HealthDial({ index, tone, label }) {
   const t = toneOf(tone);
@@ -91,5 +86,4 @@ export function HealthDial({ index, tone, label }) {
       <p className="mt-0.5 text-[10px] uppercase tracking-[.07em] text-muted-soft">Health Index</p>
     </div>
   );
->>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }

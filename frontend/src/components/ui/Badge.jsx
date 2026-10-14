@@ -22,6 +22,7 @@ export function Badge({ tone = 'slate', children, className, size = 'sm', animat
 }
 
 /** Numeric health score in a tone-matched pill (disabled). */
-export function HealthBadge() {
-  return null;
+export function HealthBadge({ value, tone = 'green' }) {
+  if (value == null) return null;
+  return <Badge tone={tone} size="sm">{value}</Badge>;
 }

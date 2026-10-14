@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, getToken } from '../../api/client.js';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import { Badge } from '../../components/ui/Badge.jsx';
+import { Badge, HealthBadge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -268,17 +268,7 @@ function AcademicAndDiscipline({ data }) {
   </>;
 }
 
-<<<<<<< HEAD
-function MentorTracker({ rows, compact = false }) {
-  return <SectionTable title="Mentor Tracker" subtitle="Assigned learners, mentoring compliance and follow-up load">
-    <DataTable rows={rows} rowKey={(row) => row.id} columns={[
-      { key: 'mentor', header: 'Mentor', render: (row) => <div><p className="font-medium">{row.name}</p><p className="text-[11.5px] text-muted">{row.staffCode}</p></div> },
-      { key: 'assigned', header: 'Assigned', align: 'right' },
-      { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
-      { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
-    ]} />
-  </SectionTable>;
-=======
+
 function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
   const [filter, setFilter] = useState('all');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -459,7 +449,6 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
       />
     </SectionTable>
   );
->>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }
 
 function StudentDirectory({ role, onNavigate }) {
@@ -470,24 +459,7 @@ function StudentDirectory({ role, onNavigate }) {
   const { data, loading, error } = useResource(`/${role}/me/students?${query}`);
 
   function updateSearch(value) { setSearch(value); setPage(1); }
-<<<<<<< HEAD
-  return <SectionTable title="Student Directory" subtitle="Filter by student name or roll number; server-side pagination keeps the dataset scalable" action={<div className="w-56"><TextField label="" placeholder="Search student or roll no." value={search} onChange={(event) => updateSearch(event.target.value)} /></div>}>
-    {error && <EmptyState title="Couldn't load students" description={error.message} icon="!" />}
-    {loading && !data && <div className="p-5 text-sm text-muted">Loading student dataset…</div>}
-    {data && <>
-      <DataTable rows={data.students} rowKey={(row) => row.id} columns={[
-        { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber} · {row.section}</p></div> },
-        { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
-        { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
-        { key: 'mentor', header: 'Mentoring', align: 'right', render: (row) => `${row.meetingsHeld}/${row.meetingsDue}` },
-      ]} />
-      <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[12px] text-muted">
-        <span>{data.total} students · page {data.page} of {data.totalPages}</span>
-        <div className="flex gap-2"><Button size="sm" variant="secondary" disabled={data.page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button><Button size="sm" variant="secondary" disabled={data.page >= data.totalPages} onClick={() => setPage((value) => value + 1)}>Next</Button></div>
-      </div>
-    </>}
-  </SectionTable>;
-=======
+
   return (
     <SectionTable
       title="Student Directory"
@@ -528,7 +500,6 @@ function StudentDirectory({ role, onNavigate }) {
       </>}
     </SectionTable>
   );
->>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }
 
 function AdvisorOperations({ data, reload, composer, setComposer }) {

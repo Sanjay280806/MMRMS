@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Avatar } from '../../../components/ui/Avatar.jsx';
 import { Badge } from '../../../components/ui/Badge.jsx';
-<<<<<<< HEAD
-=======
+
 import { Button } from '../../../components/ui/Button.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
->>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
+
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
 import { SectionTable } from '../../../components/ui/SectionCard.jsx';
 import { Skeleton } from '../../../components/ui/Skeleton.jsx';
