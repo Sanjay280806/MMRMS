@@ -22,11 +22,86 @@ function ViewEvidenceButton({ evidence = [], title, label = 'View' }) {
   );
 }
 
-function categoryTone(category) {
-  if (category === 'Technical') return 'indigo';
-  if (category === 'Co-Curricular') return 'green';
-  return 'slate';
+function areaBadgeTone(area) {
+  const map = {
+    Hackathon: 'indigo',
+    Certification: 'green',
+    Internship: 'brand',
+    Workshop: 'amber',
+    Events: 'slate',
+    'Paper Presentation': 'indigo',
+    Arts: 'rose',
+    Others: 'slate',
+  };
+  return map[area] ?? 'slate';
 }
+
+/**
+ * Unified Activities & Achievements history — shown in both the student's own
+ * record book and the mentor's read-only copy of a mentee's record.
+ */
+export function ActivitiesAndAchievements({ activities = [] }) {
+  const displayLabel = (record) =>
+    record.area === 'Others' && record.customArea ? record.customArea : record.area;
+
+  return (
+    <SectionCard
+      section="Activities"
+      title="Activities & Achievements"
+      subtitle="Your participation history across all areas"
+    >
+      {activities.length === 0 ? (
+        <EmptyState
+          title="No activities recorded yet"
+          description="Add your hackathons, certifications, internships, workshops, and other activities."
+          icon="◇"
+        />
+      ) : (
+        <ul className="divide-y divide-line">
+          {activities.map((record) => {
+            const label = displayLabel(record);
+            const title = record.activityName;
+            return (
+              <li key={record.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={areaBadgeTone(record.area)}>{label}</Badge>
+                    </div>
+                    <p className="mt-2 text-[14px] font-semibold text-ink">{title}</p>
+                    <dl className="mt-2 space-y-1 text-[12.5px] text-muted">
+                      {record.description && (
+                        <div>
+                          <span className="text-muted-soft">Description: </span>
+                          <span className="text-muted-strong">{record.description}</span>
+                        </div>
+                      )}
+                      {record.achievement && (
+                        <div>
+                          <span className="text-muted-soft">Achievement: </span>
+                          <span className="text-muted-strong">{record.achievement}</span>
+                        </div>
+                      )}
+                      {record.date && (
+                        <div>
+                          <span className="text-muted-soft">Date: </span>
+                          <span className="tnum font-medium text-muted-strong">{record.date}</span>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                  <ViewEvidenceButton evidence={record.evidence} title={title} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
+
 
 /** Section 6 — unified participation history with per-record evidence. */
 export function ParticipationRecord({ participation }) {

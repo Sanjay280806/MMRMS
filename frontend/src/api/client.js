@@ -34,19 +34,35 @@ export class ApiError extends Error {
 }
 
 /** Thin fetch wrapper: attaches the bearer token, credentials, and unwraps API envelope. */
-export async function api(path, { method = 'GET', body, auth = true } = {}) {
+export async function api(path, { method = 'GET', body, auth = true, _retry = 0 } = {}) {
   const headers = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const token = auth ? getToken() : null;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  let response = await fetch(`/api${path}`, {
-    method,
-    headers,
-    credentials: 'include',
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method,
+      headers,
+      credentials: 'include',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (networkErr) {
+    // Network error (server not reachable) — retry up to 3 times with backoff
+    if (_retry < 3) {
+      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, _retry)));
+      return api(path, { method, body, auth, _retry: _retry + 1 });
+    }
+    throw new ApiError(0, 'Could not reach the server. Please try again.', null);
+  }
+
+  // Transient gateway errors from proxy (backend not yet ready) — retry up to 3 times
+  if ((response.status === 502 || response.status === 503 || response.status === 504) && _retry < 3) {
+    await new Promise((r) => setTimeout(r, 500 * Math.pow(2, _retry)));
+    return api(path, { method, body, auth, _retry: _retry + 1 });
+  }
 
   // If 401 on authenticated call, attempt token refresh and retry once
   if (response.status === 401 && auth && path !== '/auth/login' && path !== '/auth/refresh') {

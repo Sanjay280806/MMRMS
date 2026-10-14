@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     hmr: false,
     host: '0.0.0.0',
-    port: 3000,
+    port: 5173,
     // Keeps the client on one origin: /api is proxied to the Express server.
     proxy: {
       '/api': {

@@ -17,7 +17,8 @@ export function RequireRole({ role, children }) {
 export function homeFor(role) {
   if (role === 'student') return '/student';
   if (role === 'mentor') return '/mentor';
-  if (role === 'advisor') return '/advisor';
   if (role === 'coordinator') return '/coordinator';
+  if (role === 'hod') return '/hod';
+  if (role === 'advisor') return '/advisor';
   return '/login';
 }

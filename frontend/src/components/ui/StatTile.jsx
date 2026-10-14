@@ -17,10 +17,10 @@ export function StatTile({ label, value, suffix, decimals = 0, footer, aside, cl
         {aside}
       </div>
       <div className="mt-4 flex items-baseline gap-1">
-        <span className="tnum font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-ink">
+        <span className="tnum font-display text-[34px] font-medium leading-none tracking-[-0.02em] text-ink">
           {display}
         </span>
-        {suffix && <span className="text-sm font-semibold text-muted-soft">{suffix}</span>}
+        {suffix && <span className="text-sm font-medium text-muted-soft">{suffix}</span>}
       </div>
       {footer && <div className="mt-3 text-[12px] leading-relaxed text-muted">{footer}</div>}
     </Card>

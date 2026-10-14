@@ -10,6 +10,7 @@ export function requireAuth(req, _res, next) {
   const header = req.headers.authorization ?? '';
   let token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token && req.query.token) token = req.query.token;
+  if (!token && req.cookies?.mmrms_token) token = req.cookies.mmrms_token;
   if (!token) return next(new HttpError(401, 'Missing bearer token', null, 'UNAUTHORIZED'));
 
   let payload;
@@ -21,6 +22,7 @@ export function requireAuth(req, _res, next) {
 
   const user = findUserById(payload.sub);
   if (!user) return next(new HttpError(401, 'User no longer exists', null, 'USER_NOT_FOUND'));
+  if (user.archived) return next(new HttpError(403, 'This account has been archived. Access is disabled for discontinued staff.', null, 'ACCOUNT_ARCHIVED'));
 
   req.user = user;
   next();

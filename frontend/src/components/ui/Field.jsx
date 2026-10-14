@@ -27,6 +27,28 @@ export function TextArea({ label, className, rows = 4, ...rest }) {
   );
 }
 
+export function SelectField({ label, hint, options = [], children, className, ...rest }) {
+  const id = useId();
+  return (
+    <div className={className}>
+      <Label htmlFor={id}>{label}</Label>
+      <select id={id} className={cx('input-field cursor-pointer')} {...rest}>
+        {children ||
+          options.map((opt) => {
+            const val = typeof opt === 'string' ? opt : opt.value;
+            const text = typeof opt === 'string' ? opt : opt.label;
+            return (
+              <option key={val} value={val}>
+                {text}
+              </option>
+            );
+          })}
+      </select>
+      {hint && <p className="mt-1.5 text-[11.5px] text-muted-soft">{hint}</p>}
+    </div>
+  );
+}
+
 export function Label({ htmlFor, children, className }) {
   if (!children) return null;
   return (

@@ -23,22 +23,22 @@ export const INSTITUTION = {
 /** Roles recognised by the sign-in screen, in institutional workflow order. */
 export const ROLES = [
   {
-    key: 'coordinator',
-    name: 'Year Coordinator',
-    short: 'Programme coordination',
+    key: 'hod',
+    name: 'Head of Department',
+    short: 'Department oversight',
     description:
-      'Monitor year-wise progress, mentoring compliance, institutional events, OD approvals, and audit-ready evidence.',
-    target: '/coordinator',
-    targetLabel: 'Coordinator View',
+      'Executive department-wide leadership — oversee all cohorts, Year Coordinators, faculty mentors, and student welfare.',
+    target: '/hod',
+    targetLabel: 'HOD Executive View',
   },
   {
-    key: 'advisor',
-    name: 'Class Advisor',
-    short: 'Class care and coordination',
+    key: 'coordinator',
+    name: 'Year Coordinator',
+    short: 'Cohort-level coordination',
     description:
-      'Monitor class performance, attendance, discipline, grievances, parent communication, and class meetings.',
-    target: '/advisor',
-    targetLabel: 'Class Advisor Console',
+      'Monitor cohort-wise progress, mentoring compliance, institutional events, bulk Excel/ERP upload, and student progress.',
+    target: '/coordinator',
+    targetLabel: 'Coordinator View',
   },
   {
     key: 'mentor',
@@ -62,7 +62,8 @@ export const ROLES = [
 
 /** Demo accounts. Every password is `mmrms@2026` — hashed at boot in store.js. */
 export const USERS = [
-  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Year Coordinator · 2024 BCS', coordinatorId: 'yc-1' },
+  { id: 'u-hod', role: 'hod', name: 'Dr. HOD CSE', email: 'hod.cse@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Professor & Head of Department' },
+  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Year Coordinator · 2024 BCS', coordinatorId: 'yc-1', cohortId: '24BCS' },
   { id: 'u-advisor', role: 'advisor', name: 'Suganthi', email: 'suganthi@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Class Advisor · 2024 BCS', advisorId: 'ca-1' },
   { id: 'u-mentor-1', role: 'mentor', name: 'Bharathi Priya', email: 'bharathi.priya@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-1' },
   { id: 'u-mentor-2', role: 'mentor', name: 'Asmitha Shree', email: 'asmitha.shree@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-2' },
@@ -122,6 +123,8 @@ export const YEAR_COORDINATORS = [
     department: 'Computer Science and Engineering',
     designation: 'Year Coordinator',
     year: 'III Year',
+    cohortId: '24BCS',
+    cohortName: '2024 BCS',
     programme: 'B.E. Computer Science and Engineering',
     room: 'CSE Block · Room 210',
   },
@@ -136,6 +139,98 @@ export const GRIEVANCES = [
   { id: 'gr-1', studentId: 's-106', category: 'Academic', subject: 'Request for additional Theory of Computation support', raisedOn: '18 Jul 2026', priority: 'High', status: 'In Progress', owner: 'Suganthi' },
   { id: 'gr-2', studentId: 's-128', category: 'Personal', subject: 'Transport concern affecting first-hour attendance', raisedOn: '15 Jul 2026', priority: 'Medium', status: 'Referred', owner: 'Suganthi' },
   { id: 'gr-3', studentId: 's-121', category: 'Academic', subject: 'Clarification on attendance condonation process', raisedOn: '10 Jul 2026', priority: 'Low', status: 'Resolved', owner: 'Suganthi' },
+];
+
+export const CONCERN_CATEGORIES = ['Academic', 'Personal', 'Administrative', 'Financial', 'Infrastructure', 'Career', 'Others'];
+export const CONCERN_PRIORITIES = ['Low', 'Medium', 'High'];
+export const CONCERN_STATUSES = ['OPEN', 'RESOLVED', 'CLOSED'];
+
+export const CONCERNS = [
+  {
+    id: 'cn-1',
+    studentId: 's-106',
+    studentName: 'ABISHAI JARON I',
+    rollNumber: '24BCS006',
+    mentorId: 'm-1',
+    mentorName: 'Bharathi Priya',
+    category: 'Academic',
+    priority: 'High',
+    subject: 'Request for remedial coaching in Theory of Computation',
+    description: 'Having difficulty with pumping lemma proofs and context-free grammar reductions prior to CIA-1.',
+    status: 'OPEN',
+    raisedAt: '2026-07-18T10:15:00.000Z',
+    resolution: null,
+    resolvedAt: null,
+    resolvedBy: null,
+    evidence: [],
+    acknowledgedAt: null,
+  },
+  {
+    id: 'cn-2',
+    studentId: 's-1',
+    studentName: 'ABHINAV DINESH',
+    rollNumber: '24BCS001',
+    mentorId: 'm-1',
+    mentorName: 'Bharathi Priya',
+    category: 'Administrative',
+    priority: 'Medium',
+    subject: 'Attendance regularisation for State Hackathon participation',
+    description: 'Participated in the inter-collegiate hackathon on 08–09 July with OD approval. Need internal portal attendance update.',
+    status: 'RESOLVED',
+    raisedAt: '2026-07-12T14:30:00.000Z',
+    resolution: 'Verified On-Duty approval signed by Year Coordinator Anitha P. 3 days attendance condoned and updated in database.',
+    resolvedAt: '2026-07-15T11:20:00.000Z',
+    resolvedBy: 'Bharathi Priya',
+    evidence: [
+      {
+        id: 'ev-cn-2',
+        name: 'OD_Approval_Hackathon_2026.pdf',
+        contentType: 'application/pdf',
+        size: 145200,
+        dataUrl: 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwgL0xlbmd0aCA1IDAgUiAvRmlsdGVyIC9GbGF0ZURlY29kZSA+PgpzdHJlYW0KeJwrVAgsLUgtKslMTlWISSxJTYkvKEpNLwYAKjIH1A==\nendstream\nendobj',
+        uploadedAt: '2026-07-15T11:20:00.000Z',
+      },
+    ],
+    acknowledgedAt: null,
+  },
+  {
+    id: 'cn-3',
+    studentId: 's-1',
+    studentName: 'ABHINAV DINESH',
+    rollNumber: '24BCS001',
+    mentorId: 'm-1',
+    mentorName: 'Bharathi Priya',
+    category: 'Personal',
+    priority: 'Low',
+    subject: 'Hostel Block C electrical study-lamp connection',
+    description: 'Room 304 study desk socket was fluctuating during late evening hours.',
+    status: 'CLOSED',
+    raisedAt: '2026-07-02T09:00:00.000Z',
+    resolution: 'Reported to Hostel Estate Maintenance. Wiring inspected and socket replaced on 03 July.',
+    resolvedAt: '2026-07-03T16:00:00.000Z',
+    resolvedBy: 'Bharathi Priya',
+    evidence: [],
+    acknowledgedAt: '2026-07-04T10:30:00.000Z',
+  },
+  {
+    id: 'cn-4',
+    studentId: 's-128',
+    studentName: 'ARUNA P',
+    rollNumber: '24BCS029',
+    mentorId: 'm-1',
+    mentorName: 'Bharathi Priya',
+    category: 'Personal',
+    priority: 'High',
+    subject: 'College bus route delay affecting morning lecture attendance',
+    description: 'Route 14 bus experiencing traffic delays on Avinashi Road causing arrival after 8:45 AM.',
+    status: 'OPEN',
+    raisedAt: '2026-07-20T08:50:00.000Z',
+    resolution: null,
+    resolvedAt: null,
+    resolvedBy: null,
+    evidence: [],
+    acknowledgedAt: null,
+  },
 ];
 
 export const COORDINATOR_EVENTS = [

@@ -7,7 +7,7 @@ import {
 import { dimensionList, healthIndex, scoreTone } from './health.js';
 import { computeDimensions, decorateGoals, formatBatch, initials, standingArrearCount } from './student.js';
 import { menteeToStudent } from './mentee.js';
-import { listMentees } from '../data/store.js';
+import { listConcerns, listMentees, listMentors } from '../data/store.js';
 
 const FLAG_TONE = {
   'Low Attendance': 'amber',
@@ -53,9 +53,11 @@ export function summariseMentee(mentee) {
     healthTone: scoreTone(index),
     dimensions: dims,
 
-    cgpa: Number(
-      (student.performance.reduce((s, p) => s + p.gpa, 0) / (student.performance.length || 1)).toFixed(1),
-    ),
+    cgpa: mentee.gpa !== undefined
+      ? Number(Number(mentee.gpa).toFixed(1))
+      : Number(
+        (student.performance.reduce((s, p) => s + p.gpa, 0) / (student.performance.length || 1)).toFixed(1),
+      ),
     attendance: mentee.attendance,
     attendanceBelowRequirement: mentee.attendance < ATTENDANCE_REQUIREMENT,
     shortageCount: shortageSubjects.length,
@@ -74,6 +76,9 @@ export function summariseMentee(mentee) {
     flagTone: mentee.flagReason ? FLAG_TONE[mentee.flagReason] ?? 'slate' : null,
     suggestedAction: mentee.suggestedAction ?? null,
     initialInteractionOverdue: initialInteractionOverdue(mentee),
+    mentorId: mentee.mentorId,
+    mentorName: mentee.mentorName || (mentee.mentorId ? listMentors().find(m => m.id === mentee.mentorId)?.name : null) || 'Bharathi Priya',
+    staffCode: mentee.staffCode,
   };
 }
 
@@ -127,6 +132,7 @@ export function buildMentorOverview(mentor) {
       standingArrears: mentees.reduce((s, m) => s + m.standingArrears, 0),
       wellbeingConcerns: mentees.filter((m) => m.wellbeingConcerns > 0).length,
       openActionItems: mentees.reduce((s, m) => s + m.openActionItems, 0),
+      openConcernsCount: listConcerns({ mentorId: mentor.id, status: 'OPEN' }).length,
       parentContactsThisTerm,
       recordBooksComplete: mentees.filter((mentee) => mentee.meetingsHeld > 0).length,
       recordBooksTotal: mentees.length,
@@ -159,21 +165,46 @@ export function buildMentorOverview(mentor) {
   };
 }
 
-/** Section 12 across the roster — every open action item, by student. */
+/** Section 12 across the roster — every open action item and open student concern. */
 export function buildActionItemQueue(mentor) {
-  return listMentees(mentor.id).flatMap((mentee) => {
+  const meetingItems = listMentees(mentor.id).flatMap((mentee) => {
     const student = menteeToStudent(mentee);
     return student.meetings
       .flatMap((m) => (m.actionItems ?? []).map((a) => ({ ...a, meetingNumber: m.number, meetingDate: m.date })))
       .filter((a) => a.status !== 'Completed')
       .map((a) => ({
         ...a,
+        itemType: 'meeting_action',
         studentId: mentee.id,
         student: mentee.name,
         initials: initials(mentee.name),
         tone: a.status === 'In Progress' ? 'indigo' : 'amber',
       }));
   });
+
+  const concernItems = listConcerns({ mentorId: mentor.id, status: 'OPEN' }).map((c) => ({
+    id: c.id,
+    itemType: 'concern',
+    concernId: c.id,
+    studentId: c.studentId,
+    student: c.studentName,
+    rollNumber: c.rollNumber,
+    initials: initials(c.studentName),
+    task: `Student Concern: ${c.subject}`,
+    subject: c.subject,
+    description: c.description,
+    category: c.category,
+    priority: c.priority,
+    raisedAt: c.raisedAt,
+    meetingNumber: '—',
+    meetingDate: 'Direct Concern',
+    responsible: 'Mentor',
+    targetDate: 'Immediate',
+    status: 'Pending Resolution',
+    tone: c.priority === 'High' ? 'rose' : 'amber',
+  }));
+
+  return [...concernItems, ...meetingItems];
 }
 
 /** SMART goals across the roster — Section 12's goal-progress view. */

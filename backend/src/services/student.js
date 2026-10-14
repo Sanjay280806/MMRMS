@@ -37,6 +37,7 @@ import {
 } from './health.js';
 import { findMentorById } from '../data/store.js';
 
+
 /* ── shared derivations, reused by the mentor's view of a mentee ────────── */
 
 export function initials(name) {
@@ -192,6 +193,40 @@ export function normalizeInternshipAndProject(internshipAndProject = {}) {
     });
   }
   return { records };
+}
+
+/** Area → display tone mapping for the new unified activities section. */
+export const ACTIVITY_AREAS = [
+  'Hackathon',
+  'Certification',
+  'Internship',
+  'Workshop',
+  'Events',
+  'Paper Presentation',
+  'Arts',
+  'Others',
+];
+
+export function areaTone(area) {
+  const map = {
+    Hackathon: 'indigo',
+    Certification: 'green',
+    Internship: 'brand',
+    Workshop: 'amber',
+    Events: 'slate',
+    'Paper Presentation': 'indigo',
+    Arts: 'rose',
+    Others: 'slate',
+  };
+  return map[area] ?? 'slate';
+}
+
+/** Decorate activities list — ensures evidence array always exists. */
+export function decorateActivities(activities = []) {
+  return activities.map((a) => ({
+    ...a,
+    evidence: a.evidence ?? [],
+  }));
 }
 
 export function decorateGoals(goals = []) {
@@ -430,7 +465,11 @@ export function buildStudentRecordBook(student) {
       skills: SKILL_ITEMS,
       mentorAssessmentItems: MENTOR_ASSESSMENT_ITEMS,
       extraCurricularCategories: EXTRA_CURRICULAR_CATEGORIES,
+      activityAreas: ACTIVITY_AREAS,
     },
+
+    /* Unified Activities & Achievements (replaces Sections 6, 7, 9 in student view). */
+    activities: decorateActivities(student.activities),
   };
 }
 

@@ -71,7 +71,25 @@ export function ProfileHeader({
   );
 }
 
+<<<<<<< HEAD
 /** The health chip that sits in the header's `aside` slot (disabled). */
 export function HealthDial() {
   return null;
+=======
+/** The health chip that sits in the header's `aside` slot. */
+export function HealthDial({ index, tone, label }) {
+  const t = toneOf(tone);
+  return (
+    <div className={cx('rounded-2xl px-6 py-4 text-center shadow-inner transition-all duration-300', t.bg, t.border, 'border')}>
+      <div className="flex items-baseline justify-center gap-1">
+        <span className={cx('tnum font-display text-[38px] font-medium leading-none', t.text)}>
+          {index}
+        </span>
+        <span className="text-xs font-medium text-muted-soft">/100</span>
+      </div>
+      <p className={cx('mt-1.5 text-[11.5px] font-semibold', t.text)}>{label}</p>
+      <p className="mt-0.5 text-[10px] uppercase tracking-[.07em] text-muted-soft">Health Index</p>
+    </div>
+  );
+>>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }

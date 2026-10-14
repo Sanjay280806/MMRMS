@@ -47,12 +47,26 @@ router.post('/login', (req, res, next) => {
     return next(new HttpError(401, 'Invalid email or password. Please try again.'));
   }
 
+  if (user.archived) {
+    return next(new HttpError(403, 'This account has been archived. Access is disabled for discontinued staff.', {
+      archivedReason: user.archivedReason,
+      archivedAt: user.archivedAt,
+    }, 'ACCOUNT_ARCHIVED'));
+  }
+
   attempts.delete(key);
   const role = ROLES.find((r) => r.key === user.role);
   const accessToken = signToken(user);
   const refreshToken = signRefreshToken(user);
 
   const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+  res.cookie('mmrms_token', accessToken, {
+    httpOnly: true,
+    secure: isHttps,
+    sameSite: isHttps ? 'none' : 'lax',
+    path: '/',
+    maxAge: 24 * 60 * 60 * 1000,
+  });
   res.cookie('mmrms_refresh', refreshToken, {
     httpOnly: true,
     secure: isHttps,

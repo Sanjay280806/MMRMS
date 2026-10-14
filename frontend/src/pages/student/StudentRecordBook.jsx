@@ -7,13 +7,7 @@ import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { ErrorBoundary } from '../../components/ui/ErrorBoundary.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import {
-  AcademicBackground,
-  Aspirations,
-  MentorAssessment,
-  SelfAssessment,
-  SkillAssessment,
-} from '../../components/record/SectionOne.jsx';
+import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
   ArrearTracking,
   AttendanceMonitoring,
@@ -22,19 +16,15 @@ import {
   PerformanceTracker,
 } from '../../components/record/Academics.jsx';
 import {
-  CertificationTracker,
-  InternshipAndProject,
-  ParentInteractionLog,
-  ParticipationRecord,
+  ActivitiesAndAchievements,
   PlacementReadiness,
-  WellbeingReview,
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
-import { GoalPanel } from '../../components/record/Goals.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
-import { AddParticipation, AddCertification, AddInternshipProject } from './AddEntry.jsx';
+import { AddActivity } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { AnnouncementsHistory } from './AnnouncementsHistory.jsx';
+import { AcknowledgeConcernModal } from '../../components/concerns/AcknowledgeConcernModal.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { useAnnouncements } from '../../hooks/useAnnouncements.js';
 
@@ -43,14 +33,11 @@ const NAV_GROUPS = [
     label: 'My Record Book',
     items: [
       { key: 'profile', label: 'Profile & Background' },
-      { key: 'skills', label: 'Skills & Assessment' },
     ],
   },
   {
     label: 'Academics',
     items: [
-      { key: 'performance', label: 'Performance Tracker' },
-      { key: 'attendance', label: 'Attendance Monitoring' },
       { key: 'courses', label: 'Course Performance' },
       { key: 'arrears', label: 'Arrear Tracking' },
     ],
@@ -58,24 +45,14 @@ const NAV_GROUPS = [
   {
     label: 'Growth',
     items: [
-      { key: 'participation', label: 'Participation Record' },
-      { key: 'certifications', label: 'Certifications' },
+      { key: 'activities', label: 'Activities & Achievements' },
       { key: 'placement', label: 'Placement Readiness' },
-      { key: 'internship', label: 'Internship & Project' },
-    ],
-  },
-  {
-    label: 'Support',
-    items: [
-      { key: 'wellbeing', label: 'Well-being' },
-      { key: 'parents', label: 'Parent Interactions' },
     ],
   },
   {
     label: 'Mentoring',
     items: [
       { key: 'meetings', label: 'Meeting Log' },
-      { key: 'goals', label: 'SMART Goals' },
       { key: 'contact', label: 'Contact Mentor' },
       { key: 'announcements', label: 'Announcements' },
     ],
@@ -84,19 +61,11 @@ const NAV_GROUPS = [
 
 const TITLES = {
   profile: 'Profile & Academic Background',
-  skills: 'Skills & Assessment',
-  performance: 'Academic Performance Tracker',
-  attendance: 'Attendance Monitoring',
   courses: 'Course Performance',
   arrears: 'Arrear Tracking',
-  participation: 'Participation Record',
-  certifications: 'Certification Tracker',
+  activities: 'Activities & Achievements',
   placement: 'Placement Readiness',
-  internship: 'Internship & Project',
-  wellbeing: 'Student Well-being',
-  parents: 'Parent Interaction Log',
   meetings: 'Mentor Meeting Log',
-  goals: 'SMART Goals',
   contact: 'Contact Your Mentor',
   announcements: 'Announcements',
 };
@@ -104,7 +73,9 @@ const TITLES = {
 export default function StudentRecordBook() {
   const [section, setSection] = useState('profile');
   const [saving, setSaving] = useState(null);
+  const [acknowledgingConcern, setAcknowledgingConcern] = useState(null);
   const { data, loading, error, reload, setData } = useResource('/student/me/record-book');
+  const { data: concernsData, reload: reloadConcerns } = useResource('/student/me/concerns');
   const { announcement, clearAnnouncement } = useAnnouncements();
 
   /** Every write refetches the book so derived figures stay truthful. */
@@ -149,6 +120,7 @@ export default function StudentRecordBook() {
   const { identity } = data;
   const openActions = data.meetings.openActionItems.length;
   const awaitingGoals = data.goals.filter((g) => g.needsAcknowledgement).length;
+  const pendingAcknowledgment = concernsData?.concerns?.filter((c) => c.status === 'RESOLVED') || [];
 
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -159,8 +131,9 @@ export default function StudentRecordBook() {
           : item.key === 'goals' ? awaitingGoals
             : item.key === 'arrears' ? data.performance.standingArrears
               : item.key === 'wellbeing' ? data.wellbeing.concerns
-                : 0,
-      badgeTone: item.key === 'arrears' ? 'rose' : 'indigo',
+                : item.key === 'contact' ? pendingAcknowledgment.length
+                  : 0,
+      badgeTone: item.key === 'arrears' || item.key === 'contact' ? 'rose' : 'indigo',
     })),
   }));
 
@@ -215,8 +188,6 @@ export default function StudentRecordBook() {
             { key: 'Blood Group', value: identity.bloodGroup },
             { key: 'Mobile Number', value: identity.mobile },
             { key: 'Email ID', value: identity.email },
-            { key: 'Parent / Guardian', value: identity.parentName },
-            { key: 'Parent Contact', value: identity.parentContact },
             { key: 'Day Scholar / Hosteller', value: identity.hostelOrDayScholar },
             { key: 'Mentor Since', value: identity.mentorSince },
             { key: 'Address', value: identity.address, span: true },
@@ -231,7 +202,7 @@ export default function StudentRecordBook() {
           <div className="bg-white rounded-xl shadow-xl border border-line-strong overflow-hidden flex flex-col">
             <div className="bg-indigo-600 px-4 py-2 flex justify-between items-center">
               <span className="text-white font-semibold text-sm">Announcement from {announcement.mentorName || 'Mentor'}</span>
-              <button 
+              <button
                 onClick={clearAnnouncement}
                 className="text-white/80 hover:text-white transition-colors p-1"
               >
@@ -248,86 +219,72 @@ export default function StudentRecordBook() {
 
       <ErrorBoundary resetKey={section}>
         <div className="animate-fadeRise space-y-5">
-          {section === 'profile' && (
-            <>
-              <div className="space-y-5">
-                <div>
-                  <AcademicBackground background={data.sectionOne.academicBackground} />
-                  <Aspirations aspirations={data.sectionOne.aspirations} />
+          {/* Global Action Required Banner: Resolved Concerns Awaiting Student Acknowledgment */}
+          {pendingAcknowledgment.length > 0 && section !== 'contact' && (
+            <div className="rounded-xl border border-brand-300 bg-brand-500/10 p-4 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white shadow-xs">
+                    !
+                  </span>
+                  <div>
+                    <p className="text-[13px] font-bold text-brand-900">
+                      {pendingAcknowledgment.length === 1
+                        ? 'Action Required: Your mentor resolved your concern'
+                        : `Action Required: ${pendingAcknowledgment.length} concerns resolved by mentor`}
+                    </p>
+                    <p className="text-xs text-brand-700">
+                      &quot;{pendingAcknowledgment[0].subject}&quot; has been resolved by {pendingAcknowledgment[0].resolvedBy || 'your mentor'}. Please review the resolution and evidence to confirm closure.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
-
-          {section === 'skills' && (
-            <div className="grid gap-5 lg:grid-cols-2">
-              <SkillAssessment
-                skills={data.sectionOne.skillAssessment}
-                onRate={(skill, rating) =>
-                  mutate(skill, () =>
-                    api(`/student/me/skills/${encodeURIComponent(skill)}`, {
-                      method: 'PATCH',
-                      body: { rating },
-                    }),
-                  )
-                }
-              />
-              <div className="space-y-5">
-                <SelfAssessment
-                  assessment={data.sectionOne.selfAssessment}
-                  onSave={(patch) =>
-                    mutate('self', () =>
-                      api('/student/me/self-assessment', { method: 'PATCH', body: patch }),
-                    )
-                  }
-                />
-                <MentorAssessment assessment={data.sectionOne.mentorAssessment} />
+                <Button
+                  size="sm"
+                  onClick={() => setAcknowledgingConcern(pendingAcknowledgment[0])}
+                >
+                  Review & Acknowledge
+                </Button>
               </div>
             </div>
           )}
 
-          {section === 'performance' && (
-            <div className="grid gap-5 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <PerformanceTracker performance={data.performance} />
-              </div>
-              <CgpaTarget performance={data.performance} />
+          {/* Profile & Background — Academic Background only (no Career Aspirations) */}
+          {section === 'profile' && (
+            <div className="space-y-5">
+              <AcademicBackground background={data.sectionOne.academicBackground} />
             </div>
           )}
 
-          {section === 'attendance' && <AttendanceMonitoring attendance={data.attendance} />}
-          {section === 'courses' && <CoursePerformance coursePerformance={data.coursePerformance} />}
+          {section === 'courses' && (
+            <div className="space-y-5">
+              <CoursePerformance coursePerformance={data.coursePerformance} />
+              <AttendanceMonitoring attendance={data.attendance} />
+              <div className="grid gap-5 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <PerformanceTracker performance={data.performance} />
+                </div>
+                <CgpaTarget performance={data.performance} />
+              </div>
+            </div>
+          )}
           {section === 'arrears' && <ArrearTracking arrears={data.arrears} />}
 
-          {section === 'participation' && (
+          {/* Activities & Achievements — unified growth section */}
+          {section === 'activities' && (
             <>
-              <AddParticipation
-                categories={data.participation.categories}
-                onAdd={(group, entry) =>
-                  mutate('participation', () =>
-                    api(`/student/me/participation/${group}`, { method: 'POST', body: entry }),
-                  )
-                }
-                saving={saving === 'participation'}
-              />
-              <ParticipationRecord participation={data.participation} />
-            </>
-          )}
-
-          {section === 'certifications' && (
-            <>
-              <AddCertification
+              <AddActivity
                 onAdd={(entry) =>
-                  mutate('certification', () =>
-                    api('/student/me/certifications', { method: 'POST', body: entry }),
+                  mutate('activity', () =>
+                    api('/student/me/activities', { method: 'POST', body: entry }),
                   )
                 }
-                saving={saving === 'certification'}
+                saving={saving === 'activity'}
               />
-              <CertificationTracker certifications={data.certifications} />
+              <ActivitiesAndAchievements activities={data.activities ?? []} />
             </>
           )}
 
+          {/* Placement Readiness — restored exactly as before */}
           {section === 'placement' && (
             <>
               <EvidencePanel
@@ -356,22 +313,6 @@ export default function StudentRecordBook() {
             </>
           )}
 
-          {section === 'internship' && (
-            <>
-              <AddInternshipProject
-                onAdd={(entry) =>
-                  mutate('internship', () =>
-                    api('/student/me/internship-projects', { method: 'POST', body: entry }),
-                  )
-                }
-                saving={saving === 'internship'}
-              />
-              <InternshipAndProject internshipAndProject={data.internshipAndProject} />
-            </>
-          )}
-          {section === 'wellbeing' && <WellbeingReview wellbeing={data.wellbeing} />}
-          {section === 'parents' && <ParentInteractionLog parentInteractions={data.parentInteractions} />}
-
           {section === 'meetings' && (
             <MeetingLog
               meetings={data.meetings}
@@ -379,18 +320,6 @@ export default function StudentRecordBook() {
               onUpdateAction={(actionId, status) =>
                 mutate(actionId, () =>
                   api(`/student/me/action-items/${actionId}`, { method: 'PATCH', body: { status } }),
-                )
-              }
-            />
-          )}
-
-          {section === 'goals' && (
-            <GoalPanel
-              goals={data.goals}
-              acknowledging={saving}
-              onAcknowledge={(goalId) =>
-                mutate(goalId, () =>
-                  api(`/student/me/goals/${goalId}/acknowledge`, { method: 'POST' }),
                 )
               }
             />
@@ -418,6 +347,19 @@ export default function StudentRecordBook() {
           {section === 'announcements' && <AnnouncementsHistory />}
         </div>
       </ErrorBoundary>
+
+      {/* Concern Review & Acknowledgment Modal (Q6) */}
+      {acknowledgingConcern && (
+        <AcknowledgeConcernModal
+          concern={acknowledgingConcern}
+          onClose={() => setAcknowledgingConcern(null)}
+          onAcknowledged={() => {
+            setAcknowledgingConcern(null);
+            reloadConcerns();
+            reload();
+          }}
+        />
+      )}
     </ConsoleLayout>
   );
 }

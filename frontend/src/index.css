@@ -1,7 +1,145 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────
+   MMRMS Design Tokens — Tailwind v4 @theme block
+   (replaces tailwind.config.js theme.extend)
+───────────────────────────────────────────────────────────── */
+@theme {
+  /* Colors — ink */
+  --color-ink: #12131A;
+  --color-ink-soft: #1A1B24;
+  --color-ink-deep: #0D0E14;
+  --color-ink-line: #2A2B36;
+
+  /* Colors — brand */
+  --color-brand-50: #EEF2FF;
+  --color-brand-100: #E0E7FF;
+  --color-brand-200: #C7D2FE;
+  --color-brand-300: #A5B4FC;
+  --color-brand-400: #818CF8;
+  --color-brand-500: #6366F1;
+  --color-brand-600: #4F46E5;
+  --color-brand-700: #4338CA;
+  --color-brand-violet: #8B5CF6;
+  --color-brand-violet-light: #A78BFA;
+
+  /* Colors — canvas */
+  --color-canvas: #F4F5F8;
+  --color-canvas-subtle: #ECEEF3;
+
+  /* Colors — line */
+  --color-line: #E8E9EF;
+  --color-line-strong: #DCDDE6;
+  --color-line-faint: #F0F1F5;
+
+  /* Colors — muted */
+  --color-muted: #6B7280;
+  --color-muted-soft: #9CA3AF;
+  --color-muted-strong: #374151;
+  --color-muted-faint: #B0B5C0;
+
+  /* Colors — semantic */
+  --color-good: #10B981;
+  --color-good-ink: #047857;
+  --color-good-tint: #ECFDF5;
+  --color-warn: #F59E0B;
+  --color-warn-ink: #B45309;
+  --color-warn-tint: #FFFBEB;
+  --color-bad: #F43F5E;
+  --color-bad-ink: #E11D48;
+  --color-bad-tint: #FFF1F2;
+  --color-neutral: #64748B;
+  --color-neutral-ink: #475569;
+  --color-neutral-tint: #F1F5F9;
+
+  /* Colors — sidebar */
+  --color-sidebar: #12131A;
+  --color-sidebar-hover: rgba(255,255,255,0.06);
+  --color-sidebar-active: rgba(99,102,241,0.18);
+
+  /* Font families — v4 uses --font-{name} */
+  --font-sans: "Plus Jakarta Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+
+  /* Border radii */
+  --radius-card: 16px;
+  --radius-field: 12px;
+  --radius-pill: 9999px;
+
+  /* Box shadows */
+  --shadow-card: 0 1px 2px rgba(18,19,26,.03), 0 4px 16px -4px rgba(18,19,26,.08), 0 12px 32px -12px rgba(18,19,26,.10);
+  --shadow-card-hover: 0 2px 4px rgba(18,19,26,.04), 0 8px 24px -6px rgba(18,19,26,.12), 0 20px 40px -16px rgba(99,102,241,.10);
+  --shadow-raised: 0 4px 14px rgba(99,102,241,.30), 0 2px 6px rgba(99,102,241,.15);
+  --shadow-glow: 0 0 20px rgba(99,102,241,.25), 0 4px 12px rgba(139,92,246,.20);
+  --shadow-pop: 0 2px 10px rgba(0,0,0,.06), 0 8px 20px -8px rgba(0,0,0,.08);
+  --shadow-inner: inset 0 1px 2px rgba(18,19,26,.06);
+  --shadow-inner-field: inset 0 1px 3px rgba(18,19,26,.05);
+  --shadow-topbar: 0 1px 0 rgba(18,19,26,.04), 0 4px 16px -8px rgba(18,19,26,.06);
+
+
+
+  /* Animations — @keyframes are defined below, outside @theme */
+  --animate-fadeRise: fadeRise .5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fadeIn: fadeIn .4s ease both;
+  --animate-slideUp: slideUp .55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-pulseSoft: pulseSoft 2s ease-in-out infinite;
+  --animate-badgePop: badgePop .35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-spinSlow: spinSlow 1.2s linear infinite;
+
+  /* Easing */
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Keyframes (must live outside @theme in Tailwind v4) ──────── */
+@keyframes fadeRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.02); }
+}
+@keyframes badgePop {
+  0%   { opacity: 0; transform: scale(0.85); }
+  60%  { transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Custom gradient utilities (Tailwind v4: @utility) ────────
+   These work in both @apply and className="bg-brand-gradient"
+─────────────────────────────────────────────────────────────── */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+}
+@utility bg-brand-gradient-hover {
+  background-image: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+}
+@utility bg-brand-gradient-subtle {
+  background-image: linear-gradient(135deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.06) 100%);
+}
+@utility bg-sidebar-glow {
+  background-image: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(99,102,241,0.15) 0%, transparent 70%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base styles
+───────────────────────────────────────────────────────────── */
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
@@ -23,6 +161,9 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Component utilities
+───────────────────────────────────────────────────────────── */
 @layer components {
   /* ── Focus & interaction primitives ─────────────────────────────── */
 
@@ -33,23 +174,23 @@
   /* ── Buttons ──────────────────────────────────────────────────── */
 
   .btn-base {
-    @apply focus-ring inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply btn-base bg-brand-gradient text-white shadow-raised hover:-translate-y-0.5 hover:bg-brand-gradient-hover hover:shadow-glow active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-brand-gradient text-white shadow-raised hover:-translate-y-0.5 hover:bg-brand-gradient-hover hover:shadow-glow active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0;
   }
 
   .btn-secondary {
-    @apply btn-base border border-line-strong bg-white text-ink shadow-inner hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-pop active:translate-y-0 disabled:text-muted-soft disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed border border-line-strong bg-white text-ink shadow-inner hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-pop active:translate-y-0 disabled:text-muted-soft disabled:hover:translate-y-0;
   }
 
   .btn-ghost {
-    @apply btn-base text-muted hover:text-brand-500 disabled:text-muted-soft;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed text-muted hover:text-brand-500 disabled:text-muted-soft;
   }
 
   .btn-dark {
-    @apply btn-base bg-ink text-white shadow-pop hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-0 disabled:bg-muted-soft disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-ink text-white shadow-pop hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-0 disabled:bg-muted-soft disabled:hover:translate-y-0;
   }
 
   /* ── Cards & surfaces ─────────────────────────────────────────── */
@@ -59,7 +200,7 @@
   }
 
   .card-interactive {
-    @apply card-surface hover:-translate-y-0.5 hover:shadow-card-hover;
+    @apply rounded-card border border-line-faint/80 bg-white shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover;
   }
 
   .card-header {
@@ -129,7 +270,7 @@
   }
 
   .table-row-interactive {
-    @apply table-row cursor-pointer hover:bg-brand-50/40 hover:shadow-[inset_3px_0_0_#6366F1];
+    @apply border-b border-line/50 transition-all duration-200 last:border-0 even:bg-canvas/30 cursor-pointer hover:bg-brand-50/40 hover:shadow-[inset_3px_0_0_#6366F1];
   }
 
   .table-td {
@@ -160,26 +301,16 @@
     @apply animate-slideUp;
   }
 
-  .page-enter-stagger > *:nth-child(1) {
-    animation-delay: 0ms;
-  }
-  .page-enter-stagger > *:nth-child(2) {
-    animation-delay: 60ms;
-  }
-  .page-enter-stagger > *:nth-child(3) {
-    animation-delay: 120ms;
-  }
-  .page-enter-stagger > *:nth-child(4) {
-    animation-delay: 180ms;
-  }
-  .page-enter-stagger > *:nth-child(5) {
-    animation-delay: 240ms;
-  }
+  .page-enter-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .page-enter-stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .page-enter-stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .page-enter-stagger > *:nth-child(4) { animation-delay: 180ms; }
+  .page-enter-stagger > *:nth-child(5) { animation-delay: 240ms; }
 
   /* ── Tabs ─────────────────────────────────────────────────────── */
 
   .tab-pill {
-    @apply focus-ring rounded-full font-semibold transition-all duration-300;
+    @apply outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 rounded-full font-semibold;
   }
 
   .tab-pill-active {
@@ -205,19 +336,12 @@
     scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
   }
 
-  .sidebar-scroll::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .sidebar-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
+  .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+  .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
   .sidebar-scroll::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.14);
     border-radius: 9999px;
   }
-
   .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255, 255, 255, 0.24);
   }

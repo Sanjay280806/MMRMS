@@ -31,9 +31,6 @@ export function AcademicBackground({ background }) {
           },
           { key: 'History of Arrears', value: String(background.historyOfArrears) },
           { key: 'Latest Semester', value: `Semester ${background.latestSemester}` },
-          { key: 'Favourite Subjects', value: background.favouriteSubjects?.join(', ') },
-          { key: 'Subjects Finding Difficult', value: background.difficultSubjects?.join(', ') },
-          { key: 'Remarks', value: background.remarks },
         ]}
       />
     </SectionCard>

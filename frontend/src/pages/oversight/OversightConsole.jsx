@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../../api/client.js';
+import { api, getToken } from '../../api/client.js';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
@@ -11,6 +11,9 @@ import { SectionCard, SectionTable } from '../../components/ui/SectionCard.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { StatTile } from '../../components/ui/StatTile.jsx';
 import { useResource } from '../../hooks/useResource.js';
+import { ExcelUploadSection } from './ExcelUploadSection.jsx';
+import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
+import { MentorDashboardModal } from '../../components/oversight/MentorDashboardModal.jsx';
 
 const titles = {
   advisor: {
@@ -19,7 +22,8 @@ const titles = {
   },
   coordinator: {
     dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset', risk: 'At-Risk Students',
-    mentors: 'Mentor & Advisor Tracker', operations: 'Events & OD Approvals', audit: 'Audit & Accreditation Readiness',
+    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', reassignment: 'Mentor Reassignment Tool', operations: 'Year Events & Calendar',
+    audit: 'Audit & Accreditation Readiness',
   },
 };
 
@@ -29,6 +33,27 @@ const statusTone = (status) => {
   if (['Pending', 'Raised', 'In Progress', 'Referred'].includes(status)) return 'amber';
   return 'indigo';
 };
+
+async function downloadDatasetExport() {
+  try {
+    const token = getToken();
+    const res = await fetch('/api/coordinator/me/export/excel', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'MMRMS_2024_BCS_Students_Export.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Export error:', err);
+  }
+}
 
 export function AdvisorConsole() {
   return <OversightConsole role="advisor" />;
@@ -60,7 +85,7 @@ function OversightConsole({ role }) {
     ]
     : [
       { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }, { key: 'risk', label: 'At-Risk Students', badge: stats.atRisk, badgeTone: 'rose' }] },
-      { label: 'Year Operations', items: [{ key: 'mentors', label: 'Mentor Tracker' }, { key: 'operations', label: 'Events & OD', badge: stats.pendingOd, badgeTone: 'rose' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'operations', label: 'Year Events', badge: stats.plannedEvents, badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -70,7 +95,16 @@ function OversightConsole({ role }) {
 
   const action = isAdvisor
     ? <Button size="sm" onClick={() => { setSection('operations'); setComposer('meeting'); }}>＋ Plan class meeting</Button>
-    : <Button size="sm" onClick={() => { setSection('operations'); setComposer('event'); }}>＋ Plan event</Button>;
+    : (
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setSection('upload')}>
+          ⚡ Upload Excel / CSV
+        </Button>
+        <Button size="sm" onClick={() => { setSection('operations'); setComposer('event'); }}>
+          ＋ Plan event
+        </Button>
+      </div>
+    );
 
   return (
     <ConsoleLayout
@@ -87,7 +121,7 @@ function OversightConsole({ role }) {
     >
       <div className="animate-fadeRise space-y-5">
         {isAdvisor && <AdvisorSections section={section} data={data} reload={reload} composer={composer} setComposer={setComposer} />}
-        {!isAdvisor && <CoordinatorSections section={section} data={data} reload={reload} composer={composer} setComposer={setComposer} />}
+        {!isAdvisor && <CoordinatorSections section={section} data={data} reload={reload} composer={composer} setComposer={setComposer} navigate={navigate} />}
       </div>
     </ConsoleLayout>
   );
@@ -118,7 +152,7 @@ function profileFields(role, person, stats) {
   const yearFields = [
     { key: 'Programme', value: person.programme }, { key: 'Year', value: person.year }, { key: 'Email ID', value: person.email },
     { key: 'Mobile number', value: person.mobile }, { key: 'Room', value: person.room }, { key: 'Students tracked', value: String(stats.students) },
-    { key: 'Mentors monitored', value: String(stats.mentors) }, { key: 'Pending OD approvals', value: String(stats.pendingOd) },
+    { key: 'Mentors monitored', value: String(stats.mentors) }, { key: 'Planned year events', value: String(stats.plannedEvents) },
   ];
   return role === 'advisor' ? classFields : yearFields;
 }
@@ -132,13 +166,28 @@ function AdvisorSections({ section, data, reload, composer, setComposer }) {
   return <MentorTracker rows={data.mentorTracker} />;
 }
 
-function CoordinatorSections({ section, data, reload, composer, setComposer }) {
-  if (section === 'dashboard') return <CoordinatorDashboard data={data} />;
-  if (section === 'students') return <StudentDirectory role="coordinator" />;
-  if (section === 'risk') return <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />;
-  if (section === 'mentors') return <MentorTracker rows={data.mentors} />;
-  if (section === 'operations') return <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />;
-  return <AuditPanel rows={data.audit} tracker={data.academicTracker} />;
+function CoordinatorSections({ section, data, reload, composer, setComposer, navigate }) {
+  const [inspectingMentorId, setInspectingMentorId] = useState(null);
+
+  return (
+    <>
+      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
+      {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
+      {section === 'risk' && <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />}
+      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
+      {section === 'operations' && <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />}
+      {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
+
+      {inspectingMentorId && (
+        <MentorDashboardModal
+          mentorId={inspectingMentorId}
+          onClose={() => setInspectingMentorId(null)}
+        />
+      )}
+    </>
+  );
 }
 
 function AdvisorDashboard({ data }) {
@@ -158,17 +207,41 @@ function AdvisorDashboard({ data }) {
   </>;
 }
 
-function CoordinatorDashboard({ data }) {
+function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
   const { stats } = data;
   return <>
     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
       <StatTile label="Students tracked" value={stats.students} footer="2024 BCS consolidated dataset" />
       <StatTile label="Mentor compliance" value={stats.mentorCompliance} suffix="%" footer="Recorded mentoring sessions vs due" />
-      <StatTile label="Students at risk" value={stats.atRisk} footer="Needs attendance or academic follow-up" />
-      <StatTile label="Pending OD approvals" value={stats.pendingOd} footer={`${stats.plannedEvents} planned year activity(s)`} />
+      <StatTile label="Students at risk" value={stats.atRisk} footer="Needs attendance or academic follow-up" tone={stats.atRisk ? 'rose' : 'green'} />
+      <StatTile label="Planned year events" value={stats.plannedEvents} footer="PTM, orientation & reviews" tone="indigo" />
     </div>
+
+    {/* Batch Data Management & Quick Sync Action Card */}
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/70 via-white to-purple-50/50 p-5 shadow-card">
+      <div className="flex items-center gap-3.5">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-white shadow-sm text-xl">
+          📊
+        </span>
+        <div>
+          <h4 className="text-[14px] font-semibold text-ink">MyCamu ERP & Excel Data Synchronisation</h4>
+          <p className="text-[12px] text-muted">
+            Batch data management: Upload student enrollment rosters, attendance reports, and academic internal marks.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={downloadDatasetExport}>
+          Export Dataset (.xlsx)
+        </Button>
+        <Button size="sm" onClick={() => onNavigate?.('upload')}>
+          ⚡ Upload Excel / CSV
+        </Button>
+      </div>
+    </div>
+
     <div className="grid gap-5 xl:grid-cols-2">
-      <MentorTracker rows={data.mentors} compact />
+      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
     <StudentWatch title="Immediate attention" subtitle="Students requiring immediate follow-up" rows={data.atRisk.slice(0, 8)} metric="health" />
@@ -195,6 +268,7 @@ function AcademicAndDiscipline({ data }) {
   </>;
 }
 
+<<<<<<< HEAD
 function MentorTracker({ rows, compact = false }) {
   return <SectionTable title="Mentor Tracker" subtitle="Assigned learners, mentoring compliance and follow-up load">
     <DataTable rows={rows} rowKey={(row) => row.id} columns={[
@@ -204,9 +278,191 @@ function MentorTracker({ rows, compact = false }) {
       { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
     ]} />
   </SectionTable>;
+=======
+function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
+  const [filter, setFilter] = useState('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  async function handleToggleSoftDelete(mentor, shouldSoftDelete) {
+    setActionLoadingId(mentor.id);
+    setStatusMessage(null);
+    try {
+      await api(`/coordinator/me/mentors/${mentor.id}/soft-delete`, {
+        method: 'POST',
+        body: {
+          softDelete: shouldSoftDelete,
+          reason: shouldSoftDelete ? 'Soft-deleted by Year Coordinator' : 'Restored by Year Coordinator',
+        },
+      });
+      setConfirmDeleteId(null);
+      setStatusMessage(`${mentor.name} was successfully ${shouldSoftDelete ? 'soft-deleted' : 'restored'}.`);
+      if (onReload) onReload();
+    } catch (err) {
+      setStatusMessage(`Error: ${err.message || 'Operation failed'}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  const activeCount = rows.filter((r) => !r.archived).length;
+  const archivedCount = rows.filter((r) => r.archived).length;
+
+  const filteredRows = rows.filter((r) => {
+    if (filter === 'active') return !r.archived;
+    if (filter === 'archived') return r.archived;
+    return true;
+  });
+
+  return (
+    <SectionTable
+      title="Mentor Tracker"
+      subtitle="Assigned learners, mentoring compliance, and faculty status"
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          {!compact && (
+            <div className="flex items-center rounded-lg border border-line bg-surface-subtle p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setFilter('all')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'all' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                All ({rows.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('active')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'active' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilter('archived')}
+                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                  filter === 'archived' ? 'bg-white shadow-xs text-bad-ink font-semibold' : 'text-muted hover:text-ink'
+                }`}
+              >
+                Soft-Deleted ({archivedCount})
+              </button>
+            </div>
+          )}
+          {!compact && onNavigate && (
+            <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
+              ⚡ Mentor Reassignment Tool
+            </Button>
+          )}
+        </div>
+      }
+    >
+      {statusMessage && (
+        <div className="border-b border-line bg-brand-50/60 px-4 py-2 text-[12px] font-medium text-brand-900 flex justify-between items-center">
+          <span>{statusMessage}</span>
+          <button type="button" onClick={() => setStatusMessage(null)} className="text-muted hover:text-ink">✕</button>
+        </div>
+      )}
+      <DataTable
+        rows={filteredRows}
+        rowKey={(row) => row.id}
+        onRowClick={(row) => onInspectMentor?.(row.id)}
+        empty={<EmptyState title="No mentors found" description="No faculty matching the selected filter." icon="✓" />}
+        columns={[
+          {
+            key: 'mentor',
+            header: 'Mentor',
+            render: (row) => (
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-brand-700 hover:underline">{row.name}</p>
+                  {row.archived && <Badge tone="rose" size="xs">Soft-Deleted</Badge>}
+                </div>
+                <p className="text-[11.5px] text-muted">{row.staffCode} · {row.designation}</p>
+              </div>
+            ),
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            align: 'center',
+            render: (row) => (
+              <Badge tone={row.archived ? 'rose' : 'green'} size="xs">
+                {row.archived ? 'Soft-Deleted' : 'Active'}
+              </Badge>
+            ),
+          },
+          { key: 'assigned', header: 'Assigned', align: 'right' },
+          { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
+          { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
+          { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
+          {
+            key: 'actions',
+            header: '',
+            align: 'right',
+            render: (row) => (
+              <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onInspectMentor?.(row.id)}
+                >
+                  Inspect
+                </Button>
+                {confirmDeleteId === row.id ? (
+                  <div className="flex items-center gap-1 rounded-lg bg-bad-surface/60 p-1 border border-bad-line">
+                    <span className="text-[11px] font-bold text-bad-ink px-1">Soft Delete?</span>
+                    <Button
+                      size="xs"
+                      variant="danger"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => handleToggleSoftDelete(row, true)}
+                    >
+                      Yes
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      onClick={() => setConfirmDeleteId(null)}
+                    >
+                      No
+                    </Button>
+                  </div>
+                ) : (
+                  row.archived ? (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => handleToggleSoftDelete(row, false)}
+                    >
+                      Restore
+                    </Button>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant="secondary"
+                      disabled={actionLoadingId === row.id}
+                      onClick={() => setConfirmDeleteId(row.id)}
+                    >
+                      Soft Delete
+                    </Button>
+                  )
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
+    </SectionTable>
+  );
+>>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }
 
-function StudentDirectory({ role }) {
+function StudentDirectory({ role, onNavigate }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const query = new URLSearchParams({ page: String(page), limit: '20' });
@@ -214,6 +470,7 @@ function StudentDirectory({ role }) {
   const { data, loading, error } = useResource(`/${role}/me/students?${query}`);
 
   function updateSearch(value) { setSearch(value); setPage(1); }
+<<<<<<< HEAD
   return <SectionTable title="Student Directory" subtitle="Filter by student name or roll number; server-side pagination keeps the dataset scalable" action={<div className="w-56"><TextField label="" placeholder="Search student or roll no." value={search} onChange={(event) => updateSearch(event.target.value)} /></div>}>
     {error && <EmptyState title="Couldn't load students" description={error.message} icon="!" />}
     {loading && !data && <div className="p-5 text-sm text-muted">Loading student dataset…</div>}
@@ -230,6 +487,48 @@ function StudentDirectory({ role }) {
       </div>
     </>}
   </SectionTable>;
+=======
+  return (
+    <SectionTable
+      title="Student Directory"
+      subtitle="Filter by student name or roll number; server-side pagination keeps the dataset scalable"
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-52">
+            <TextField label="" placeholder="Search student or roll no." value={search} onChange={(event) => updateSearch(event.target.value)} />
+          </div>
+          {role === 'coordinator' && (
+            <>
+              <Button size="sm" variant="secondary" onClick={downloadDatasetExport} title="Export all students as Excel spreadsheet">
+                📊 Export Excel
+              </Button>
+              {onNavigate && (
+                <Button size="sm" onClick={() => onNavigate('upload')} title="Upload new student roster or marks from Excel">
+                  ⚡ Upload Excel
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      }
+    >
+      {error && <EmptyState title="Couldn't load students" description={error.message} icon="!" />}
+      {loading && !data && <div className="p-5 text-sm text-muted">Loading student dataset…</div>}
+      {data && <>
+        <DataTable rows={data.students} rowKey={(row) => row.id} columns={[
+          { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber} · {row.section}</p></div> },
+          { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
+          { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
+          { key: 'mentor', header: 'Mentoring', align: 'right', render: (row) => `${row.meetingsHeld}/${row.meetingsDue}` },
+        ]} />
+        <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[12px] text-muted">
+          <span>{data.total} students · page {data.page} of {data.totalPages}</span>
+          <div className="flex gap-2"><Button size="sm" variant="secondary" disabled={data.page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button><Button size="sm" variant="secondary" disabled={data.page >= data.totalPages} onClick={() => setPage((value) => value + 1)}>Next</Button></div>
+        </div>
+      </>}
+    </SectionTable>
+  );
+>>>>>>> c98e9442a8f1b50289e2349501411e5624414e54
 }
 
 function AdvisorOperations({ data, reload, composer, setComposer }) {
@@ -261,13 +560,6 @@ function CoordinatorOperations({ data, reload, composer, setComposer }) {
       <DataTable rows={data.events} rowKey={(row) => row.id} columns={[
         { key: 'title', header: 'Activity', render: (row) => <div><p className="font-medium">{row.title}</p><p className="text-[11.5px] text-muted">{row.notes}</p></div> },
         { key: 'date', header: 'Date', align: 'right' }, { key: 'type', header: 'Type', align: 'right', render: (row) => <Badge tone="indigo">{row.type}</Badge> }, { key: 'status', header: 'Status', align: 'right', render: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
-      ]} />
-    </SectionTable>
-    <SectionTable title="External Event / OD Approvals" subtitle="Approve or reject pending on-duty requests">
-      <DataTable rows={data.odRequests} rowKey={(row) => row.id} columns={[
-        { key: 'student', header: 'Student / event', render: (row) => <div><p className="font-medium">{row.student}</p><p className="text-[11.5px] text-muted">{row.rollNumber} · {row.event}</p></div> },
-        { key: 'dates', header: 'Dates', align: 'right', render: (row) => `${row.from} – ${row.to}` },
-        { key: 'status', header: 'Decision', align: 'right', render: (row) => row.status === 'Pending' ? <div className="flex justify-end gap-2"><StatusButton path={`/coordinator/me/od-requests/${row.id}`} status={row.status} next="Approved" onDone={reload} /><StatusButton path={`/coordinator/me/od-requests/${row.id}`} status={row.status} next="Rejected" onDone={reload} /></div> : <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
       ]} />
     </SectionTable>
   </div>;
