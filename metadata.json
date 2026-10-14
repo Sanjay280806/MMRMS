@@ -1,0 +1,8 @@
+{
+  "name": "MMRMS · Mentor–Mentee Relationship Management",
+  "description": "MMRMS — one workspace connecting students, mentors, and departments at Kumaraguru College of Technology.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -63,7 +63,7 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
 
   if (loading && !data) return <DashboardSkeleton tiles={3} />;
 
-  const { identity, roster } = data;
+  const { identity, health, roster } = data;
 
   return (
     <div className="space-y-5">

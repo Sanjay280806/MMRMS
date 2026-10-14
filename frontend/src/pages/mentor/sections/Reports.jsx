@@ -20,11 +20,9 @@ export function Reports() {
     );
   }
 
-  const cards = data.filter((card) => !card.key.toLowerCase().includes('health'));
-
   return (
     <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card) => (
+      {data.map((card) => (
         <StatTile
           key={card.key}
           label={card.key}

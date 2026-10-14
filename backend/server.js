@@ -14,12 +14,11 @@ const app = createApp();
 const rawPort = process.env.PORT;
 const port = (rawPort && rawPort !== '8080') ? Number(rawPort) : 4000;
 
-// Only listen on a port when running locally
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.STANDALONE_BACKEND === 'true') {
   app.listen(port, () => {
     console.log(`MMRMS API listening on http://localhost:${port}`);
   });
 }
 
-// Export the app ibnstance for Vercel Serverless execution
+// Export the app instance for Vercel Serverless execution
 export default app;
