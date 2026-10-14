@@ -21,9 +21,12 @@ export function createApp() {
 
   app.disable('etag');
 
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    frameguard: false,
+  }));
   app.use(cors({
-    origin: process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:5173'],
+    origin: true,
     credentials: true,
   }));
   app.use(cookieParser());
@@ -55,7 +58,7 @@ export function createApp() {
   app.use('/api/hod', hodRoutes);
   app.use('/api/announcements', announcementRoutes);
 
-  app.use(notFound);
+  app.use('/api', notFound);
   app.use(errorHandler);
 
   return app;

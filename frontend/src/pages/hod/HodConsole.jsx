@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { StatTile } from '../../components/ui/StatTile.jsx';
 import { SectionCard, SectionTable } from '../../components/ui/SectionCard.jsx';
@@ -69,19 +70,13 @@ export default function HodConsole() {
       ],
     },
     {
-      label: 'Staff & Interventions',
+      label: 'Faculty & Mentorship',
       items: [
         {
           key: 'mentors',
           label: 'Faculty Mentors',
           badge: `${stats.compliancePct}%`,
           badgeTone: stats.compliancePct >= 80 ? 'green' : 'amber',
-        },
-        {
-          key: 'atrisk',
-          label: 'At-Risk Watchlist',
-          badge: stats.atRiskCount,
-          badgeTone: stats.atRiskCount ? 'rose' : 'green',
         },
       ],
     },
@@ -109,9 +104,7 @@ export default function HodConsole() {
           ? 'Department Overview'
           : section === 'cohorts'
           ? 'Cohort Management & YC Oversight'
-          : section === 'mentors'
-          ? 'Faculty Mentors & Compliance Matrix'
-          : 'Department-Wide At-Risk Interventions'
+          : 'Faculty Mentors Directory'
       }
       subtitle={`${data.institution.name} · ${data.department} · Multi-Cohort Governance`}
       greet={section === 'overview'}
@@ -160,7 +153,6 @@ export default function HodConsole() {
               setSelectedMentor(m);
               setSection('mentors');
             }}
-            onOpenStudent={setSelectedStudentId}
           />
         )}
 
@@ -185,13 +177,6 @@ export default function HodConsole() {
             onClearPreselectedMentor={() => setPreselectedMentorReassignId(null)}
             archivedMentors={data.archivedStaff?.mentors || []}
             onSuccessReassign={() => reload()}
-          />
-        )}
-
-        {section === 'atrisk' && (
-          <AtRiskSection
-            atRisk={data.atRisk}
-            onOpenStudent={setSelectedStudentId}
           />
         )}
       </div>
@@ -222,8 +207,8 @@ export default function HodConsole() {
 
 /* ── Section: Executive Overview ────────────────────────────────────────── */
 
-function OverviewSection({ data, onSelectCohort, onSelectMentor, onOpenStudent }) {
-  const { stats, cohorts, atRisk } = data;
+function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
+  const { stats, cohorts } = data;
 
   return (
     <div className="space-y-6">
@@ -248,10 +233,10 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor, onOpenStudent }
           tone={stats.avgHealth >= 75 ? 'green' : 'amber'}
         />
         <StatTile
-          label="At-Risk Interventions"
-          value={stats.atRiskCount}
-          subtext={`${stats.attendanceShortfalls} attendance shortfalls`}
-          tone={stats.atRiskCount ? 'rose' : 'green'}
+          label="Faculty Mentors"
+          value={stats.totalMentors}
+          subtext={`${stats.totalCoordinators} year coordinators`}
+          tone="slate"
         />
       </div>
 
@@ -292,18 +277,16 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor, onOpenStudent }
                   <span className="font-medium text-ink">{cohort.totalStudents}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-muted">Assigned Mentors:</span>
+                  <span className="font-medium text-ink">{cohort.totalMentors}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted">Avg Attendance:</span>
                   <span className="font-medium text-ink">{cohort.avgAttendance}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Avg CGPA:</span>
                   <span className="font-medium text-ink">{cohort.avgCgpa}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">At-Risk Count:</span>
-                  <span className={`font-semibold ${cohort.atRiskCount ? 'text-bad-ink' : 'text-good-ink'}`}>
-                    {cohort.atRiskCount}
-                  </span>
                 </div>
               </div>
 
@@ -321,80 +304,6 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor, onOpenStudent }
           ))}
         </div>
       </SectionCard>
-
-      {/* Critical Watchlist Preview */}
-      <SectionTable
-        title="Immediate Student Attention Watchlist"
-        subtitle="Students across all cohorts requiring academic or attendance intervention"
-        action={
-          <Badge tone={atRisk.length ? 'rose' : 'green'} size="md">
-            {atRisk.length} flagged
-          </Badge>
-        }
-      >
-        <DataTable
-          rows={atRisk.slice(0, 8)}
-          rowKey={(s) => s.id}
-          onRowClick={(s) => onOpenStudent(s.id)}
-          empty={<EmptyState title="No high-risk students" description="All students are currently performing well." icon="✓" />}
-          columns={[
-            {
-              key: 'student',
-              header: 'Student',
-              render: (s, i) => (
-                <div className="flex items-center gap-2.5">
-                  <Avatar initials={s.initials} seed={i} size="sm" />
-                  <div>
-                    <p className="font-semibold text-ink leading-tight">{s.name}</p>
-                    <p className="text-[11px] text-muted">{s.rollNumber} · {s.section}</p>
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'mentor',
-              header: 'Assigned Mentor',
-              render: (s) => <span className="text-[12.5px] text-muted-strong">{s.mentor || s.mentorName || '—'}</span>,
-            },
-            {
-              key: 'attendance',
-              header: 'Attendance',
-              align: 'right',
-              render: (s) => (
-                <span className={`font-semibold tnum ${s.attendance < 75 ? 'text-bad-ink' : 'text-ink'}`}>
-                  {s.attendance}%
-                </span>
-              ),
-            },
-            {
-              key: 'cgpa',
-              header: 'CGPA',
-              align: 'right',
-              render: (s) => <span className="font-medium tnum">{s.cgpa?.toFixed(2)}</span>,
-            },
-            {
-              key: 'arrears',
-              header: 'Arrears',
-              align: 'right',
-              render: (s) => (
-                <span className={`tnum ${s.standingArrears ? 'font-semibold text-bad-ink' : 'text-muted-soft'}`}>
-                  {s.standingArrears}
-                </span>
-              ),
-            },
-            {
-              key: 'health',
-              header: 'Health Index',
-              align: 'right',
-              render: (s) => (
-                <Badge tone={s.health < 60 ? 'rose' : s.health < 75 ? 'amber' : 'green'}>
-                  {s.health}/100
-                </Badge>
-              ),
-            },
-          ]}
-        />
-      </SectionTable>
     </div>
   );
 }
@@ -418,6 +327,9 @@ function CohortsSection({
     try {
       const res = await api(`/hod/me/cohorts/${cohort.cohortId}`);
       setCohortStudents(res.students || []);
+      if (res.cohort) {
+        onSelectCohort(res.cohort);
+      }
     } catch {
       setCohortStudents([]);
     } finally {
@@ -611,9 +523,21 @@ function CohortsSection({
           title={`Students in ${selectedCohort.cohortName} (${selectedCohort.cohortId})`}
           subtitle={`Year Coordinator: ${selectedCohort.yearCoordinator} · Showing ${cohortStudents.length} enrolled students`}
           action={
-            <Button size="xs" variant="secondary" onClick={() => onSelectCohort(null)}>
-              ✕ Close Roster
-            </Button>
+            <div className="flex items-center gap-2">
+              {onReassignYc && (
+                <Button
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => onReassignYc(selectedCohort)}
+                  title="Reassign Year Coordinator for this cohort"
+                >
+                  ⚡ Reassign YC
+                </Button>
+              )}
+              <Button size="xs" variant="secondary" onClick={() => onSelectCohort(null)}>
+                ✕ Close Roster
+              </Button>
+            </div>
           }
         >
           {loadingStudents ? (
@@ -701,7 +625,6 @@ function MentorsSection({
   const [reassignMentorId, setReassignMentorId] = useState(preselectedMentorReassignId);
   const [mentorDetail, setMentorDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const { data: complianceData } = useResource('/hod/me/compliance');
 
   async function openMentorMentees(mentor) {
     onSelectMentor(mentor);
@@ -737,13 +660,6 @@ function MentorsSection({
           onClick={() => setActiveTab('reassignment')}
         >
           ⚡ Mentor Reassignment Tool
-        </Button>
-        <Button
-          size="sm"
-          variant={activeTab === 'matrix' ? 'primary' : 'secondary'}
-          onClick={() => setActiveTab('matrix')}
-        >
-          Weekly Compliance Matrix
         </Button>
         <Button
           size="sm"
@@ -944,58 +860,6 @@ function MentorsSection({
         </SectionTable>
       )}
 
-      {activeTab === 'matrix' && complianceData && (
-        <SectionTable
-          title="Department-Wide Weekly Compliance Matrix"
-          subtitle="Real-time audit log of mentor review sessions across academic weeks"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="border-b border-line bg-surface-subtle text-[11px] uppercase tracking-wider text-muted-soft">
-                <tr>
-                  <th className="p-3.5">Mentor</th>
-                  <th className="p-3.5 text-center">Assigned</th>
-                  <th className="p-3.5 text-center">Compliance</th>
-                  {complianceData.weeks.map((w) => (
-                    <th key={w} className="p-3.5 text-center">{w}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {complianceData.mentors.map((m) => (
-                  <tr key={m.mentorId} className="hover:bg-surface-subtle/50">
-                    <td className="p-3.5 font-medium text-ink">
-                      {m.name} <span className="text-[11px] text-muted">({m.staffCode})</span>
-                    </td>
-                    <td className="p-3.5 text-center tnum">{m.assignedCount}</td>
-                    <td className="p-3.5 text-center">
-                      <Badge tone={m.compliance >= 80 ? 'green' : 'amber'}>
-                        {m.compliance}%
-                      </Badge>
-                    </td>
-                    {m.weeklyStatus.map((ws, wIdx) => (
-                      <td key={wIdx} className="p-3.5 text-center">
-                        <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            ws.status === 'Completed'
-                              ? 'bg-good-surface text-good-ink'
-                              : ws.status === 'Partial'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-slate-100 text-slate-500'
-                          }`}
-                        >
-                          {ws.status}
-                        </span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </SectionTable>
-      )}
-
       {/* Mentor Mentees Drawer */}
       {selectedMentor && (
         <SectionTable
@@ -1040,97 +904,38 @@ function MentorsSection({
   );
 }
 
-/* ── Section: At-Risk Watchlist ──────────────────────────────────────────── */
-
-function AtRiskSection({ atRisk, onOpenStudent }) {
-  return (
-    <SectionTable
-      title="Department-Wide At-Risk Interventions"
-      subtitle="Comprehensive list of students with health score < 70, attendance < 75%, or standing arrears"
-      action={<Badge tone="rose">{atRisk.length} flagged students</Badge>}
-    >
-      <DataTable
-        rows={atRisk}
-        rowKey={(s) => s.id}
-        onRowClick={(s) => onOpenStudent(s.id)}
-        columns={[
-          {
-            key: 'student',
-            header: 'Student',
-            render: (s, i) => (
-              <div className="flex items-center gap-2.5">
-                <Avatar initials={s.initials} seed={i} size="sm" />
-                <div>
-                  <p className="font-semibold text-ink">{s.name}</p>
-                  <p className="text-[11px] text-muted">{s.rollNumber} · {s.section}</p>
-                </div>
-              </div>
-            ),
-          },
-          {
-            key: 'mentor',
-            header: 'Assigned Mentor',
-            render: (s) => <span className="text-[12.5px] text-muted-strong">{s.mentorName || s.mentor || '—'}</span>,
-          },
-          {
-            key: 'attendance',
-            header: 'Attendance',
-            align: 'right',
-            render: (s) => (
-              <span className={`font-semibold tnum ${s.attendance < 75 ? 'text-bad-ink' : 'text-ink'}`}>
-                {s.attendance}%
-              </span>
-            ),
-          },
-          {
-            key: 'cgpa',
-            header: 'CGPA',
-            align: 'right',
-            render: (s) => <span className="font-medium tnum">{s.cgpa?.toFixed(2)}</span>,
-          },
-          {
-            key: 'arrears',
-            header: 'Standing Arrears',
-            align: 'right',
-            render: (s) => (
-              <span className={`tnum ${s.standingArrears ? 'font-semibold text-bad-ink' : 'text-muted-soft'}`}>
-                {s.standingArrears}
-              </span>
-            ),
-          },
-          {
-            key: 'health',
-            header: 'Health Score',
-            align: 'right',
-            render: (s) => (
-              <Badge tone={s.health < 60 ? 'rose' : 'amber'}>
-                {s.health}/100
-              </Badge>
-            ),
-          },
-          {
-            key: 'flag',
-            header: 'Flag Reason',
-            render: (s) => (
-              <span className="text-[11.5px] text-bad-ink font-medium">
-                {s.flagReason || (s.attendance < 75 ? 'Attendance Shortage' : s.standingArrears ? 'Standing Arrears' : 'Well-being Concern')}
-              </span>
-            ),
-          },
-        ]}
-      />
-    </SectionTable>
-  );
-}
-
 /* ── Modal: Student Record Book Read-Only View ───────────────────────────── */
 
 function StudentRecordModal({ studentId, onClose }) {
   const { data: record, loading, error } = useResource(`/hod/me/students/${studentId}`);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = orig;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fadeIn"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{ backgroundColor: '#ffffff', color: '#12131A' }}
+        className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-line bg-white p-6 shadow-2xl animate-slideUp text-ink"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600">
@@ -1201,6 +1006,7 @@ function StudentRecordModal({ studentId, onClose }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

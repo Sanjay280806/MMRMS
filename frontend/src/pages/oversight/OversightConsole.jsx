@@ -21,8 +21,8 @@ const titles = {
     academics: 'Academic & Discipline Watch', operations: 'Class Coordination', mentors: 'Mentor Coordination',
   },
   coordinator: {
-    dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset', risk: 'At-Risk Students',
-    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', reassignment: 'Mentor Reassignment Tool', operations: 'Year Events & Calendar',
+    dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset',
+    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', reassignment: 'Mentor Reassignment Tool',
     audit: 'Audit & Accreditation Readiness',
   },
 };
@@ -84,8 +84,8 @@ function OversightConsole({ role }) {
       { label: 'Coordination', items: [{ key: 'operations', label: 'Meetings & Grievances', badge: stats.openGrievances, badgeTone: 'rose' }, { key: 'mentors', label: 'Mentor Coordination' }] },
     ]
     : [
-      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }, { key: 'risk', label: 'At-Risk Students', badge: stats.atRisk, badgeTone: 'rose' }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'operations', label: 'Year Events', badge: stats.plannedEvents, badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -99,9 +99,6 @@ function OversightConsole({ role }) {
       <div className="flex items-center gap-2">
         <Button size="sm" variant="secondary" onClick={() => setSection('upload')}>
           ⚡ Upload Excel / CSV
-        </Button>
-        <Button size="sm" onClick={() => { setSection('operations'); setComposer('event'); }}>
-          ＋ Plan event
         </Button>
       </div>
     );
@@ -174,10 +171,8 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
       {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
       {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
-      {section === 'risk' && <StudentWatch title="At-Risk Students" subtitle="Prioritised from attendance, academic, mentoring and well-being evidence" rows={data.atRisk} metric="health" />}
       {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
-      {section === 'operations' && <CoordinatorOperations data={data} reload={reload} composer={composer} setComposer={setComposer} />}
       {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
 
       {inspectingMentorId && (
@@ -208,15 +203,7 @@ function AdvisorDashboard({ data }) {
 }
 
 function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
-  const { stats } = data;
   return <>
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      <StatTile label="Students tracked" value={stats.students} footer="2024 BCS consolidated dataset" />
-      <StatTile label="Mentor compliance" value={stats.mentorCompliance} suffix="%" footer="Recorded mentoring sessions vs due" />
-      <StatTile label="Students at risk" value={stats.atRisk} footer="Needs attendance or academic follow-up" tone={stats.atRisk ? 'rose' : 'green'} />
-      <StatTile label="Planned year events" value={stats.plannedEvents} footer="PTM, orientation & reviews" tone="indigo" />
-    </div>
-
     {/* Batch Data Management & Quick Sync Action Card */}
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/70 via-white to-purple-50/50 p-5 shadow-card">
       <div className="flex items-center gap-3.5">
@@ -244,7 +231,6 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
       <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
-    <StudentWatch title="Immediate attention" subtitle="Students requiring immediate follow-up" rows={data.atRisk.slice(0, 8)} metric="health" />
   </>;
 }
 
@@ -252,6 +238,7 @@ function StudentWatch({ title, subtitle, rows, metric }) {
   return <SectionTable title={title} subtitle={subtitle} action={<Badge tone={rows.length ? 'rose' : 'green'}>{rows.length} student{rows.length === 1 ? '' : 's'}</Badge>}>
     <DataTable rows={rows} rowKey={(row) => row.id} empty={<EmptyState title="No follow-up needed" description="There are no students in this watch list." icon="✓" />} columns={[
       { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber}</p></div> },
+      { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
       { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
       { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
       { key: 'metric', header: metric === 'health' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? (metric === 'health' ? 'Review' : 'Attendance')}</Badge> },
@@ -267,7 +254,6 @@ function AcademicAndDiscipline({ data }) {
     </SectionCard>
   </>;
 }
-
 
 function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
   const [filter, setFilter] = useState('all');
@@ -459,7 +445,6 @@ function StudentDirectory({ role, onNavigate }) {
   const { data, loading, error } = useResource(`/${role}/me/students?${query}`);
 
   function updateSearch(value) { setSearch(value); setPage(1); }
-
   return (
     <SectionTable
       title="Student Directory"
