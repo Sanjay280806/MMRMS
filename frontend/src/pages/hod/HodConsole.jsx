@@ -109,12 +109,12 @@ export default function HodConsole() {
       subtitle={`${data.institution.name} · ${data.department} · Multi-Cohort Governance`}
       greet={section === 'overview'}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <Badge tone={stats.compliancePct >= 80 ? 'green' : 'amber'} size="md">
-            Department Compliance: {stats.compliancePct}%
+            Compliance: {stats.compliancePct}%
           </Badge>
           <Button size="sm" variant="secondary" onClick={reload}>
-            ↻ Refresh Metrics
+            ↻ Refresh
           </Button>
         </div>
       }
@@ -213,7 +213,7 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
   return (
     <div className="space-y-6">
       {/* KPI Tiles */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatTile
           label="Total Students"
           value={stats.totalStudents}

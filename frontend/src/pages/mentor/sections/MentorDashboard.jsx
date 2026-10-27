@@ -11,8 +11,8 @@ export function MentorDashboard({ data, onOpenMentee }) {
   const { stats, attention, cohortHealth, initialInteractionAlerts } = data;
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4 sm:space-y-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
         <StatTile
           label="Assigned Mentees"
           value={stats.assignedMentees}
@@ -37,7 +37,7 @@ export function MentorDashboard({ data, onOpenMentee }) {
         />
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-3 sm:gap-5">
         <WatchTile label="Attendance shortfalls" value={stats.attendanceShortfalls} tone="amber" />
         <WatchTile label="Standing arrears" value={stats.standingArrears} tone="indigo" />
         <WatchTile label="Parent contacts logged" value={stats.parentContactsThisTerm} tone="green" />
@@ -155,10 +155,10 @@ export function MentorDashboard({ data, onOpenMentee }) {
 
 function WatchTile({ label, value, tone }) {
   return (
-    <div className="rounded-card border border-line bg-white p-4 shadow-card">
-      <div className="flex items-baseline gap-2">
-        <span className="tnum font-display text-[26px] font-medium leading-none text-ink">{value}</span>
-        <Badge tone={tone}>{label}</Badge>
+    <div className="rounded-card border border-line bg-white p-3 shadow-card sm:p-4">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:gap-2">
+        <span className="tnum font-display text-[22px] font-medium leading-none text-ink sm:text-[26px]">{value}</span>
+        <Badge tone={tone} className="text-[10px] sm:text-xs">{label}</Badge>
       </div>
     </div>
   );
