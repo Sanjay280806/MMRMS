@@ -22,7 +22,7 @@ export function ConsoleLayout({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen overflow-x-hidden bg-canvas">
       <Sidebar
         product={product}
         groups={navGroups}
@@ -41,9 +41,9 @@ export function ConsoleLayout({
           onMenu={() => setMenuOpen(true)}
           greet={greet}
         />
-        <main className="page-enter space-y-6 px-5 py-6 lg:px-8 lg:py-8">
+        <main className="page-enter space-y-4 px-3 py-4 sm:space-y-6 sm:px-5 sm:py-6 lg:px-8 lg:py-8">
           {profile}
-          <div className="page-enter-stagger space-y-6">{children}</div>
+          <div className="page-enter-stagger space-y-4 sm:space-y-6">{children}</div>
         </main>
       </div>
     </div>

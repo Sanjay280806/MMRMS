@@ -71,9 +71,9 @@ export default function Login() {
     <div className="flex min-h-screen bg-canvas">
       <BrandPanel institution={context?.institution} roles={context?.roles} />
 
-      <div className="flex w-full flex-col items-center justify-center px-6 py-12 lg:w-[45%] lg:px-14">
+      <div className="flex w-full flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12 lg:w-[45%] lg:px-14">
         <div className="w-full max-w-[400px] animate-fadeRise">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
+          <div className="mb-6 flex items-center gap-3 lg:hidden">
             <Logo />
             <div className="leading-tight">
               <div className="text-[15px] font-bold tracking-[.02em]">MMRMS</div>
@@ -83,7 +83,7 @@ export default function Login() {
             </div>
           </div>
 
-          <h1 className="hero-title text-[28px]">Sign in to MMRMS</h1>
+          <h1 className="font-display text-[24px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[28px]">Sign in to MMRMS</h1>
           <p className="hero-subtitle">Access your mentoring workspace</p>
 
           {error && <AlertBanner tone="rose" className="mt-5" title={error} />}

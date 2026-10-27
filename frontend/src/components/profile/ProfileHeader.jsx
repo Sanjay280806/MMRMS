@@ -22,18 +22,18 @@ export function ProfileHeader({
 }) {
   return (
     <Card as="header" className="overflow-hidden">
-      <div className="flex flex-wrap items-start gap-5 p-6 lg:p-7">
+      <div className="flex flex-wrap items-start gap-3 p-4 sm:gap-5 sm:p-6 lg:p-7">
         <Avatar initials={initials} size="lg" seed={seed} />
 
         <div className="min-w-0 flex-1">
           <h2 className="hero-title">
             {name}
           </h2>
-          {subtitle && <p className="mt-1 text-[13px] text-muted-strong">{subtitle}</p>}
-          {meta && <p className="mt-0.5 text-[12px] text-muted">{meta}</p>}
+          {subtitle && <p className="mt-1 text-[12px] text-muted-strong sm:text-[13px]">{subtitle}</p>}
+          {meta && <p className="mt-0.5 text-[11px] text-muted sm:text-[12px]">{meta}</p>}
 
           {stats.length > 0 && (
-            <div className="mt-3.5 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5 sm:mt-3.5 sm:gap-2">
               {stats.map((stat) => (
                 <Badge key={stat.label} tone={stat.tone} size="md">
                   <span className="font-normal opacity-70">{stat.label}</span>
@@ -50,7 +50,7 @@ export function ProfileHeader({
       {fields.length > 0 &&
         (collapsible ? (
           <details open={defaultOpen} className="group border-t border-line">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-[12px] font-semibold text-muted transition hover:text-ink lg:px-6">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[12px] font-semibold text-muted transition hover:text-ink sm:px-5 lg:px-6">
               Full profile
               <span
                 aria-hidden="true"
@@ -59,13 +59,13 @@ export function ProfileHeader({
                 ▼
               </span>
             </summary>
-            <div className="border-t border-line bg-canvas/50 px-5 py-5 lg:px-6">
-              <DefinitionList items={fields} columns={4} />
+            <div className="border-t border-line bg-canvas/50 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
+              <DefinitionList items={fields} columns={2} />
             </div>
           </details>
         ) : (
-          <div className="border-t border-line bg-canvas/50 px-5 py-5 lg:px-6">
-            <DefinitionList items={fields} columns={4} />
+          <div className="border-t border-line bg-canvas/50 px-4 py-4 sm:px-5 sm:py-5 lg:px-6">
+            <DefinitionList items={fields} columns={2} />
           </div>
         ))}
     </Card>

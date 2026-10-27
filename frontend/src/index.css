@@ -204,7 +204,7 @@
   }
 
   .card-header {
-    @apply flex items-start justify-between gap-4 border-b border-line/60 px-6 py-4;
+    @apply flex flex-wrap items-start justify-between gap-3 border-b border-line/60 px-4 py-3 sm:px-6 sm:py-4;
   }
 
   /* ── Forms & inputs ───────────────────────────────────────────── */
@@ -220,7 +220,7 @@
   /* ── Typography — hero & page headers ─────────────────────────── */
 
   .hero-title {
-    @apply font-display text-[26px] font-semibold leading-tight tracking-[-0.02em] text-ink lg:text-[30px];
+    @apply font-display text-[22px] font-semibold leading-tight tracking-[-0.02em] text-ink sm:text-[26px] lg:text-[30px];
   }
 
   .hero-subtitle {
@@ -262,7 +262,7 @@
   }
 
   .table-th {
-    @apply px-6 py-3 text-[11px] font-semibold uppercase tracking-[.07em] text-muted-soft;
+    @apply px-3 py-3 text-[11px] font-semibold uppercase tracking-[.07em] text-muted-soft sm:px-6;
   }
 
   .table-row {
@@ -274,7 +274,7 @@
   }
 
   .table-td {
-    @apply px-6 py-4 text-[13px] text-ink;
+    @apply px-3 py-3 text-[12px] text-ink sm:px-6 sm:py-4 sm:text-[13px];
   }
 
   /* ── Badges & alerts ──────────────────────────────────────────── */

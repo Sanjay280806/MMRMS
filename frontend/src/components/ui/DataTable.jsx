@@ -10,8 +10,8 @@ export function DataTable({ columns, rows, rowKey, empty, onRowClick, className 
   const align = { right: 'text-right', center: 'text-center' };
 
   return (
-    <div className={cx('overflow-x-auto', className)}>
-      <table className="w-full min-w-[540px] border-collapse text-left">
+    <div className={cx('w-full overflow-x-auto -mx-0', className)}>
+      <table className="w-full min-w-[480px] border-collapse text-left">
         <thead className="table-head">
           <tr>
             {columns.map((col) => (

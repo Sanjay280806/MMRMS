@@ -50,17 +50,19 @@ export async function api(path, { method = 'GET', body, auth = true, _retry = 0 
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch (networkErr) {
-    // Network error (server not reachable) — retry up to 3 times with backoff
-    if (_retry < 3) {
-      await new Promise((r) => setTimeout(r, 500 * Math.pow(2, _retry)));
+    // Network error (server not reachable) — retry up to 5 times with backoff.
+    // This covers ECONNREFUSED on cold start before the backend is ready.
+    if (_retry < 5) {
+      await new Promise((r) => setTimeout(r, 800 * Math.pow(1.8, _retry)));
       return api(path, { method, body, auth, _retry: _retry + 1 });
     }
     throw new ApiError(0, 'Could not reach the server. Please try again.', null);
   }
 
-  // Transient gateway errors from proxy (backend not yet ready) — retry up to 3 times
-  if ((response.status === 502 || response.status === 503 || response.status === 504) && _retry < 3) {
-    await new Promise((r) => setTimeout(r, 500 * Math.pow(2, _retry)));
+  // Transient gateway errors from proxy (backend not yet ready) — retry up to 5 times.
+  // 503 is what our vite proxy emits on ECONNREFUSED/ECONNRESET (cold-start).
+  if ((response.status === 502 || response.status === 503 || response.status === 504) && _retry < 5) {
+    await new Promise((r) => setTimeout(r, 800 * Math.pow(1.8, _retry)));
     return api(path, { method, body, auth, _retry: _retry + 1 });
   }
 
