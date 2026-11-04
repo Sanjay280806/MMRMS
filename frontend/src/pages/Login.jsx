@@ -16,6 +16,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: context } = useResource('/auth/context');
+  const { data: msConfig } = useResource('/auth/microsoft/config');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +24,15 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [lockedFor, setLockedFor] = useState(0);
+
+  // Check URL query parameters for OAuth redirect results or errors
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const oauthError = params.get('error') || params.get('oauth_error');
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+    }
+  }, [location.search]);
 
   // Tick the lockout countdown returned by the API.
   useEffect(() => {
@@ -66,6 +76,8 @@ export default function Login() {
       setSubmitting(false);
     }
   }
+
+  const msConfigured = Boolean(msConfig?.configured);
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -148,7 +160,20 @@ export default function Login() {
             <span className="h-px flex-1 bg-line" />
           </div>
 
-          <Button variant="secondary" size="lg" disabled title="Single sign-on is not configured">
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            onClick={() => {
+              window.location.href = '/api/auth/microsoft/login';
+            }}
+            disabled={!msConfigured}
+            title={
+              msConfigured
+                ? 'Sign in with your institutional Microsoft 365 account'
+                : 'Single sign-on is not configured (set AZURE_CLIENT_ID and AZURE_CLIENT_SECRET in backend/.env)'
+            }
+          >
             <MicrosoftMark />
             Continue with Microsoft
           </Button>

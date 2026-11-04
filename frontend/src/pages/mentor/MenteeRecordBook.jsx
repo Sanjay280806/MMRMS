@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import { api } from '../../api/client.js';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DashboardSkeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
 import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Card } from '../../components/ui/Card.jsx';
+import { SectionCard } from '../../components/ui/SectionCard.jsx';
+import { MessageThread } from '../../components/dashboard/MessageThread.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
@@ -26,7 +29,7 @@ const TABS = [
   { value: 'profile', label: 'Profile & Background' },
   { value: 'academics', label: 'Academics' },
   { value: 'growth', label: 'Growth & Career' },
-  { value: 'support', label: 'Parent Interactions' },
+  { value: 'support', label: 'Parent Log & Messages' },
   { value: 'meetings', label: 'Meeting Log' },
 ];
 
@@ -37,6 +40,7 @@ const TABS = [
  */
 export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
   const [tab, setTab] = useState(initialTab);
+  const [chatMessages, setChatMessages] = useState([]);
 
   useEffect(() => {
     if (initialTab) {
@@ -45,6 +49,35 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
   }, [menteeId, initialTab]);
 
   const { data, loading, error } = useResource(`/mentor/me/mentees/${menteeId}`);
+
+  useEffect(() => {
+    if (data?.support?.messages) {
+      setChatMessages(data.support.messages);
+    }
+  }, [data?.support?.messages]);
+
+  useEffect(() => {
+    if (!menteeId) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await api(`/mentor/me/mentees/${menteeId}/messages`);
+        if (Array.isArray(res?.messages)) {
+          setChatMessages(res.messages);
+        }
+      } catch {
+        // quiet fallback
+      }
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [menteeId]);
+
+  async function handleSendMentorMessage(text) {
+    const msg = await api(`/mentor/me/mentees/${menteeId}/messages`, {
+      method: 'POST',
+      body: { text },
+    });
+    setChatMessages((prev) => [...prev, msg]);
+  }
 
   if (error) {
     return (
@@ -163,8 +196,20 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
       )}
 
       {tab === 'support' && (
-        <div className="space-y-5">
+        <div className="grid gap-5 lg:grid-cols-2 items-start">
           <ParentInteractionLog parentInteractions={data.parentInteractions} />
+          <SectionCard
+            title="Direct Messages"
+            subtitle={`Chat with ${data.identity.name}`}
+            className="flex flex-col h-full"
+            bodyClassName="flex flex-col flex-1 p-5"
+          >
+            <MessageThread
+              messages={chatMessages}
+              selfRole="mentor"
+              onSend={handleSendMentorMessage}
+            />
+          </SectionCard>
         </div>
       )}
 

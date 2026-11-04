@@ -13,6 +13,7 @@ import { StatTile } from '../../components/ui/StatTile.jsx';
 import { useResource } from '../../hooks/useResource.js';
 import { ExcelUploadSection } from './ExcelUploadSection.jsx';
 import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
+import { MentorAssignmentTool } from '../../components/assignment/MentorAssignmentTool.jsx';
 import { MentorDashboardModal } from '../../components/oversight/MentorDashboardModal.jsx';
 
 const titles = {
@@ -22,7 +23,7 @@ const titles = {
   },
   coordinator: {
     dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset',
-    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', reassignment: 'Mentor Reassignment Tool',
+    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', assignment: 'Mentor Assignment Tool', reassignment: 'Mentor Reassignment Tool',
     audit: 'Audit & Accreditation Readiness',
   },
 };
@@ -85,7 +86,7 @@ function OversightConsole({ role }) {
     ]
     : [
       { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'assignment', label: 'Mentor Assignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -136,7 +137,6 @@ function profileStats(role, stats) {
       { label: 'Students', value: stats.students, tone: 'indigo' },
       { label: 'Mentors', value: stats.mentors, tone: 'indigo' },
       { label: 'Mentor compliance', value: `${stats.mentorCompliance}%`, tone: stats.mentorCompliance >= 80 ? 'green' : 'amber' },
-      { label: 'At risk', value: stats.atRisk, tone: stats.atRisk ? 'rose' : 'green' },
     ];
 }
 
@@ -149,7 +149,7 @@ function profileFields(role, person, stats) {
   const yearFields = [
     { key: 'Programme', value: person.programme }, { key: 'Year', value: person.year }, { key: 'Email ID', value: person.email },
     { key: 'Mobile number', value: person.mobile }, { key: 'Room', value: person.room }, { key: 'Students tracked', value: String(stats.students) },
-    { key: 'Mentors monitored', value: String(stats.mentors) }, { key: 'Planned year events', value: String(stats.plannedEvents) },
+    { key: 'Mentors monitored', value: String(stats.mentors) }, /* { key: 'Planned year events', value: String(stats.plannedEvents) }, */
   ];
   return role === 'advisor' ? classFields : yearFields;
 }
@@ -172,6 +172,7 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
       {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
       {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
       {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
       {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
 
@@ -227,7 +228,7 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
       </div>
     </div>
 
-    <div className="grid gap-5 xl:grid-cols-2">
+<div className="grid gap-5 xl:grid-cols-2">
       <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
       <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
     </div>
@@ -329,9 +330,14 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
             </div>
           )}
           {!compact && onNavigate && (
-            <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
-              ⚡ Mentor Reassignment Tool
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="xs" onClick={() => onNavigate('assignment')}>
+                ＋ Mentor Assignment
+              </Button>
+              <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
+                ⚡ Mentor Reassignment Tool
+              </Button>
+            </div>
           )}
         </div>
       }
@@ -508,6 +514,7 @@ function AdvisorOperations({ data, reload, composer, setComposer }) {
   </div>;
 }
 
+/*
 function CoordinatorOperations({ data, reload, composer, setComposer }) {
   return <div className="space-y-5">
     {composer === 'event' && <EventForm onDone={() => { setComposer(null); reload(); }} onCancel={() => setComposer(null)} />}
@@ -520,6 +527,7 @@ function CoordinatorOperations({ data, reload, composer, setComposer }) {
     </SectionTable>
   </div>;
 }
+*/
 
 function AuditPanel({ rows, tracker }) {
   return <div className="space-y-5">
@@ -561,8 +569,10 @@ function GrievanceForm({ students, onDone, onCancel }) {
   return <SectionCard title="Raise Grievance" subtitle="Log a concern and route it through the class-advisor workflow"><form className="space-y-4" onSubmit={submit}><label className="block text-[12.5px] font-semibold text-muted-strong">Student<select className="mt-1.5 w-full rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-3 text-[13.5px] text-ink" value={studentId} onChange={(event) => setStudentId(event.target.value)} required>{students.map((student) => <option key={student.id} value={student.id}>{student.rollNumber} · {student.name}</option>)}</select></label><div className="grid gap-4 sm:grid-cols-3"><TextField label="Category" value={category} onChange={(event) => setCategory(event.target.value)} /><TextField label="Priority" value={priority} onChange={(event) => setPriority(event.target.value)} /><TextField label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} required /></div>{error && <p className="text-sm text-bad-ink">{error}</p>}<div className="flex gap-2"><Button type="submit" size="sm" loading={saving}>Log grievance</Button><Button size="sm" variant="secondary" onClick={onCancel}>Cancel</Button></div></form></SectionCard>;
 }
 
+/*
 function EventForm({ onDone, onCancel }) {
   const [type, setType] = useState('PTM'); const [title, setTitle] = useState(''); const [date, setDate] = useState(''); const [notes, setNotes] = useState(''); const [error, setError] = useState(''); const [saving, setSaving] = useState(false);
   async function submit(event) { event.preventDefault(); setSaving(true); setError(''); try { await api('/coordinator/me/events', { method: 'POST', body: { type, title, date, notes } }); onDone(); } catch (err) { setError(err.message); } finally { setSaving(false); } }
   return <SectionCard title="Plan Year Activity" subtitle="Add a PTM, orientation, review meeting or another coordination event"><form className="space-y-4" onSubmit={submit}><div className="grid gap-4 sm:grid-cols-3"><TextField label="Type" value={type} onChange={(event) => setType(event.target.value)} /><TextField label="Title" value={title} onChange={(event) => setTitle(event.target.value)} required /><TextField label="Date" placeholder="22 Aug 2026" value={date} onChange={(event) => setDate(event.target.value)} required /></div><TextArea label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} />{error && <p className="text-sm text-bad-ink">{error}</p>}<div className="flex gap-2"><Button type="submit" size="sm" loading={saving}>Save activity</Button><Button size="sm" variant="secondary" onClick={onCancel}>Cancel</Button></div></form></SectionCard>;
 }
+*/

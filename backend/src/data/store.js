@@ -1208,11 +1208,44 @@ export function addSupportRequest(studentId, { subject, category, priority }) {
   return request;
 }
 
-export function addMessage(studentId, text) {
-  const student = students.get(studentId);
-  if (!student) return null;
-  student.messages ??= [];
-  const message = { id: nextId('msg'), from: 'student', text, time: 'Just now' };
-  student.messages.push(message);
+export function getStudentMessages(id) {
+  let target = students.get(id);
+  if (!target) {
+    const mentee = mentees.find((m) => m.id === id || m.rollNumber === id);
+    if (mentee?.recordBook) target = mentee.recordBook;
+    else if (mentee) target = mentee;
+  }
+  if (!target && id === 's-1') {
+    target = signedInMentee?.recordBook || students.get('s-1');
+  }
+  return target?.messages ?? [];
+}
+
+export function addMessage(id, text, from = 'student') {
+  let target = students.get(id);
+  if (!target) {
+    const mentee = mentees.find((m) => m.id === id || m.rollNumber === id);
+    if (mentee?.recordBook) target = mentee.recordBook;
+    else if (mentee) {
+      mentee.messages ??= [];
+      target = mentee;
+    }
+  }
+  if (!target && id === 's-1') {
+    target = signedInMentee?.recordBook || students.get('s-1');
+  }
+  if (!target) return null;
+  target.messages ??= [];
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const message = {
+    id: nextId('msg'),
+    from,
+    text,
+    time: `${dateStr}, ${timeStr}`,
+    timestamp: now.toISOString(),
+  };
+  target.messages.push(message);
   return message;
 }

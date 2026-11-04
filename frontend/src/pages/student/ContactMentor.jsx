@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../api/client.js';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -28,6 +28,28 @@ const DEFAULT_PRIORITIES = ['Low', 'Medium', 'High'];
  */
 export function ContactMentor({ support, mentor, onMessageAdded }) {
   const { data: concernsData, loading: concernsLoading, reload: reloadConcerns } = useResource('/student/me/concerns');
+  const [messages, setMessages] = useState(support?.messages || []);
+
+  useEffect(() => {
+    if (support?.messages) {
+      setMessages(support.messages);
+    }
+  }, [support?.messages]);
+
+  // Real-time polling for new messages every 3.5 seconds
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await api('/student/me/messages');
+        if (Array.isArray(res?.messages)) {
+          setMessages(res.messages);
+        }
+      } catch {
+        // silent fallback
+      }
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
 
   const categories = concernsData?.categories || support?.categories || DEFAULT_CATEGORIES;
   const priorities = concernsData?.priorities || support?.priorities || DEFAULT_PRIORITIES;
@@ -160,14 +182,19 @@ export function ContactMentor({ support, mentor, onMessageAdded }) {
         </SectionCard>
 
         {/* Message Thread */}
-        <SectionCard title="Direct Messages" subtitle={mentor?.name}>
+        <SectionCard
+          title="Direct Messages"
+          subtitle={mentor?.name}
+          className="flex flex-col h-full"
+          bodyClassName="flex flex-col flex-1 p-5"
+        >
           <MessageThread
-            messages={support?.messages || []}
+            messages={messages}
             selfRole="student"
             onSend={async (text) => {
-              if (onMessageAdded) {
-                onMessageAdded(await api('/student/me/messages', { method: 'POST', body: { text } }));
-              }
+              const newMsg = await api('/student/me/messages', { method: 'POST', body: { text } });
+              setMessages((prev) => [...prev, newMsg]);
+              if (onMessageAdded) onMessageAdded(newMsg);
             }}
           />
         </SectionCard>

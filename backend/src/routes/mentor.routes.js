@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
 import {
+  addMessage,
   addMentorMeeting,
   findConcernById,
   findMenteeById,
   findMentorById,
+  getStudentMessages,
   listConcerns,
   listMentees,
   resolveConcern,
@@ -83,6 +85,28 @@ router.get('/me/mentees/:menteeId', (req, res, next) => {
     return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
   }
   res.json(buildMenteeRecordBook(mentee));
+});
+
+/** Direct messaging with a mentee */
+router.get('/me/mentees/:menteeId/messages', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const mentee = findMenteeById(req.params.menteeId);
+  if (!mentee || mentee.mentorId !== mentor.id) {
+    return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
+  }
+  res.json({ messages: getStudentMessages(mentee.id) });
+});
+
+router.post('/me/mentees/:menteeId/messages', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const mentee = findMenteeById(req.params.menteeId);
+  if (!mentee || mentee.mentorId !== mentor.id) {
+    return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
+  }
+  const text = req.body?.text?.trim();
+  if (!text) return next(new HttpError(400, 'Message text is required'));
+  const msg = addMessage(mentee.id, text, 'mentor');
+  res.status(201).json(msg);
 });
 
 /** Section 12 — write a structured mentoring session and its follow-up. */

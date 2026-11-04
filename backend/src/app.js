@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import authRoutes from './routes/auth.routes.js';
 import refreshRoutes from './routes/refresh.routes.js';
+import microsoftAuthRoutes from './routes/microsoftAuth.routes.js';
 import studentRoutes from './routes/student.routes.js';
 import mentorRoutes from './routes/mentor.routes.js';
 import advisorRoutes from './routes/advisor.routes.js';
@@ -51,6 +52,7 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/auth', refreshRoutes);
+  app.use('/api/auth/microsoft', microsoftAuthRoutes);
   app.use('/api/student', studentRoutes);
   app.use('/api/mentor', mentorRoutes);
   app.use('/api/advisor', advisorRoutes);

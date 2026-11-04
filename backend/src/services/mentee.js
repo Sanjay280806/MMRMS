@@ -428,9 +428,15 @@ export function menteeToStudent(mentee) {
 
 /** The mentor's copy of a mentee's record book. */
 export function buildMenteeRecordBook(mentee) {
-  const book = buildStudentRecordBook(menteeToStudent(mentee));
+  const student = mentee.recordBook || menteeToStudent(mentee);
+  const book = buildStudentRecordBook(student);
+  const messages = mentee.recordBook?.messages ?? mentee.messages ?? book.support?.messages ?? [];
   return {
     ...book,
+    support: {
+      ...book.support,
+      messages,
+    },
     roster: {
       flagReason: mentee.flagReason ?? null,
       suggestedAction: mentee.suggestedAction ?? null,

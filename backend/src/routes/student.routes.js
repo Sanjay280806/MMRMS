@@ -13,6 +13,7 @@ import {
   addParticipation,
   addSupportRequest,
   findStudentById,
+  getStudentMessages,
   listConcerns,
   updateActionItem,
   updateReadiness,
@@ -310,11 +311,16 @@ router.post('/me/support-requests', (req, res, next) => {
   );
 });
 
+router.get('/me/messages', (req, res) => {
+  const student = currentStudent(req);
+  res.json({ messages: getStudentMessages(student.id) });
+});
+
 router.post('/me/messages', (req, res, next) => {
   const student = currentStudent(req);
   const text = req.body?.text?.trim();
   if (!text) return next(new HttpError(400, 'Message text is required'));
-  res.status(201).json(addMessage(student.id, text));
+  res.status(201).json(addMessage(student.id, text, 'student'));
 });
 
 /* ── Concerns lifecycle (Q6) ─────────────────────────────────────────── */
