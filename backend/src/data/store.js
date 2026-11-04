@@ -257,7 +257,7 @@ export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discon
     }
   }
 
-  // Create the new Year Coordinator record
+  // Create the new Mentor Coordinator record
   const newYcId = nextId('yc');
   const newEmail = String(newFaculty.email).toLowerCase().trim();
   const cohortName = oldCoordinator?.cohortName || `${cId} BCS`;
@@ -270,7 +270,7 @@ export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discon
     email: newEmail,
     mobile: newFaculty.mobile || '+91 98430 00000',
     department: newFaculty.department || 'Computer Science and Engineering',
-    designation: newFaculty.designation || 'Year Coordinator',
+    designation: newFaculty.designation || 'Mentor Coordinator',
     year: yearName,
     cohortId: cId,
     cohortName,
@@ -298,7 +298,7 @@ export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discon
     existingUser.cohortId = cId;
     existingUser.archived = false;
     existingUser.status = 'Active';
-    existingUser.designation = `Year Coordinator · ${cohortName}`;
+    existingUser.designation = `Mentor Coordinator · ${cohortName}`;
   } else {
     existingUser = {
       id: nextId('u'),
@@ -307,7 +307,7 @@ export function reassignYearCoordinator({ cohortId, newFaculty, reason = 'Discon
       email: newEmail,
       passwordHash: getDefaultStudentPasswordHash(),
       department: newCoordinator.department,
-      designation: `Year Coordinator · ${cohortName}`,
+      designation: `Mentor Coordinator · ${cohortName}`,
       coordinatorId: newYcId,
       cohortId: cId,
       archived: false,
@@ -372,7 +372,7 @@ export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
         toMentorId: target.id,
         toMentorName: target.name,
         transferredAt: new Date().toISOString(),
-        reason: 'Assigned by Year Coordinator',
+        reason: 'Assigned by Mentor Coordinator',
       });
     }
 
@@ -426,7 +426,7 @@ export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
   };
 }
 
-export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-deleted by Year Coordinator') {
+export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-deleted by Mentor Coordinator') {
   const mentor = mentors.find((m) => m.id === mentorId);
   if (!mentor) throw new Error(`Mentor "${mentorId}" not found`);
   mentor.archived = Boolean(softDelete);
@@ -605,7 +605,7 @@ export function listArchivedStaff() {
     .filter((yc) => yc.archived)
     .map((yc) => ({
       ...yc,
-      role: 'Year Coordinator',
+      role: 'Mentor Coordinator',
       auditPreservedRecords: {
         eventsCount: coordinatorEvents.filter((e) => e.owner === yc.name).length,
         uploadLogsCount: uploadHistory.filter((u) => u.uploadedBy === yc.name).length,

@@ -181,7 +181,7 @@ export default function HodConsole() {
         )}
       </div>
 
-      {/* Reassign Year Coordinator Modal */}
+      {/* Reassign Mentor Coordinator Modal */}
       {reassigningCohort && (
         <ReassignYcModal
           cohort={reassigningCohort}
@@ -235,7 +235,7 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
         <StatTile
           label="Faculty Mentors"
           value={stats.totalMentors}
-          subtext={`${stats.totalCoordinators} year coordinators`}
+          subtext={`${stats.totalCoordinators} mentor coordinators`}
           tone="slate"
         />
       </div>
@@ -243,7 +243,7 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
       {/* Cohort Comparison Cards */}
       <SectionCard
         title="Active Cohort Governance"
-        subtitle="Cross-cohort performance overview mapped to Year Coordinators"
+        subtitle="Cross-cohort performance overview mapped to Mentor Coordinators"
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {cohorts.map((cohort) => (
@@ -269,7 +269,7 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
 
               <div className="mt-4 space-y-2 border-t border-line/60 pt-3 text-[12px]">
                 <div className="flex justify-between">
-                  <span className="text-muted">Year Coordinator:</span>
+                  <span className="text-muted">Mentor Coordinator:</span>
                   <span className="font-medium text-ink">{cohort.yearCoordinator}</span>
                 </div>
                 <div className="flex justify-between">
@@ -308,7 +308,7 @@ function OverviewSection({ data, onSelectCohort, onSelectMentor }) {
   );
 }
 
-/* ── Section: Cohorts & Year Coordinators ────────────────────────────────── */
+/* ── Section: Cohorts & Mentor Coordinators ────────────────────────────────── */
 
 function CohortsSection({
   cohorts,
@@ -341,7 +341,7 @@ function CohortsSection({
     <div className="space-y-6">
       <SectionTable
         title="Departmental Cohorts Directory"
-        subtitle="Manage cohorts, assigned Year Coordinators, and batch-level metrics"
+        subtitle="Manage cohorts, assigned Mentor Coordinators, and batch-level metrics"
         action={
           <div className="flex items-center gap-2">
             <Badge tone="indigo">{cohorts.length} Cohorts Active</Badge>
@@ -350,7 +350,7 @@ function CohortsSection({
                 size="xs"
                 variant="secondary"
                 onClick={() => onReassignYc(selectedCohort || cohorts[0])}
-                title="Reassign Year Coordinator for an active cohort"
+                title="Reassign Mentor Coordinator for an active cohort"
               >
                 ⚡ Reassign YC
               </Button>
@@ -375,7 +375,7 @@ function CohortsSection({
             },
             {
               key: 'yc',
-              header: 'Year Coordinator',
+              header: 'Mentor Coordinator',
               render: (c) => (
                 <div>
                   <p className="font-medium text-ink">{c.yearCoordinator}</p>
@@ -435,7 +435,7 @@ function CohortsSection({
                       size="xs"
                       variant="secondary"
                       onClick={() => onReassignYc(c)}
-                      title="Reassign Year Coordinator for this cohort"
+                      title="Reassign Mentor Coordinator for this cohort"
                     >
                       Reassign YC
                     </Button>
@@ -447,10 +447,10 @@ function CohortsSection({
         />
       </SectionTable>
 
-      {/* Archived Year Coordinators & Audit Trail */}
+      {/* Archived Mentor Coordinators & Audit Trail */}
       {archivedCoordinators.length > 0 && (
         <SectionTable
-          title="Archived Year Coordinators & Succession Audit Trail"
+          title="Archived Mentor Coordinators & Succession Audit Trail"
           subtitle="Departing coordinators whose login accounts have been soft-deleted while 100% of historical events, uploads, and records are preserved"
           action={<Badge tone="amber">{archivedCoordinators.length} Archived Accounts</Badge>}
         >
@@ -521,7 +521,7 @@ function CohortsSection({
       {selectedCohort && (
         <SectionTable
           title={`Students in ${selectedCohort.cohortName} (${selectedCohort.cohortId})`}
-          subtitle={`Year Coordinator: ${selectedCohort.yearCoordinator} · Showing ${cohortStudents.length} enrolled students`}
+          subtitle={`Mentor Coordinator: ${selectedCohort.yearCoordinator} · Showing ${cohortStudents.length} enrolled students`}
           action={
             <div className="flex items-center gap-2">
               {onReassignYc && (
@@ -529,7 +529,7 @@ function CohortsSection({
                   size="xs"
                   variant="secondary"
                   onClick={() => onReassignYc(selectedCohort)}
-                  title="Reassign Year Coordinator for this cohort"
+                  title="Reassign Mentor Coordinator for this cohort"
                 >
                   ⚡ Reassign YC
                 </Button>

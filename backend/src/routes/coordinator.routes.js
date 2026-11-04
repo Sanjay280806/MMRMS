@@ -115,7 +115,7 @@ router.post('/me/mentors/reassign', (req, res, next) => {
       targetMentorId,
       menteeIds: menteeIds || [],
       archiveDepartingMentor: Boolean(archiveDepartingMentor),
-      reason: reason?.trim() || 'Mentor Discontinued / Reassigned by Year Coordinator',
+      reason: reason?.trim() || 'Mentor Discontinued / Reassigned by Mentor Coordinator',
     });
     res.json(result);
   } catch (err) {
