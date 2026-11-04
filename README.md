@@ -40,7 +40,7 @@ Password for all of them: `mmrms@2026`
 | Mentor | `bharathi.priya@kct.ac.in` | Mentor console + every mentee's record book |
 | Mentor | `asmitha.shree@kct.ac.in` | Mentor console for the KCT01765 group |
 | Class Advisor | `suganthi@kct.ac.in` | Class advisor console |
-| Year Coordinator | `anitha.p@kct.ac.in` | Year coordinator console |
+| Mentor Coordinator | `anitha.p@kct.ac.in` | Mentor coordinator console |
 
 Five consecutive failed sign-ins lock an email for 15 minutes, with a live
 countdown from the API.
@@ -100,9 +100,9 @@ student directory, attendance and academic watch lists, a transparent discipline
 register, mentor coordination tracker, class committee/feedback meeting log, and
 grievance workflow (raise, refer, resolve, close).
 
-### Year coordinator console
+### Mentor coordinator console
 
-The year coordinator has a year-wide dashboard for student risk, mentor
+The mentor coordinator has a year-wide dashboard for student risk, mentor
 compliance, attendance, academic tracker, PTM/orientation/review calendar,
 external-event OD approvals, and audit/accreditation-ready evidence coverage.
 
@@ -173,7 +173,7 @@ can't disagree about what "at risk" means.
 `backend/src/data/seed.js` holds every fixture in record-book shape, including
 the provided 40-student 2024 BCS roster: KCT01763 is assigned to **Bharathi
 Priya** and KCT01765 to **Asmitha Shree**. **Suganthi** is the class advisor and
-**Anitha P** is the year coordinator.
+**Anitha P** is the mentor coordinator.
 `store.js` clones it into memory at boot; writes persist for the life of the
 process. A mentee's record book is *derived* from a dozen roster facts by
 `services/mentee.js`, then passed through the **same builder** the signed-in
@@ -232,7 +232,7 @@ Removed as not in the record book:
 Added, each supporting a field the book already asks for:
 
 - **Register Number, Date of Birth, Parent/Guardian, Parent Contact, Address,
-  Year Coordinator** — cover-page fields the earlier build omitted.
+  Mentor Coordinator** — cover-page fields the earlier build omitted.
 - **Per-subject attendance** in Section 4, because Section 3's "Shortage" field
   has to name a subject.
 - **Running CGPA** in Section 2, derived from the GPA column rather than typed.

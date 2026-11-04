@@ -173,7 +173,7 @@ export default function MentorConsole() {
             { key: 'Email ID', value: mentor.email },
             { key: 'Mobile Number', value: mentor.mobile },
             { key: 'Cabin', value: mentor.cabin },
-            { key: 'Year Coordinator', value: mentor.yearCoordinator },
+            { key: 'Mentor Coordinator', value: mentor.yearCoordinator },
             { key: 'Batches Mentored', value: mentor.batches?.join(', ') },
             { key: 'Review Cycle', value: stats.reviewCycle },
             { key: 'Record Books Complete', value: `${stats.recordBooksComplete} of ${stats.recordBooksTotal}` },

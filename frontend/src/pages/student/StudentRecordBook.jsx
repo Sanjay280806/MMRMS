@@ -190,7 +190,7 @@ export default function StudentRecordBook() {
             { key: 'Mentor Since', value: identity.mentorSince },
             { key: 'Address', value: identity.address, span: true },
             { key: 'Mentor', value: identity.mentor && `${identity.mentor.name} · ${identity.mentor.email}` },
-            { key: 'Year Coordinator', value: identity.yearCoordinator },
+            { key: 'Mentor Coordinator', value: identity.yearCoordinator },
           ]}
         />
       }

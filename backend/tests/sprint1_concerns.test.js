@@ -68,7 +68,7 @@ ok(!!mentorToken, 'Mentor login succeeds');
 
 const { body: clb } = await post('/api/auth/login', { email: 'anitha.p@kct.ac.in', password: 'mmrms@2026' });
 const coordinatorToken = extractToken(clb);
-ok(!!coordinatorToken, 'Year Coordinator login succeeds');
+ok(!!coordinatorToken, 'Mentor Coordinator login succeeds');
 
 // 2. Student retrieves concerns
 console.log('\n[Student Concerns: List]');
@@ -146,8 +146,8 @@ const closedConcern = ackBody?.data ?? ackBody;
 ok(closedConcern?.status === 'CLOSED', 'Concern status transitioned to CLOSED');
 ok(!!closedConcern?.acknowledgedAt, 'acknowledgedAt timestamp set');
 
-// 7. Year Coordinator read-only mentor dashboard
-console.log('\n[Year Coordinator: Read-Only Mentor Dashboard]');
+// 7. Mentor Coordinator read-only mentor dashboard
+console.log('\n[Mentor Coordinator: Read-Only Mentor Dashboard]');
 const { res: ycdRes, body: ycdBody } = await get('/api/coordinator/me/mentors/m-1/dashboard', coordinatorToken);
 ok(ycdRes.status === 200, 'GET /api/coordinator/me/mentors/m-1/dashboard => 200');
 const ycDashboard = ycdBody?.data ?? ycdBody;

@@ -323,7 +323,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
                 </svg>
               </span>
               <h2 className="font-display text-[18px] font-semibold text-ink">Institutional Excel & ERP Batch Uploader</h2>
-              <Badge tone="indigo">Year Coordinator</Badge>
+              <Badge tone="indigo">Mentor Coordinator</Badge>
             </div>
             <p className="mt-1 text-[13px] text-muted">
               Import student master rosters, attendance data, or academic marks from MyCamu ERP (.xlsx, .xls, .csv).
@@ -782,7 +782,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
       {activeTab === 'history' && (
         <SectionTable
           title="Upload History & Audit Log"
-          subtitle="Complete record of all spreadsheets processed by Year Coordinators"
+          subtitle="Complete record of all spreadsheets processed by Mentor Coordinators"
           action={
             <Button size="sm" variant="secondary" onClick={loadHistory} loading={historyLoading}>
               Refresh Log

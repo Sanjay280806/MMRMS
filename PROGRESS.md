@@ -16,7 +16,7 @@ The system supports four distinct role-based perspectives:
 1. **Student** — Manages their personal 12-section record book, tracks SMART goals, logs achievements, and submits support requests.
 2. **Mentor** — Manages assigned mentees, conducts and records mentoring sessions, monitors risk indicators, sets SMART goals, and logs parent interactions.
 3. **Class Advisor** — Oversees class-wide academic health, monitors attendance & discipline watchlists, conducts class meetings, and manages student grievances.
-4. **Year Coordinator** — Monitors year-level compliance, tracks mentor meeting completion rates, approves On-Duty (OD) requests, schedules department events, and exports NAAC/NBA audit evidence.
+4. **Mentor Coordinator** — Monitors year-level compliance, tracks mentor meeting completion rates, approves On-Duty (OD) requests, schedules department events, and exports NAAC/NBA audit evidence.
 
 ---
 
@@ -49,7 +49,7 @@ The system supports four distinct role-based perspectives:
     - **Bharathi Priya** (`bharathi.priya@kct.ac.in`) — Mentor (33 Mentees, Section A).
     - **Asmitha Shree** (`asmitha.shree@kct.ac.in`) — Mentor (7 Mentees, Section B).
     - **Suganthi** (`suganthi@kct.ac.in`) — Class Advisor (2024 BCS).
-    - **Anitha P** (`anitha.p@kct.ac.in`) — Year Coordinator (2024 BCS).
+    - **Anitha P** (`anitha.p@kct.ac.in`) — Mentor Coordinator (2024 BCS).
   - Initialized student records with SGPA/CGPA history, attendance logs, arrear history, skill self-assessments, certifications, and well-being indicators.
 
 ---
@@ -94,7 +94,7 @@ The system supports four distinct role-based perspectives:
 
 ---
 
-### Phase 5: Oversight Console (Class Advisor & Year Coordinator)
+### Phase 5: Oversight Console (Class Advisor & Mentor Coordinator)
 - **What was done:** Integrated institutional oversight for class care, department administration, and accreditation compliance.
 - **How it was done:**
   - **Class Advisor View (`AdvisorConsole`):**
@@ -102,7 +102,7 @@ The system supports four distinct role-based perspectives:
     - Attendance & academic watchlists for proactive intervention.
     - Class meetings management.
     - Student Grievance Lifecycle (Raise -> Refer to Coordinator -> Resolve -> Close).
-  - **Year Coordinator View (`CoordinatorConsole`):**
+  - **Mentor Coordinator View (`CoordinatorConsole`):**
     - Year-wide overview & program-level health analytics.
     - Mentor Compliance Tracker monitoring meeting completion percentages for all department mentors.
     - Institutional Events Calendar (Parent-Teacher Meetings, Reviews, Orientations).
@@ -116,7 +116,7 @@ The system supports four distinct role-based perspectives:
 - **How it was done:**
   - Implemented dynamic, time-aware greetings in `Topbar.jsx` (e.g., `"Good morning, Bharathi Priya"`, `"Good evening, Suganthi"`) across all role consoles.
   - Configured institutional details for **Kumaraguru College of Technology (KCT)**.
-  - Updated Year Coordinator references to **Anitha P** (`anitha.p@kct.ac.in`).
+  - Updated Mentor Coordinator references to **Anitha P** (`anitha.p@kct.ac.in`).
   - Optimized layout components (`ConsoleLayout`, `Sidebar`, `ProfileHeader`) for responsive desktop and mobile displays.
 
 ---

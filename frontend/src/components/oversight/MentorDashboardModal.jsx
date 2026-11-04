@@ -33,7 +33,7 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-brand-600">
-                  Year Coordinator · Mentor Read-Only Oversight
+                  Mentor Coordinator · Mentor Read-Only Oversight
                 </span>
                 {data?.cohortId && (
                   <Badge tone="indigo" size="sm">
