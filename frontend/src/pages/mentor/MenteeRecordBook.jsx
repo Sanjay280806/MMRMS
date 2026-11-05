@@ -23,6 +23,7 @@ import {
 } from '../../components/record/Growth.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
+import { ScheduleMeetingModal } from '../../components/meetings/ScheduleMeetingModal.jsx';
 import { useResource } from '../../hooks/useResource.js';
 
 const TABS = [
@@ -41,6 +42,7 @@ const TABS = [
 export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
   const [tab, setTab] = useState(initialTab);
   const [chatMessages, setChatMessages] = useState([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
     if (initialTab) {
@@ -48,7 +50,7 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
     }
   }, [menteeId, initialTab]);
 
-  const { data, loading, error } = useResource(`/mentor/me/mentees/${menteeId}`);
+  const { data, loading, error, reload } = useResource(`/mentor/me/mentees/${menteeId}`);
 
   useEffect(() => {
     if (data?.support?.messages) {
@@ -100,13 +102,25 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
 
   return (
     <div className="space-y-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="focus-ring rounded text-[12.5px] font-semibold text-muted transition hover:text-brand-500"
-      >
-        ← My Mentees
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          className="focus-ring rounded text-[12.5px] font-semibold text-muted transition hover:text-brand-500"
+        >
+          ← My Mentees
+        </button>
+        <Button
+          size="sm"
+          onClick={() => setShowScheduleModal(true)}
+          className="bg-[#464EB8] hover:bg-[#3b429f] text-white flex items-center gap-2 shadow-xs font-medium"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+          </svg>
+          Schedule Teams Meeting
+        </Button>
+      </div>
 
       <ProfileHeader
         initials={identity.initials}
@@ -215,8 +229,32 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
 
       {tab === 'meetings' && (
         <div className="space-y-5">
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => setShowScheduleModal(true)}
+              className="bg-[#464EB8] hover:bg-[#3b429f] text-white flex items-center gap-2 shadow-xs"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+              </svg>
+              + Schedule Meeting
+            </Button>
+          </div>
           <MeetingLog meetings={data.meetings} menteeName={data.identity.name} />
         </div>
+      )}
+
+      {showScheduleModal && (
+        <ScheduleMeetingModal
+          mentee={{ id: menteeId, name: identity.name, rollNumber: identity.rollNumber }}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => {
+            setShowScheduleModal(false);
+            setTab('meetings');
+            reload();
+          }}
+        />
       )}
     </div>
   );

@@ -99,6 +99,66 @@ export function findUserByEmail(email) {
   return null;
 }
 
+export function findOrCreateMicrosoftUser(email, profile = {}) {
+  const norm = String(email).toLowerCase().trim();
+  let user = findUserByEmail(norm);
+  if (user) return user;
+
+  // Auto-provision KCT institutional users signing in via Microsoft Entra ID
+  if (norm.endsWith('@kct.ac.in') || norm.endsWith('.kct.ac.in')) {
+    const rawName = profile.displayName || profile.givenName || norm.split('@')[0].replace(/[._]/g, ' ');
+    const formattedName = rawName.split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    const isStudent = /\d/.test(norm.split('@')[0]);
+    const id = nextId('u');
+
+    if (isStudent) {
+      const studentId = nextId('s');
+      user = {
+        id,
+        role: 'student',
+        name: formattedName.toUpperCase(),
+        email: norm,
+        passwordHash: bcrypt.hashSync('mmrms@2026', 10),
+        department: 'Computer Science and Engineering',
+        designation: 'Student',
+        studentId,
+      };
+      const studentProfile = clone(STUDENT_PROFILE);
+      studentProfile.id = studentId;
+      studentProfile.identity.name = formattedName.toUpperCase();
+      studentProfile.identity.email = norm;
+      studentProfile.identity.rollNumber = norm.split('@')[0].toUpperCase();
+      students.set(studentId, studentProfile);
+    } else {
+      const mentorId = nextId('m');
+      user = {
+        id,
+        role: 'mentor',
+        name: formattedName,
+        email: norm,
+        passwordHash: bcrypt.hashSync('mmrms@2026', 10),
+        department: 'Computer Science and Engineering',
+        designation: 'Faculty / Mentor',
+        mentorId,
+      };
+      mentors.push({
+        id: mentorId,
+        name: formattedName,
+        email: norm,
+        department: 'Computer Science and Engineering',
+        designation: 'Faculty / Mentor',
+        staffCode: `KCT${Math.floor(1000 + Math.random() * 9000)}`,
+        menteeCount: 0,
+      });
+    }
+
+    users.push(user);
+    return user;
+  }
+
+  return null;
+}
+
 export function findUserById(id) {
   return users.find((u) => u.id === id);
 }

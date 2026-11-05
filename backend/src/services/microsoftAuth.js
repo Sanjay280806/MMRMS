@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 
 const DEFAULT_TENANT = 'common';
 const GRAPH_ME_URL = 'https://graph.microsoft.com/v1.0/me';
-const DEFAULT_SCOPES = ['openid', 'profile', 'email', 'User.Read'];
+const DEFAULT_SCOPES = ['openid', 'profile', 'email', 'User.Read', 'OnlineMeetings.ReadWrite', 'Calendars.ReadWrite'];
 
 /**
  * Get the current Microsoft OAuth configuration from environment variables.

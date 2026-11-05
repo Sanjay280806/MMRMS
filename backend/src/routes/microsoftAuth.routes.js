@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ROLES } from '../data/seed.js';
-import { findUserByEmail, publicUser } from '../data/store.js';
+import { findOrCreateMicrosoftUser, findUserByEmail, publicUser } from '../data/store.js';
 import { signToken } from '../middleware/auth.js';
 import { signRefreshToken } from '../lib/token.js';
 import { HttpError } from '../middleware/error.js';
@@ -125,10 +125,10 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${frontendUrl}/login?error=${encodeURIComponent('No email address provided by Microsoft account.')}`);
     }
 
-    const user = findUserByEmail(email);
+    const user = findOrCreateMicrosoftUser(email, profile);
     if (!user) {
       return res.redirect(
-        `${frontendUrl}/login?error=${encodeURIComponent(`No MMRMS account associated with ${email}. Please sign in with your institutional credentials.`)}`
+        `${frontendUrl}/login?error=${encodeURIComponent(`Access restricted to @kct.ac.in accounts. No MMRMS account found for ${email}.`)}`
       );
     }
 
@@ -138,10 +138,21 @@ router.get('/callback', async (req, res) => {
       );
     }
 
+    user.msAccessToken = tokens.access_token;
+
     const accessToken = signToken(user);
     const refreshToken = signRefreshToken(user);
 
     setAuthCookies(req, res, accessToken, refreshToken);
+
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+    res.cookie('mmrms_ms_token', tokens.access_token, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
     res.clearCookie('mmrms_oauth_state');
 
     // Redirect to frontend with success flag
@@ -195,10 +206,21 @@ router.post('/exchange', async (req, res, next) => {
     }
 
     const role = ROLES.find((r) => r.key === user.role);
+    user.msAccessToken = tokens.access_token;
+
     const accessToken = signToken(user);
     const refreshToken = signRefreshToken(user);
 
     setAuthCookies(req, res, accessToken, refreshToken);
+
+    const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+    res.cookie('mmrms_ms_token', tokens.access_token, {
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
     res.clearCookie('mmrms_oauth_state');
 
     res.json({

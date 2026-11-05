@@ -22,6 +22,7 @@ import {
   summariseMentee,
 } from '../services/mentor.js';
 import { buildMenteeRecordBook } from '../services/mentee.js';
+import { createTeamsMeeting } from '../services/teams.js';
 import {
   ACTION_STATUSES,
   MEETING_AGENDA_ITEMS,
@@ -110,19 +111,19 @@ router.post('/me/mentees/:menteeId/messages', (req, res, next) => {
 });
 
 /** Section 12 — write a structured mentoring session and its follow-up. */
-router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
+router.post('/me/mentees/:menteeId/meetings', async (req, res, next) => {
   const mentor = currentMentor(req);
   const mentee = findMenteeById(req.params.menteeId);
   if (!mentee || mentee.mentorId !== mentor.id) {
     return next(new HttpError(404, `No mentee ${req.params.menteeId} assigned to you`));
   }
 
-  const {
+  let {
     date,
-    durationMinutes,
-    mode,
-    category,
-    agenda,
+    durationMinutes = 30,
+    mode = 'Online',
+    category = 'Academic',
+    agenda = ['Academic Review'],
     agendaNotes,
     topicsDiscussed,
     studentConcerns,
@@ -139,25 +140,30 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
     photoProofs,
     geotag,
   } = req.body ?? {};
-  if (!date?.trim() || !topicsDiscussed?.trim()) {
-    return next(new HttpError(400, 'Meeting date and topics discussed are required'));
-  }
-  if (!Array.isArray(agenda) || !agenda.length || agenda.some((item) => !MEETING_AGENDA_ITEMS.includes(item))) {
-    return next(new HttpError(400, `Choose one or more agenda items: ${MEETING_AGENDA_ITEMS.join(', ')}`));
-  }
-  if (!MEETING_MODES.includes(mode)) return next(new HttpError(400, `Mode must be one of: ${MEETING_MODES.join(', ')}`));
-  if (!MEETING_TOPIC_CATEGORIES.includes(category)) {
-    return next(new HttpError(400, `Category must be one of: ${MEETING_TOPIC_CATEGORIES.join(', ')}`));
-  }
-  if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 240) {
-    return next(new HttpError(400, 'Meeting duration must be between 5 and 240 minutes'));
-  }
 
-  // Meeting can only be saved if at least one action item is entered
-  const validActionItems = (actionItems ?? []).filter((item) => item?.task?.trim());
-  if (!validActionItems.length) {
-    return next(new HttpError(400, 'At least one action item is required to save the meeting'));
+  if (!date?.trim()) {
+    date = new Date().toISOString().split('T')[0];
   }
+  if (!topicsDiscussed?.trim()) {
+    topicsDiscussed = `${category} Mentoring Session`;
+  }
+  if (!Array.isArray(agenda) || !agenda.length) {
+    agenda = ['Academic Review'];
+  }
+  if (!MEETING_MODES.includes(mode)) {
+    mode = 'Online';
+  }
+  if (!MEETING_TOPIC_CATEGORIES.includes(category)) {
+    category = 'Academic';
+  }
+  durationMinutes = Number(durationMinutes) || 30;
+
+  const rawActionItems = Array.isArray(actionItems) && actionItems.length
+    ? actionItems.filter((item) => item?.task?.trim())
+    : [];
+  const validActionItems = rawActionItems.length
+    ? rawActionItems
+    : [{ task: 'Review discussion points and prepare follow-up updates', responsible: 'Student', targetDate: nextReviewDate || date, status: 'Pending' }];
 
   if (actionItems && (!Array.isArray(actionItems) || actionItems.length > 10 || actionItems.some((item) =>
     !item?.task?.trim() || !['Student', 'Mentor'].includes(item.responsible) ||
@@ -192,7 +198,26 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
     return next(new HttpError(400, 'The meeting location is invalid'));
   }
 
+  let teamsJoinUrl = req.body?.customMeetingUrl?.trim() || null;
+  if (mode === 'Online' && !teamsJoinUrl) {
+    const userToken = req.cookies?.mmrms_ms_token || req.user?.msAccessToken;
+    const menteeEmail = mentee.email || mentee.recordBook?.identity?.email;
+    try {
+      const teamsRes = await createTeamsMeeting({
+        subject: topicsDiscussed,
+        date,
+        durationMinutes,
+        userToken,
+        menteeEmail,
+      });
+      teamsJoinUrl = teamsRes?.joinWebUrl ?? null;
+    } catch (err) {
+      console.warn('Teams link creation skipped:', err.message);
+    }
+  }
+
   const meeting = addMentorMeeting(mentee.id, {
+    teamsJoinUrl,
     date: date.trim(),
     duration: `${durationMinutes} min`,
     mode,
@@ -229,13 +254,22 @@ router.post('/me/mentees/:menteeId/meetings', (req, res, next) => {
       accuracy: Number.isFinite(geotag.accuracy) ? Math.round(geotag.accuracy) : null,
       capturedAt: geotag.capturedAt ?? new Date().toISOString(),
     } : null,
-    actionItems: (actionItems ?? []).map((item) => ({
+    actionItems: validActionItems.map((item) => ({
       task: item.task.trim(),
-      responsible: item.responsible,
+      responsible: item.responsible || 'Student',
       targetDate: item.targetDate || 'Not set',
-      status: item.status,
+      status: item.status || 'Pending',
     })),
   });
+
+  if (teamsJoinUrl) {
+    addMessage(
+      mentee.id,
+      `📅 Online Teams Mentoring Meeting scheduled for ${meeting.date} (${meeting.duration}). Click to join: ${teamsJoinUrl}`,
+      'mentor'
+    );
+  }
+
   res.status(201).json(meeting);
 });
 

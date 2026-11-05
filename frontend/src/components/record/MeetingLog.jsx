@@ -963,6 +963,17 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
             <Badge tone={meeting.modeTone}>{meeting.mode}</Badge>
             {meeting.category && <Badge tone="indigo">{meeting.category}</Badge>}
             <span className="text-[11.5px] text-muted">{meeting.duration}</span>
+            {meeting.teamsJoinUrl && (
+              <a
+                href={meeting.teamsJoinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#464EB8]/10 text-[#464EB8] font-semibold text-[11.5px] hover:bg-[#464EB8]/20 transition-colors"
+              >
+                Join Teams
+              </a>
+            )}
           </div>
           <p className="mt-0.5 truncate text-[11.5px] text-muted">{meeting.agenda.join(' · ')}</p>
         </div>
