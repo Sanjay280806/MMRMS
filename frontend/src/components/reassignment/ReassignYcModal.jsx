@@ -26,7 +26,7 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
     email: '',
     mobile: '+91 98430 00000',
     room: 'CSE Block · Faculty Cabin',
-    designation: 'Year Coordinator',
+    designation: 'Mentor Coordinator',
     department: 'Computer Science and Engineering',
   });
   const [reasonCategory, setReasonCategory] = useState('Departmental Administrative Rotation');
@@ -103,7 +103,7 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
         email: selectedFacultyObj.email,
         mobile: selectedFacultyObj.mobile || '+91 98430 00000',
         room: selectedFacultyObj.cabin || selectedFacultyObj.room || 'CSE Block · Room 210',
-        designation: 'Year Coordinator',
+        designation: 'Mentor Coordinator',
         department: selectedFacultyObj.department || 'Computer Science and Engineering',
       };
     } else {
@@ -140,7 +140,7 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
         if (onSuccess) onSuccess(res);
       }, 1200);
     } catch (err) {
-      setError(err.message || 'Failed to reassign Year Coordinator.');
+      setError(err.message || 'Failed to reassign Mentor Coordinator.');
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +176,7 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
               <Badge tone="indigo">{cohort.cohortId}</Badge>
             </div>
             <h2 id="reassign-yc-modal-title" className="mt-1 text-lg font-bold text-ink">
-              Reassign Year Coordinator
+              Reassign Mentor Coordinator
             </h2>
             <p className="text-[12px] text-muted">
               {cohort.cohortName} ({cohort.year})
@@ -201,10 +201,10 @@ export function ReassignYcModal({ cohort, eligibleFaculty = [], onClose, onSucce
               ✓
             </div>
             <h3 className="text-base font-bold text-ink">
-              Year Coordinator Reassigned Successfully!
+              Mentor Coordinator Reassigned Successfully!
             </h3>
             <p className="mt-1 text-[13px] text-muted-strong">
-              <strong>{successResult.newCoordinator?.name}</strong> is now the active Year Coordinator for {cohort.cohortName}.
+              <strong>{successResult.newCoordinator?.name}</strong> is now the active Mentor Coordinator for {cohort.cohortName}.
             </p>
             <div className="mt-5 rounded-xl border border-good/30 bg-good-tint/60 p-4 text-left text-[12px] space-y-2">
               <div className="flex justify-between">

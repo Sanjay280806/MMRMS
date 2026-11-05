@@ -157,7 +157,7 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
           { key: 'Day Scholar / Hosteller', value: identity.hostelOrDayScholar },
           { key: 'Mentor Since', value: identity.mentorSince },
           { key: 'Address', value: identity.address, span: true },
-          { key: 'Year Coordinator', value: identity.yearCoordinator },
+          { key: 'Mentor Coordinator', value: identity.yearCoordinator },
           { key: 'Last Meeting', value: roster.lastMeeting },
         ]}
       />

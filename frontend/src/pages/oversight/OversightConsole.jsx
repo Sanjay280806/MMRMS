@@ -22,7 +22,7 @@ const titles = {
     academics: 'Academic & Discipline Watch', operations: 'Class Coordination', mentors: 'Mentor Coordination',
   },
   coordinator: {
-    dashboard: 'Year Coordinator Dashboard', students: 'Student Dataset',
+    dashboard: 'Mentor Coordinator Dashboard', students: 'Student Dataset',
     upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', assignment: 'Mentor Assignment Tool', reassignment: 'Mentor Reassignment Tool',
     audit: 'Audit & Accreditation Readiness',
   },
@@ -106,7 +106,7 @@ function OversightConsole({ role }) {
 
   return (
     <ConsoleLayout
-      product={isAdvisor ? 'Class Advisor Console' : 'Year Coordinator Console'}
+      product={isAdvisor ? 'Class Advisor Console' : 'Mentor Coordinator Console'}
       navGroups={groups}
       activeNav={section}
       onNavChange={navigate}
@@ -142,7 +142,7 @@ function profileStats(role, stats) {
 
 function profileFields(role, person, stats) {
   const classFields = [
-    { key: 'Class', value: person.className }, { key: 'Year', value: person.year }, { key: 'Year Coordinator', value: person.yearCoordinator },
+    { key: 'Class', value: person.className }, { key: 'Year', value: person.year }, { key: 'Mentor Coordinator', value: person.yearCoordinator },
     { key: 'Email ID', value: person.email }, { key: 'Mobile number', value: person.mobile }, { key: 'Class room', value: person.room },
     { key: 'Students tracked', value: String(stats.enrolled) }, { key: 'Discipline incidents', value: String(stats.disciplineIncidents) },
   ];
@@ -270,7 +270,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
         method: 'POST',
         body: {
           softDelete: shouldSoftDelete,
-          reason: shouldSoftDelete ? 'Soft-deleted by Year Coordinator' : 'Restored by Year Coordinator',
+          reason: shouldSoftDelete ? 'Soft-deleted by Mentor Coordinator' : 'Restored by Mentor Coordinator',
         },
       });
       setConfirmDeleteId(null);

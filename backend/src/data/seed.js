@@ -27,13 +27,13 @@ export const ROLES = [
     name: 'Head of Department',
     short: 'Department oversight',
     description:
-      'Executive department-wide leadership — oversee all cohorts, Year Coordinators, faculty mentors, and student welfare.',
+      'Executive department-wide leadership — oversee all cohorts, Mentor Coordinators, faculty mentors, and student welfare.',
     target: '/hod',
     targetLabel: 'HOD Executive View',
   },
   {
     key: 'coordinator',
-    name: 'Year Coordinator',
+    name: 'Mentor Coordinator',
     short: 'Cohort-level coordination',
     description:
       'Monitor cohort-wise progress, mentoring compliance, institutional events, bulk Excel/ERP upload, and student progress.',
@@ -63,7 +63,7 @@ export const ROLES = [
 /** Demo accounts. Every password is `mmrms@2026` — hashed at boot in store.js. */
 export const USERS = [
   { id: 'u-hod', role: 'hod', name: 'Dr. HOD CSE', email: 'hod.cse@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Professor & Head of Department' },
-  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Year Coordinator · 2024 BCS', coordinatorId: 'yc-1', cohortId: '24BCS' },
+  { id: 'u-coordinator', role: 'coordinator', name: 'Anitha P', email: 'anitha.p@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor Coordinator · 2024 BCS', coordinatorId: 'yc-1', cohortId: '24BCS' },
   { id: 'u-advisor', role: 'advisor', name: 'Suganthi', email: 'suganthi@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Class Advisor · 2024 BCS', advisorId: 'ca-1' },
   { id: 'u-mentor-1', role: 'mentor', name: 'Bharathi Priya', email: 'bharathi.priya@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-1' },
   { id: 'u-mentor-2', role: 'mentor', name: 'Asmitha Shree', email: 'asmitha.shree@kct.ac.in', password: 'mmrms@2026', department: 'Computer Science and Engineering', designation: 'Mentor', mentorId: 'm-2' },
@@ -121,7 +121,7 @@ export const YEAR_COORDINATORS = [
     email: 'anitha.p@kct.ac.in',
     mobile: '+91 98430 11904',
     department: 'Computer Science and Engineering',
-    designation: 'Year Coordinator',
+    designation: 'Mentor Coordinator',
     year: 'III Year',
     cohortId: '24BCS',
     cohortName: '2024 BCS',
@@ -178,7 +178,7 @@ export const CONCERNS = [
     description: 'Participated in the inter-collegiate hackathon on 08–09 July with OD approval. Need internal portal attendance update.',
     status: 'RESOLVED',
     raisedAt: '2026-07-12T14:30:00.000Z',
-    resolution: 'Verified On-Duty approval signed by Year Coordinator Anitha P. 3 days attendance condoned and updated in database.',
+    resolution: 'Verified On-Duty approval signed by Mentor Coordinator Anitha P. 3 days attendance condoned and updated in database.',
     resolvedAt: '2026-07-15T11:20:00.000Z',
     resolvedBy: 'Bharathi Priya',
     evidence: [
