@@ -963,14 +963,17 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
             <Badge tone={meeting.modeTone}>{meeting.mode}</Badge>
             {meeting.category && <Badge tone="indigo">{meeting.category}</Badge>}
             <span className="text-[11.5px] text-muted">{meeting.duration}</span>
-            {meeting.teamsJoinUrl && (
+            {(meeting.mode === 'Online' || meeting.teamsJoinUrl) && (
               <a
-                href={meeting.teamsJoinUrl}
+                href={meeting.teamsJoinUrl || 'https://teams.microsoft.com'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#464EB8]/10 text-[#464EB8] font-semibold text-[11.5px] hover:bg-[#464EB8]/20 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#464EB8] hover:bg-[#3b429f] text-white font-semibold text-[11px] shadow-xs transition"
               >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+                </svg>
                 Join Teams
               </a>
             )}
@@ -1008,6 +1011,32 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
 
       {open && (
         <div className="space-y-5 border-t border-line bg-canvas/40 px-5 py-5">
+          {(meeting.mode === 'Online' || meeting.teamsJoinUrl) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#464EB8]/30 bg-[#464EB8]/5 p-3.5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#464EB8] text-white">
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-[12.5px] font-semibold text-ink">Microsoft Teams Online Mentoring Session</div>
+                  <p className="text-[11.5px] text-muted">
+                    {meeting.teamsJoinUrl ? 'Direct meeting room link generated via Microsoft Graph' : 'Connect via Microsoft Teams online workspace'}
+                  </p>
+                </div>
+              </div>
+              <a
+                href={meeting.teamsJoinUrl || 'https://teams.microsoft.com'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#464EB8] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#3b429f] transition"
+              >
+                Join Teams Meeting ↗
+              </a>
+            </div>
+          )}
+
           <AgendaChecklist agenda={meeting.agenda} />
 
           <DefinitionList

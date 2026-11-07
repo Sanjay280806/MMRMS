@@ -135,7 +135,7 @@ describe('Microsoft OAuth 2.0 Authentication', () => {
 
   test('GET /api/auth/microsoft/callback redirects with error when user email is not registered', async () => {
     const state = 'valid-test-state';
-    const mockCode = 'mock-code:unregistered.person@kct.ac.in';
+    const mockCode = 'mock-code:unregistered.person@gmail.com';
 
     const res = await fetch(
       `${baseUrl}/api/auth/microsoft/callback?code=${encodeURIComponent(mockCode)}&state=${state}`,
