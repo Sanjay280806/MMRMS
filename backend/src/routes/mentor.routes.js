@@ -9,6 +9,7 @@ import {
   findMentorById,
   getMentorTeamsGroup,
   saveMentorTeamsGroup,
+  getPlacementProfile,
   getStudentMessages,
   listConcerns,
   listMentees,
@@ -77,6 +78,162 @@ router.get('/me/mentees', (req, res, next) => {
     limit,
     totalPages,
     mentees: allMentees.slice((safePage - 1) * limit, safePage * limit),
+  });
+});
+
+/** Analytical overview & shortlisting for mentor's mentees */
+router.get('/me/mentee-analytics', (req, res) => {
+  const mentor = currentMentor(req);
+  const rawMentees = listMentees(mentor.id);
+
+  const analyzedMentees = rawMentees.map((mentee) => {
+    const student = mentee.recordBook || menteeToStudent(mentee);
+    const placementProfile =
+      mentee.placementProfile ??
+      getPlacementProfile(mentee.id) ??
+      getPlacementProfile(mentee.rollNumber) ??
+      student.placementProfile ??
+      {};
+
+    // 1. Hackathons attended
+    const technicalList = student.participation?.technical ?? [];
+    const hackathons = technicalList.filter((t) =>
+      /hackathon|codeathon|hack/i.test(t.activity || '')
+    );
+    const hasAttendedHackathon = hackathons.length > 0;
+
+    // 2. Placement Profile - 4 core components from student placement readiness tab
+    // (Resume, GitHub, LinkedIn, Coding Platforms)
+    const hasResume = Boolean(
+      placementProfile.resume ||
+        student.placementReadiness?.some((r) => r.item === 'Resume Prepared' && r.status === 'Completed')
+    );
+    const hasGithub = Boolean(
+      (typeof placementProfile.githubUrl === 'string' && placementProfile.githubUrl.trim().length > 0) ||
+        student.placementReadiness?.some((r) => r.item === 'GitHub Profile' && r.status === 'Completed')
+    );
+    const hasLinkedin = Boolean(
+      (typeof placementProfile.linkedinUrl === 'string' && placementProfile.linkedinUrl.trim().length > 0) ||
+        student.placementReadiness?.some((r) => r.item === 'LinkedIn Profile' && r.status === 'Completed')
+    );
+    const hasCoding = Boolean(
+      (Array.isArray(placementProfile.codingPlatforms) && placementProfile.codingPlatforms.length > 0) ||
+        student.placementReadiness?.some((r) => r.item === 'Coding Practice' && r.status === 'Completed')
+    );
+    const placementCompleted = hasResume && hasGithub && hasLinkedin && hasCoding;
+    const missingPlacementItems = [];
+    if (!hasResume) missingPlacementItems.push('Resume');
+    if (!hasGithub) missingPlacementItems.push('GitHub Profile');
+    if (!hasLinkedin) missingPlacementItems.push('LinkedIn Profile');
+    if (!hasCoding) missingPlacementItems.push('Coding Profile');
+
+    // 3. Certifications Completed (count >= 5)
+    const certList = (student.certifications ?? []).filter((c) => Boolean(c.completionDate));
+    const certificationsCount = certList.length;
+    const has5PlusCertifications = certificationsCount >= 5;
+
+    // 4. CGPA > 8.0
+    const cgpa = Number(mentee.gpa ?? student.performance?.cgpa ?? 0);
+    const isHighCgpa = cgpa > 8.0;
+
+    // 5. Projects
+    const projectRecords = (student.internshipAndProject?.records ?? []).filter((r) => r.type === 'Project');
+    const projectsCount = projectRecords.length;
+    const hasNoProjects = projectsCount === 0;
+
+    // 6. Meetings & Participation
+    const meetingsHeld = Number(mentee.meetingsHeld ?? 0);
+    const meetingsDue = Number(mentee.meetingsDue ?? 4);
+    const meetingsOverdue = Math.max(0, meetingsDue - meetingsHeld);
+    const attendance = Number(mentee.attendance ?? 0);
+    const isInactiveMeetings = meetingsOverdue > 0 || meetingsHeld <= 2 || attendance < 75;
+
+    // Attention Needed Flags
+    const attentionFlags = [];
+    if (!hasAttendedHackathon) {
+      attentionFlags.push({ key: 'no-hackathon', label: 'No Hackathons Attended', tone: 'amber' });
+    }
+    if (!placementCompleted) {
+      attentionFlags.push({
+        key: 'incomplete-placement',
+        label: `Missing Placement: ${missingPlacementItems.join(', ')}`,
+        tone: 'rose',
+      });
+    }
+    if (isInactiveMeetings) {
+      attentionFlags.push({
+        key: 'inactive-meetings',
+        label: meetingsOverdue > 0 ? `Overdue Meetings (${meetingsOverdue})` : `Low Attendance (${attendance}%)`,
+        tone: 'rose',
+      });
+    }
+    if (hasNoProjects) {
+      attentionFlags.push({ key: 'no-projects', label: 'No Projects Completed', tone: 'amber' });
+    }
+
+    return {
+      id: mentee.id,
+      rollNumber: mentee.rollNumber,
+      name: mentee.name,
+      year: mentee.year,
+      section: mentee.section,
+      cgpa,
+      attendance,
+      meetingsHeld,
+      meetingsDue,
+      meetingsOverdue,
+      lastMeeting: mentee.lastMeeting,
+      hackathons: hackathons.map((h) => ({
+        activity: h.activity,
+        role: h.role,
+        achievement: h.achievement,
+        date: h.date,
+      })),
+      hasAttendedHackathon,
+      placementProfile: {
+        hasResume,
+        hasGithub,
+        hasLinkedin,
+        hasCoding,
+        isComplete: placementCompleted,
+        missingItems: missingPlacementItems,
+      },
+      certificationsCount,
+      certifications: certList.map((c) => ({
+        certification: c.certification,
+        platform: c.platform,
+        completionDate: c.completionDate,
+      })),
+      has5PlusCertifications,
+      isHighCgpa,
+      projectsCount,
+      projects: projectRecords.map((p) => ({
+        title: p.projectTitle,
+        guide: p.facultyGuide,
+      })),
+      hasNoProjects,
+      isInactiveMeetings,
+      needsAttention: attentionFlags.length > 0,
+      attentionFlags,
+    };
+  });
+
+  const summary = {
+    totalMentees: analyzedMentees.length,
+    hackathonAttendeesCount: analyzedMentees.filter((m) => m.hasAttendedHackathon).length,
+    placementCompleteCount: analyzedMentees.filter((m) => m.placementProfile.isComplete).length,
+    certified5PlusCount: analyzedMentees.filter((m) => m.has5PlusCertifications).length,
+    cgpaAbove8Count: analyzedMentees.filter((m) => m.isHighCgpa).length,
+    attentionNeededCount: analyzedMentees.filter((m) => m.needsAttention).length,
+    noHackathonsCount: analyzedMentees.filter((m) => !m.hasAttendedHackathon).length,
+    incompletePlacementCount: analyzedMentees.filter((m) => !m.placementProfile.isComplete).length,
+    inactiveMeetingsCount: analyzedMentees.filter((m) => m.isInactiveMeetings).length,
+    noProjectsCount: analyzedMentees.filter((m) => m.hasNoProjects).length,
+  };
+
+  res.json({
+    summary,
+    mentees: analyzedMentees,
   });
 });
 
