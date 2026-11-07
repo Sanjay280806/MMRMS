@@ -1231,6 +1231,36 @@ export function updateReadiness(studentId, item, status, note) {
   return row;
 }
 
+export function getPlacementProfile(studentId) {
+  const student = students.get(studentId) || mentees.find((m) => m.id === studentId || m.rollNumber === studentId);
+  return student?.placementProfile ?? null;
+}
+
+export function updatePlacementProfile(studentId, profile) {
+  const student = students.get(studentId) || mentees.find((m) => m.id === studentId || m.rollNumber === studentId);
+  if (!student) return null;
+  student.placementProfile = {
+    resume: profile?.resume ?? null,
+    linkedinUrl: profile?.linkedinUrl ?? '',
+    githubUrl: profile?.githubUrl ?? '',
+    codingPlatforms: Array.isArray(profile?.codingPlatforms) ? profile.codingPlatforms : [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  const rollNumber = student.identity?.rollNumber || student.rollNumber;
+  if (rollNumber) {
+    const mentee = mentees.find((m) => m.rollNumber === rollNumber);
+    if (mentee) {
+      mentee.placementProfile = student.placementProfile;
+      if (mentee.recordBook) {
+        mentee.recordBook.placementProfile = student.placementProfile;
+      }
+    }
+  }
+
+  return student.placementProfile;
+}
+
 /** Section 1E — Student Self Assessment. */
 export function updateSelfAssessment(studentId, patch) {
   const student = students.get(studentId);

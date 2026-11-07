@@ -15,7 +15,9 @@ import {
   findStudentById,
   getStudentMessages,
   listConcerns,
+  getPlacementProfile,
   updateActionItem,
+  updatePlacementProfile,
   updateReadiness,
   updateSelfAssessment,
   updateSkillRating,
@@ -274,6 +276,17 @@ router.patch('/me/placement-readiness/:item', (req, res, next) => {
   oneOf(status, READINESS_STATUSES, 'Status');
 
   res.json(updateReadiness(student.id, item, status, note?.trim()));
+});
+
+/* ── Section 8 — Placement Profile (Resume, LinkedIn, GitHub, Coding) ──── */
+router.get('/me/placement-profile', (req, res) => {
+  const student = currentStudent(req);
+  res.json(getPlacementProfile(student.id) || {});
+});
+
+router.put('/me/placement-profile', (req, res) => {
+  const student = currentStudent(req);
+  res.json(updatePlacementProfile(student.id, req.body || {}));
 });
 
 /* ── Section 12 — action items and goals ────────────────────────────────── */

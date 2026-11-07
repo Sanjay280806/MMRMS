@@ -418,6 +418,7 @@ export function buildStudentRecordBook(student) {
       completed: (student.placementReadiness ?? []).filter((r) => r.status === 'Completed').length,
       total: READINESS_ITEMS.length,
     },
+    placementProfile: student.placementProfile ?? null,
 
     /* Section 9 */
     internshipAndProject: normalizeInternshipAndProject(student.internshipAndProject),
