@@ -17,6 +17,7 @@ import { Reports } from './sections/Reports.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
 import { Announcements } from './sections/Announcements.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
+import { MessagesSection } from './sections/MessagesSection.jsx';
 import { ChipGroup, TextArea, TextField } from '../../components/ui/Field.jsx';
 import { api } from '../../api/client.js';
 
@@ -27,6 +28,7 @@ const TITLES = {
   arrears: 'Arrear Watch',
   overdue: 'Overdue Meetings',
   actions: 'Action Items',
+  messages: 'Messages',
   parents: 'Parent Interaction Log',
   reports: 'Term Reports',
   timeline: 'Activity Timeline',
@@ -124,6 +126,7 @@ export default function MentorConsole() {
       label: 'Mentoring',
       items: [
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
+        { key: 'messages', label: 'Messages' },
         { key: 'parents', label: 'Parent Log' },
         { key: 'announcements', label: 'Announcements' },
       ],
@@ -245,6 +248,12 @@ export default function MentorConsole() {
           )}
 
           {section === 'actions' && <ActionItemQueue onOpenMentee={(id) => openMentee(id, 'meetings')} />}
+          {section === 'messages' && (
+            <MessagesSection
+              mentor={mentor}
+              onOpenMentee={(id, tab) => openMentee(id, tab || 'messages')}
+            />
+          )}
 
           {section === 'parents' && <ParentLog />}
           {section === 'announcements' && <Announcements />}

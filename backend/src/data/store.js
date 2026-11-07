@@ -35,6 +35,31 @@ if (signedInMentee) {
   signedInMentee.meetingsHeld = signedInMentee.recordBook.meetings?.length ?? 0;
   signedInMentee.lastMeeting = signedInMentee.recordBook.meetings?.[0]?.date ?? null;
 }
+const initialMessagesByMentee = {
+  's-102': [
+    { id: 'msg-102-1', from: 'student', text: 'Good morning ma’am, could you please review my internship NOC request submitted yesterday?', time: '23 Jul 2026, 10:15 AM', timestamp: '2026-07-23T10:15:00.000Z' },
+    { id: 'msg-102-2', from: 'mentor', text: 'Approved Abinav. Please collect the signed copy from the department office by 3 PM.', time: '23 Jul 2026, 11:30 AM', timestamp: '2026-07-23T11:30:00.000Z' },
+  ],
+  's-103': [
+    { id: 'msg-103-1', from: 'mentor', text: 'Abinaya, remember to submit your unit test analysis report before 5 PM today.', time: '24 Jul 2026, 9:00 AM', timestamp: '2026-07-24T09:00:00.000Z' },
+    { id: 'msg-103-2', from: 'student', text: 'Yes ma’am, I have uploaded the completed sheet to the portal.', time: '24 Jul 2026, 9:45 AM', timestamp: '2026-07-24T09:45:00.000Z' },
+  ],
+  's-104': [
+    { id: 'msg-104-1', from: 'student', text: 'Ma’am, I have a doubt regarding the elective selection in Semester 6.', time: '20 Jul 2026, 3:20 PM', timestamp: '2026-07-20T15:20:00.000Z' },
+    { id: 'msg-104-2', from: 'mentor', text: 'Let us discuss Cloud Architecture vs Big Data during Monday mentoring hour.', time: '20 Jul 2026, 4:00 PM', timestamp: '2026-07-20T16:00:00.000Z' },
+  ],
+  's-106': [
+    { id: 'msg-106-1', from: 'mentor', text: 'Abishai, please meet me during the remedial coaching session this Thursday regarding your Math arrear prep.', time: '21 Jul 2026, 2:00 PM', timestamp: '2026-07-21T14:00:00.000Z' },
+  ],
+};
+
+for (const [mId, msgs] of Object.entries(initialMessagesByMentee)) {
+  const m = mentees.find((item) => item.id === mId);
+  if (m) {
+    m.messages = msgs;
+  }
+}
+
 const classAdvisors = clone(CLASS_ADVISORS);
 const yearCoordinators = clone(YEAR_COORDINATORS);
 const classMeetings = clone(CLASS_MEETINGS);
@@ -1338,4 +1363,15 @@ export function addMessage(id, text, from = 'student') {
   };
   target.messages.push(message);
   return message;
+}
+
+const mentorTeamsGroups = new Map();
+
+export function getMentorTeamsGroup(mentorId) {
+  return mentorTeamsGroups.get(mentorId) || null;
+}
+
+export function saveMentorTeamsGroup(mentorId, groupData) {
+  mentorTeamsGroups.set(mentorId, groupData);
+  return groupData;
 }
