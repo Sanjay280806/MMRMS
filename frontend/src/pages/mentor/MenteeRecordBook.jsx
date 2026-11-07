@@ -19,8 +19,8 @@ import {
 import {
   ActivitiesAndAchievements,
   ParentInteractionLog,
-  PlacementReadiness,
 } from '../../components/record/Growth.jsx';
+import { MentorPlacementReadiness } from '../../components/record/MentorPlacementReadiness.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
 import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { ScheduleMeetingModal } from '../../components/meetings/ScheduleMeetingModal.jsx';
@@ -198,14 +198,8 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
           {/* Unified Activities & Achievements — read-only for mentor */}
           <ActivitiesAndAchievements activities={data.activities ?? []} />
 
-          {/* Placement Readiness — read-only for mentor (no onUpdate handler) */}
-          <PlacementReadiness placementReadiness={data.placementReadiness} />
-
-          <EvidencePanel
-            title="Placement Evidence"
-            description="Documents submitted by the student for placement readiness."
-            evidence={data.evidence.placement}
-          />
+          {/* Placement Readiness — visible to mentor, access uploads via clicking respective names */}
+          <MentorPlacementReadiness mentee={data} menteeId={menteeId} />
         </div>
       )}
 

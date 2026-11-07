@@ -15,12 +15,9 @@ import {
   CoursePerformance,
   PerformanceTracker,
 } from '../../components/record/Academics.jsx';
-import {
-  ActivitiesAndAchievements,
-  PlacementReadiness,
-} from '../../components/record/Growth.jsx';
+import { ActivitiesAndAchievements } from '../../components/record/Growth.jsx';
+import { StudentPlacementReadiness } from '../../components/record/StudentPlacementReadiness.jsx';
 import { MeetingLog } from '../../components/record/MeetingLog.jsx';
-import { EvidencePanel } from '../../components/record/Evidence.jsx';
 import { AddActivity } from './AddEntry.jsx';
 import { ContactMentor } from './ContactMentor.jsx';
 import { AnnouncementsHistory } from './AnnouncementsHistory.jsx';
@@ -65,12 +62,13 @@ const TITLES = {
   activities: 'Activities & Achievements',
   placement: 'Placement Readiness',
   meetings: 'Mentor Meeting Log',
-  contact: 'Contact Your Mentor',
+  contact: 'Messages',
   announcements: 'Announcements',
 };
 
 export default function StudentRecordBook() {
   const [section, setSection] = useState('profile');
+  const [contactMode, setContactMode] = useState('messages');
   const [saving, setSaving] = useState(null);
   const { data, loading, error, reload, setData } = useResource('/student/me/record-book');
   const { data: concernsData, reload: reloadConcerns } = useResource('/student/me/concerns');
@@ -140,7 +138,12 @@ export default function StudentRecordBook() {
       product="Student Record Book"
       navGroups={navGroups}
       activeNav={section}
-      onNavChange={setSection}
+      onNavChange={(navKey) => {
+        setSection(navKey);
+        if (navKey === 'contact') {
+          setContactMode('messages');
+        }
+      }}
       identity={{
         navKey: 'profile',
         initials: identity.initials,
@@ -148,18 +151,41 @@ export default function StudentRecordBook() {
         meta: `${identity.rollNumber} · ${identity.year}`,
         note: identity.mentor ? `Mentor · ${identity.mentor.name}` : undefined,
       }}
-      title={TITLES[section]}
-      subtitle={`${data.institution.recordBook} · Semester ${identity.semester} · ${data.institution.term}`}
+      title={
+        section === 'contact'
+          ? contactMode === 'concerns'
+            ? 'Raise a Concern'
+            : 'Messages'
+          : TITLES[section]
+      }
+      subtitle={
+        section === 'contact'
+          ? contactMode === 'concerns'
+            ? `${data.institution.recordBook} · Student Support Queue`
+            : `${data.institution.recordBook} · Direct chat with ${identity.mentor?.name || 'Mentor'}`
+          : `${data.institution.recordBook} · Semester ${identity.semester} · ${data.institution.term}`
+      }
       greet={section === 'profile'}
       actions={
-        section !== 'contact' && (
-          <Button size="sm" onClick={() => setSection('contact')}>
+        section === 'contact' && contactMode === 'concerns' ? (
+          <Button size="sm" variant="secondary" onClick={() => setContactMode('messages')}>
+            Messages
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => {
+              setSection('contact');
+              setContactMode('concerns');
+            }}
+          >
             Raise a concern
           </Button>
         )
       }
       profile={
-        <ProfileHeader
+        section === 'contact' && contactMode === 'messages' ? null : (
+          <ProfileHeader
           initials={identity.initials}
           name={identity.name}
           subtitle={`${identity.programme} · ${identity.year} · ${identity.section}`}
@@ -193,6 +219,7 @@ export default function StudentRecordBook() {
             { key: 'Mentor Coordinator', value: identity.yearCoordinator },
           ]}
         />
+        )
       }
     >
       {announcement && createPortal(
@@ -253,33 +280,11 @@ export default function StudentRecordBook() {
             </>
           )}
 
-          {/* Placement Readiness — restored exactly as before */}
+          {/* Placement Readiness */}
           {section === 'placement' && (
-            <>
-              <EvidencePanel
-                title="Placement Evidence"
-                description="Upload your resume, profile proof, offer-related document, or another readiness record."
-                evidence={data.evidence.placement}
-                saving={saving === 'evidence-placement'}
-                onUpload={(entry) =>
-                  mutate('evidence-placement', () =>
-                    api('/student/me/evidence/placement', { method: 'POST', body: entry }),
-                  )
-                }
-              />
-              <PlacementReadiness
-                placementReadiness={data.placementReadiness}
-                saving={saving}
-                onUpdate={(item, status) =>
-                  mutate(item, () =>
-                    api(`/student/me/placement-readiness/${encodeURIComponent(item)}`, {
-                      method: 'PATCH',
-                      body: { status },
-                    }),
-                  )
-                }
-              />
-            </>
+            <StudentPlacementReadiness
+              studentId={identity.rollNumber || identity.email || 'student'}
+            />
           )}
 
           {section === 'meetings' && (
@@ -296,6 +301,7 @@ export default function StudentRecordBook() {
 
           {section === 'contact' && (
             <ContactMentor
+              mode={contactMode}
               support={data.support}
               mentor={identity.mentor}
               onRequestAdded={(request) =>

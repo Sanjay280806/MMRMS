@@ -433,6 +433,7 @@ export function buildMenteeRecordBook(mentee) {
   const messages = mentee.recordBook?.messages ?? mentee.messages ?? book.support?.messages ?? [];
   return {
     ...book,
+    placementProfile: mentee.placementProfile ?? mentee.recordBook?.placementProfile ?? book.placementProfile ?? null,
     support: {
       ...book.support,
       messages,
