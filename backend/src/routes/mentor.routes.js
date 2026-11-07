@@ -7,6 +7,8 @@ import {
   findConcernById,
   findMenteeById,
   findMentorById,
+  getMentorTeamsGroup,
+  saveMentorTeamsGroup,
   getStudentMessages,
   listConcerns,
   listMentees,
@@ -21,7 +23,7 @@ import {
   mentorTimeline,
   summariseMentee,
 } from '../services/mentor.js';
-import { buildMenteeRecordBook } from '../services/mentee.js';
+import { buildMenteeRecordBook, menteeToStudent } from '../services/mentee.js';
 import { createTeamsMeeting } from '../services/teams.js';
 import {
   ACTION_STATUSES,
@@ -108,6 +110,188 @@ router.post('/me/mentees/:menteeId/messages', (req, res, next) => {
   if (!text) return next(new HttpError(400, 'Message text is required'));
   const msg = addMessage(mentee.id, text, 'mentor');
   res.status(201).json(msg);
+});
+
+/** All direct message threads across all assigned mentees */
+router.get('/me/messages', (req, res) => {
+  const mentor = currentMentor(req);
+  const mentorMentees = listMentees(mentor.id);
+  const mentorEmail = mentor.email || req.user?.email || 'bharathi.priya@kct.ac.in';
+
+  const conversations = mentorMentees.map((mentee) => {
+    const rawMessages = getStudentMessages(mentee.id);
+    const messages = Array.isArray(rawMessages) ? rawMessages : [];
+    const student = menteeToStudent(mentee);
+    const teamsEmail =
+      student?.identity?.email ||
+      mentee.email ||
+      (mentee.rollNumber ? `${mentee.rollNumber.toLowerCase()}@kct.ac.in` : 'student@kct.ac.in');
+
+    const sentMessages = messages.filter((m) => m.from === 'mentor');
+    const deliveredMessages = messages.filter((m) => m.from === 'student');
+
+    const lastSent = sentMessages.length > 0 ? sentMessages[sentMessages.length - 1] : null;
+    const lastDelivered = deliveredMessages.length > 0 ? deliveredMessages[deliveredMessages.length - 1] : null;
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+    return {
+      menteeId: mentee.id,
+      menteeName: mentee.name,
+      rollNumber: mentee.rollNumber,
+      teamsEmail,
+      year: mentee.year,
+      section: mentee.section,
+      mentorId: mentor.id,
+      mentorName: mentor.name,
+      mentorEmail,
+      messages,
+      lastMessage,
+      lastSentMessage: lastSent,
+      lastDeliveredMessage: lastDelivered,
+      totalCount: messages.length,
+    };
+  });
+
+  const teamsGroup = getMentorTeamsGroup(mentor.id);
+  res.json({
+    mentorId: mentor.id,
+    mentorName: mentor.name,
+    mentorEmail,
+    teamsGroup,
+    conversations,
+  });
+});
+
+/** Get mentor's existing Teams group if created */
+router.get('/me/teams/group', (req, res) => {
+  const mentor = currentMentor(req);
+  const group = getMentorTeamsGroup(mentor.id);
+  res.json({
+    exists: Boolean(group),
+    group: group || null,
+  });
+});
+
+/** Broadcast message to selected students via Microsoft Teams and MMRMS */
+router.post('/me/teams/broadcast', (req, res, next) => {
+  const mentor = currentMentor(req);
+  const mentorEmail = mentor.email || req.user?.email || 'bharathi.priya@kct.ac.in';
+  const { studentIds = [], text } = req.body || {};
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    return next(new HttpError(400, 'Please select at least one student recipient'));
+  }
+  const cleanText = String(text || '').trim();
+  if (!cleanText) {
+    return next(new HttpError(400, 'Message text is required'));
+  }
+
+  const allMentorMentees = listMentees(mentor.id);
+  const isAllStudents = studentIds.length === allMentorMentees.length;
+
+  const recipients = [];
+  const addedMessages = [];
+
+  for (const sId of studentIds) {
+    const mentee = findMenteeById(sId);
+    if (!mentee || mentee.mentorId !== mentor.id) {
+      continue;
+    }
+    const student = menteeToStudent(mentee);
+    const teamsEmail =
+      student?.identity?.email ||
+      mentee.email ||
+      (mentee.rollNumber ? `${mentee.rollNumber.toLowerCase()}@kct.ac.in` : 'student@kct.ac.in');
+
+    // Deliver inside MMRMS to this student's message thread
+    const msg = addMessage(mentee.id, cleanText, 'mentor');
+    if (msg) {
+      msg.viaTeams = true;
+      msg.mentorEmail = mentorEmail;
+      msg.studentTeamsEmail = teamsEmail;
+      addedMessages.push(msg);
+    }
+
+    recipients.push({
+      id: mentee.id,
+      name: mentee.name,
+      rollNumber: mentee.rollNumber,
+      teamsEmail,
+    });
+  }
+
+  const recipientEmails = recipients.map((r) => r.teamsEmail).filter(Boolean);
+
+  let teamsGroup = null;
+  let isFirstTimeGroup = false;
+  let teamsDeepLink = '';
+
+  if (isAllStudents) {
+    // When selecting all 33 students: create group first time, reuse existing group on subsequent times
+    let existingGroup = getMentorTeamsGroup(mentor.id);
+    const groupTopic = `MMRMS Mentoring Group — ${mentor.name} (${allMentorMentees.length} Mentees)`;
+
+    if (!existingGroup) {
+      isFirstTimeGroup = true;
+      const groupId = `19:mmrms-mentoring-${mentor.id}-all${allMentorMentees.length}@thread.v2`;
+      const teamsWebUrl = `https://teams.microsoft.com/l/chat/${groupId}/0?users=${encodeURIComponent(
+        recipientEmails.join(',')
+      )}`;
+
+      existingGroup = {
+        id: groupId,
+        topic: groupTopic,
+        mentorId: mentor.id,
+        mentorName: mentor.name,
+        mentorEmail,
+        createdAt: new Date().toISOString(),
+        memberCount: recipients.length,
+        memberEmails: recipientEmails,
+        teamsWebUrl,
+        messageCount: 1,
+        lastBroadcastAt: new Date().toISOString(),
+      };
+      saveMentorTeamsGroup(mentor.id, existingGroup);
+      console.log(`[Teams Group] Created NEW persistent Teams group for mentor ${mentor.id}: ${groupTopic}`);
+    } else {
+      isFirstTimeGroup = false;
+      existingGroup.messageCount = (existingGroup.messageCount || 0) + 1;
+      existingGroup.lastBroadcastAt = new Date().toISOString();
+      saveMentorTeamsGroup(mentor.id, existingGroup);
+      console.log(
+        `[Teams Group] Reusing EXISTING Teams group ${existingGroup.id} for mentor ${mentor.id} (message #${existingGroup.messageCount})`
+      );
+    }
+
+    teamsGroup = existingGroup;
+    teamsDeepLink = `${teamsGroup.teamsWebUrl}&message=${encodeURIComponent(cleanText)}`;
+  } else {
+    teamsDeepLink = `https://teams.microsoft.com/l/chat/0/0?users=${encodeURIComponent(
+      recipientEmails.join(',')
+    )}&message=${encodeURIComponent(cleanText)}`;
+  }
+
+  const responseMessage = isAllStudents
+    ? isFirstTimeGroup
+      ? `New Microsoft Teams Group "${teamsGroup.topic}" created! Message broadcasted to all ${recipients.length} students via Teams & MMRMS.`
+      : `Message successfully sent to existing Teams Group "${teamsGroup.topic}". Reused existing group — no duplicate group created.`
+    : `Message dispatched to ${recipients.length} students via Microsoft Teams & MMRMS`;
+
+  console.log(
+    `[Teams Broadcast] Mentor ${mentorEmail} sent Teams message to ${recipients.length} students. isAllStudents: ${isAllStudents}, isFirstTimeGroup: ${isFirstTimeGroup}`
+  );
+
+  res.status(201).json({
+    success: true,
+    message: responseMessage,
+    recipientCount: recipients.length,
+    recipients,
+    isAllStudents,
+    teamsGroup,
+    isFirstTimeGroup,
+    teamsDeepLink,
+    mentorTeamsEmail: mentorEmail,
+  });
 });
 
 /** Section 12 — write a structured mentoring session and its follow-up. */

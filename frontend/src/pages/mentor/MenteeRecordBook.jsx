@@ -8,6 +8,7 @@ import { Tabs } from '../../components/ui/Tabs.jsx';
 import { Card } from '../../components/ui/Card.jsx';
 import { SectionCard } from '../../components/ui/SectionCard.jsx';
 import { MessageThread } from '../../components/dashboard/MessageThread.jsx';
+import { TeamsChat } from '../../components/dashboard/TeamsChat.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
 import { AcademicBackground } from '../../components/record/SectionOne.jsx';
 import {
@@ -30,8 +31,9 @@ const TABS = [
   { value: 'profile', label: 'Profile & Background' },
   { value: 'academics', label: 'Academics' },
   { value: 'growth', label: 'Growth & Career' },
-  { value: 'support', label: 'Parent Log & Messages' },
   { value: 'meetings', label: 'Meeting Log' },
+  { value: 'messages', label: 'Messages' },
+  { value: 'parent-log', label: 'Parent Log' },
 ];
 
 /**
@@ -209,24 +211,6 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
         </div>
       )}
 
-      {tab === 'support' && (
-        <div className="grid gap-5 lg:grid-cols-2 items-start">
-          <ParentInteractionLog parentInteractions={data.parentInteractions} />
-          <SectionCard
-            title="Direct Messages"
-            subtitle={`Chat with ${data.identity.name}`}
-            className="flex flex-col h-full"
-            bodyClassName="flex flex-col flex-1 p-5"
-          >
-            <MessageThread
-              messages={chatMessages}
-              selfRole="mentor"
-              onSend={handleSendMentorMessage}
-            />
-          </SectionCard>
-        </div>
-      )}
-
       {tab === 'meetings' && (
         <div className="space-y-5">
           <div className="flex justify-end">
@@ -245,6 +229,26 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
         </div>
       )}
 
+      {tab === 'messages' && (
+        <div className="space-y-4">
+          <TeamsChat
+            messages={chatMessages}
+            selfRole="mentor"
+            mentorName="Dr. Bharathi Priya"
+            menteeName={data.identity.name}
+            menteeRoll={data.identity.rollNumber}
+            menteeInitials={data.identity.initials}
+            onSend={handleSendMentorMessage}
+            height="560px"
+          />
+        </div>
+      )}
+
+      {tab === 'parent-log' && (
+        <div className="space-y-5">
+          <ParentInteractionLog parentInteractions={data.parentInteractions} />
+        </div>
+      )}
       {showScheduleModal && (
         <ScheduleMeetingModal
           mentee={{ id: menteeId, name: identity.name, rollNumber: identity.rollNumber }}
