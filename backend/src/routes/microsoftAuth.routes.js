@@ -73,7 +73,12 @@ router.get('/login', (req, res, next) => {
     maxAge: 10 * 60 * 1000, // 10 minutes
   });
 
-  const authUrl = getMicrosoftAuthUrl({ state });
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+  const inferredRedirect = host ? `${proto}://${host}/api/auth/microsoft/callback` : undefined;
+  const redirectUri = process.env.AZURE_REDIRECT_URI || inferredRedirect;
+
+  const authUrl = getMicrosoftAuthUrl({ state, redirectUri });
 
   // If format=json was requested, return the URL instead of redirecting
   if (req.query.format === 'json' || req.headers.accept?.includes('application/json')) {
@@ -89,7 +94,11 @@ router.get('/login', (req, res, next) => {
  */
 router.get('/callback', async (req, res) => {
   const config = getMicrosoftOAuthConfig();
-  const frontendUrl = config.frontendUrl;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+  const inferredRedirect = host ? `${proto}://${host}/api/auth/microsoft/callback` : undefined;
+  const redirectUri = process.env.AZURE_REDIRECT_URI || inferredRedirect || config.redirectUri;
+  const frontendUrl = process.env.FRONTEND_URL || (host ? `${proto}://${host}` : config.frontendUrl);
 
   const { code, state, error, error_description } = req.query;
 
@@ -110,7 +119,7 @@ router.get('/callback', async (req, res) => {
   }
 
   try {
-    const tokens = await exchangeCodeForTokens({ code });
+    const tokens = await exchangeCodeForTokens({ code, redirectUri });
     const profile = await getMicrosoftUserProfile(tokens.access_token);
 
     // Resolve email address from mail or userPrincipalName or id_token

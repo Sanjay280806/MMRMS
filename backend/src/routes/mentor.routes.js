@@ -216,6 +216,15 @@ router.post('/me/mentees/:menteeId/meetings', async (req, res, next) => {
     }
   }
 
+  if (mode === 'Online' && !teamsJoinUrl) {
+    const mentorEmail = req.user?.email || mentee.mentorEmail;
+    if (mentorEmail && mentorEmail.endsWith('@kct.ac.in')) {
+      teamsJoinUrl = `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(mentorEmail)}`;
+    } else {
+      teamsJoinUrl = 'https://teams.microsoft.com';
+    }
+  }
+
   const meeting = addMentorMeeting(mentee.id, {
     teamsJoinUrl,
     date: date.trim(),
@@ -326,6 +335,7 @@ router.post('/me/meetings/batch', (req, res, next) => {
     const mentee = findMenteeById(menteeId);
     if (!mentee || mentee.mentorId !== mentor.id) continue;
     const meeting = addMentorMeeting(mentee.id, {
+      teamsJoinUrl: mode === 'Online' ? (req.user?.email ? `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(req.user.email)}` : 'https://teams.microsoft.com') : null,
       date: date.trim(),
       duration: `${durationMinutes} min`,
       mode,
