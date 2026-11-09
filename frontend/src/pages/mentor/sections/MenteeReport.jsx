@@ -1,23 +1,25 @@
 import { useState, useMemo } from 'react';
 import { useResource } from '../../../hooks/useResource.js';
-import { Card, CardBody } from '../../../components/ui/Card.jsx';
+import { Card } from '../../../components/ui/Card.jsx';
 import { Badge } from '../../../components/ui/Badge.jsx';
 import { Button } from '../../../components/ui/Button.jsx';
 import { Avatar } from '../../../components/ui/Avatar.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
 import { Skeleton } from '../../../components/ui/Skeleton.jsx';
+import { SectionTable } from '../../../components/ui/SectionCard.jsx';
+import { DataTable } from '../../../components/ui/DataTable.jsx';
+import { Tabs } from '../../../components/ui/Tabs.jsx';
 import { cx } from '../../../lib/tone.js';
 
 export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
   const { data, loading, error, reload } = useResource('/mentor/me/mentee-analytics');
 
-  // Shortlisting state for top analytics cards: 'all' | 'hackathons' | 'placement' | 'certifications' | 'cgpa'
+  // Shortlisting state for top 4 analytics cards: 'all' | 'hackathons' | 'placement' | 'certifications' | 'cgpa'
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Attention needed filter: 'all' | 'no-hackathons' | 'incomplete-placement' | 'inactive-meetings' | 'no-projects'
+  // Attention needed category filter: 'all' | 'incomplete-placement' | 'no-hackathons' | 'inactive-meetings' | 'no-projects'
   const [attentionFilter, setAttentionFilter] = useState('all');
-  const [attentionSearch, setAttentionSearch] = useState('');
 
   const summary = data?.summary || {
     totalMentees: 0,
@@ -74,616 +76,491 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
       list = list.filter((m) => m.hasNoProjects);
     }
 
-    if (attentionSearch.trim()) {
-      const q = attentionSearch.toLowerCase().trim();
-      list = list.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.rollNumber.toLowerCase().includes(q)
-      );
-    }
-
     return list;
-  }, [mentees, attentionFilter, attentionSearch]);
+  }, [mentees, attentionFilter]);
 
   if (error) {
     return (
-      <Card>
-        <CardBody className="p-8">
-          <EmptyState
-            title="Couldn't load mentee analytics"
-            description={error.message}
-            icon="!"
-            action={
-              <Button size="sm" variant="secondary" onClick={reload}>
-                Try again
-              </Button>
-            }
-          />
-        </CardBody>
-      </Card>
+      <div className="p-8">
+        <EmptyState
+          title="Couldn't load mentee analytics"
+          description={error.message}
+          icon="!"
+          action={
+            <Button size="sm" variant="secondary" onClick={reload}>
+              Try again
+            </Button>
+          }
+        />
+      </div>
     );
   }
 
   if (loading && !data) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="space-y-4 sm:space-y-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
           {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
+            <Skeleton key={i} className="h-32 rounded-card" />
           ))}
         </div>
-        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-96 rounded-card" />
       </div>
     );
   }
 
-  const filterLabels = {
+  const filterTitles = {
     all: 'All Mentees',
     hackathons: 'Hackathon Attendees',
     placement: 'Placement Profile Complete',
     certifications: '5+ Certifications Completed',
-    cgpa: 'CGPA > 8.0 (Distinction)',
+    cgpa: 'CGPA > 8.0 Distinction',
   };
 
+  const filterSubtitles = {
+    all: `${shortlistedMentees.length} mentees · select any card above to shortlist by criteria`,
+    hackathons: `Showing ${shortlistedMentees.length} students who attended hackathons or codeathons`,
+    placement: `Showing ${shortlistedMentees.length} students with all 4 placement profiles verified`,
+    certifications: `Showing ${shortlistedMentees.length} students with 5 or more course certifications`,
+    cgpa: `Showing ${shortlistedMentees.length} students maintaining CGPA above 8.0`,
+  };
+
+  const ATTENTION_TABS = [
+    { value: 'all', label: `All Flagged (${summary.attentionNeededCount})` },
+    { value: 'incomplete-placement', label: `Placement Pending (${summary.incompletePlacementCount})` },
+    { value: 'no-hackathons', label: `No Hackathons (${summary.noHackathonsCount})` },
+    { value: 'inactive-meetings', label: `Overdue Meetings (${summary.inactiveMeetingsCount})` },
+    { value: 'no-projects', label: `No Projects (${summary.noProjectsCount})` },
+  ];
+
+  const total = summary.totalMentees || 1;
+  const hackathonPct = Math.round((summary.hackathonAttendeesCount / total) * 100);
+  const placementPct = Math.round((summary.placementCompleteCount / total) * 100);
+  const certPct = Math.round((summary.certified5PlusCount / total) * 100);
+  const cgpaPct = Math.round((summary.cgpaAbove8Count / total) * 100);
+
   return (
-    <div className="space-y-8 pb-10">
-      {/* Page Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">
-              Mentee Analytical Report
-            </h1>
-            <Badge tone="indigo">{summary.totalMentees} Assigned Mentees</Badge>
-          </div>
-          <p className="text-xs text-muted mt-1">
-            Cohort health analysis, skill achievements, and shortlisting metrics. Click any card below to filter the roster.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeFilter !== 'all' && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setActiveFilter('all')}
-              className="text-xs"
-            >
-              ✕ Clear Shortlist Filter
-            </Button>
+    <div className="space-y-5">
+      {/* 4 Standard Stat Cards matching the website design */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
+        {/* Card 1: Hackathon Attendees */}
+        <Card
+          as="button"
+          type="button"
+          interactive
+          onClick={() => setActiveFilter(activeFilter === 'hackathons' ? 'all' : 'hackathons')}
+          className={cx(
+            'flex flex-col justify-between p-4 sm:p-6 text-left transition-all',
+            activeFilter === 'hackathons'
+              ? 'ring-2 ring-brand-500 border-brand-500 bg-brand-50/20 dark:bg-brand-950/20'
+              : ''
           )}
-        </div>
-      </div>
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[12px] font-medium text-muted sm:text-[12.5px]">
+              Attended Hackathons
+            </span>
+            <Badge tone={activeFilter === 'hackathons' ? 'brand' : 'slate'} size="sm">
+              {hackathonPct}%
+            </Badge>
+          </div>
+          <div className="mt-3 flex items-baseline gap-1 sm:mt-4">
+            <span className="tnum font-display text-[28px] font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]">
+              {summary.hackathonAttendeesCount}
+            </span>
+            <span className="text-sm font-medium text-muted-soft">/ {summary.totalMentees}</span>
+          </div>
+          <div className="mt-2 text-[11px] leading-relaxed text-muted sm:mt-3 sm:text-[12px]">
+            {activeFilter === 'hackathons' ? 'Active shortlist filter' : 'Departmental, national, or collegiate events'}
+          </div>
+        </Card>
 
-      {/* TOP SECTION: 4 Key Analytical Metric Cards (Clickable for Shortlisting) */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
-            Key Achievement Metrics & Shortlisting
-          </h2>
-          <span className="text-xs text-muted">Click a card to filter students below</span>
-        </div>
+        {/* Card 2: Placement Profile Complete */}
+        <Card
+          as="button"
+          type="button"
+          interactive
+          onClick={() => setActiveFilter(activeFilter === 'placement' ? 'all' : 'placement')}
+          className={cx(
+            'flex flex-col justify-between p-4 sm:p-6 text-left transition-all',
+            activeFilter === 'placement'
+              ? 'ring-2 ring-brand-500 border-brand-500 bg-brand-50/20 dark:bg-brand-950/20'
+              : ''
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[12px] font-medium text-muted sm:text-[12.5px]">
+              Placement Profile Complete
+            </span>
+            <Badge tone={activeFilter === 'placement' ? 'brand' : 'slate'} size="sm">
+              {placementPct}%
+            </Badge>
+          </div>
+          <div className="mt-3 flex items-baseline gap-1 sm:mt-4">
+            <span className="tnum font-display text-[28px] font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]">
+              {summary.placementCompleteCount}
+            </span>
+            <span className="text-sm font-medium text-muted-soft">/ {summary.totalMentees}</span>
+          </div>
+          <div className="mt-2 text-[11px] leading-relaxed text-muted sm:mt-3 sm:text-[12px]">
+            {activeFilter === 'placement' ? 'Active shortlist filter' : 'Resume, GitHub, LinkedIn & Coding profiles complete'}
+          </div>
+        </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Hackathon Attendees */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter(activeFilter === 'hackathons' ? 'all' : 'hackathons')}
-            className={cx(
-              'group relative flex flex-col text-left p-5 rounded-2xl border transition-all duration-200 cursor-pointer',
-              'hover:shadow-md hover:-translate-y-0.5',
-              activeFilter === 'hackathons'
-                ? 'bg-gradient-to-br from-indigo-50/80 to-purple-50/50 dark:from-indigo-950/40 dark:to-purple-950/20 border-indigo-500 shadow-md ring-2 ring-indigo-500/30'
-                : 'bg-card border-border/70 hover:border-indigo-300 dark:hover:border-indigo-800'
-            )}
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xl font-bold">
-                🚀
-              </span>
-              <Badge tone={activeFilter === 'hackathons' ? 'indigo' : 'slate'} size="sm">
-                {Math.round((summary.hackathonAttendeesCount / (summary.totalMentees || 1)) * 100)}%
-              </Badge>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
-                {summary.hackathonAttendeesCount}
-                <span className="text-xs font-normal text-muted ml-1.5">/ {summary.totalMentees}</span>
-              </div>
-              <div className="text-sm font-semibold text-foreground mt-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                Attended Hackathons
-              </div>
-              <p className="text-[11.5px] text-muted mt-1 leading-snug">
-                Participated in departmental, national, or collegiate hackathons
-              </p>
-            </div>
-            {activeFilter === 'hackathons' && (
-              <span className="mt-3 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
-                ✓ Currently Shortlisting
-              </span>
-            )}
-          </button>
+        {/* Card 3: 5+ Certifications Completed */}
+        <Card
+          as="button"
+          type="button"
+          interactive
+          onClick={() => setActiveFilter(activeFilter === 'certifications' ? 'all' : 'certifications')}
+          className={cx(
+            'flex flex-col justify-between p-4 sm:p-6 text-left transition-all',
+            activeFilter === 'certifications'
+              ? 'ring-2 ring-brand-500 border-brand-500 bg-brand-50/20 dark:bg-brand-950/20'
+              : ''
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[12px] font-medium text-muted sm:text-[12.5px]">
+              ≥ 5 Certifications Completed
+            </span>
+            <Badge tone={activeFilter === 'certifications' ? 'brand' : 'slate'} size="sm">
+              {certPct}%
+            </Badge>
+          </div>
+          <div className="mt-3 flex items-baseline gap-1 sm:mt-4">
+            <span className="tnum font-display text-[28px] font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]">
+              {summary.certified5PlusCount}
+            </span>
+            <span className="text-sm font-medium text-muted-soft">/ {summary.totalMentees}</span>
+          </div>
+          <div className="mt-2 text-[11px] leading-relaxed text-muted sm:mt-3 sm:text-[12px]">
+            {activeFilter === 'certifications' ? 'Active shortlist filter' : 'Completed 5+ recognized technical certifications'}
+          </div>
+        </Card>
 
-          {/* Card 2: Placement Profile Complete */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter(activeFilter === 'placement' ? 'all' : 'placement')}
-            className={cx(
-              'group relative flex flex-col text-left p-5 rounded-2xl border transition-all duration-200 cursor-pointer',
-              'hover:shadow-md hover:-translate-y-0.5',
-              activeFilter === 'placement'
-                ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/20 border-emerald-500 shadow-md ring-2 ring-emerald-500/30'
-                : 'bg-card border-border/70 hover:border-emerald-300 dark:hover:border-emerald-800'
-            )}
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xl font-bold">
-                💼
-              </span>
-              <Badge tone={activeFilter === 'placement' ? 'green' : 'slate'} size="sm">
-                {Math.round((summary.placementCompleteCount / (summary.totalMentees || 1)) * 100)}%
-              </Badge>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
-                {summary.placementCompleteCount}
-                <span className="text-xs font-normal text-muted ml-1.5">/ {summary.totalMentees}</span>
-              </div>
-              <div className="text-sm font-semibold text-foreground mt-0.5 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                Placement Profile Complete
-              </div>
-              <p className="text-[11.5px] text-muted mt-1 leading-snug">
-                Completed Resume, GitHub, LinkedIn & Coding profiles
-              </p>
-            </div>
-            {activeFilter === 'placement' && (
-              <span className="mt-3 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                ✓ Currently Shortlisting
-              </span>
-            )}
-          </button>
-
-          {/* Card 3: 5+ Certifications Completed */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter(activeFilter === 'certifications' ? 'all' : 'certifications')}
-            className={cx(
-              'group relative flex flex-col text-left p-5 rounded-2xl border transition-all duration-200 cursor-pointer',
-              'hover:shadow-md hover:-translate-y-0.5',
-              activeFilter === 'certifications'
-                ? 'bg-gradient-to-br from-blue-50/80 to-cyan-50/50 dark:from-blue-950/40 dark:to-cyan-950/20 border-blue-500 shadow-md ring-2 ring-blue-500/30'
-                : 'bg-card border-border/70 hover:border-blue-300 dark:hover:border-blue-800'
-            )}
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xl font-bold">
-                📜
-              </span>
-              <Badge tone={activeFilter === 'certifications' ? 'blue' : 'slate'} size="sm">
-                {Math.round((summary.certified5PlusCount / (summary.totalMentees || 1)) * 100)}%
-              </Badge>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
-                {summary.certified5PlusCount}
-                <span className="text-xs font-normal text-muted ml-1.5">/ {summary.totalMentees}</span>
-              </div>
-              <div className="text-sm font-semibold text-foreground mt-0.5 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                ≥ 5 Certifications Completed
-              </div>
-              <p className="text-[11.5px] text-muted mt-1 leading-snug">
-                Completed 5+ courses (NPTEL, Coursera, AWS, Cisco)
-              </p>
-            </div>
-            {activeFilter === 'certifications' && (
-              <span className="mt-3 text-[11px] font-medium text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                ✓ Currently Shortlisting
-              </span>
-            )}
-          </button>
-
-          {/* Card 4: > 8 CGPA */}
-          <button
-            type="button"
-            onClick={() => setActiveFilter(activeFilter === 'cgpa' ? 'all' : 'cgpa')}
-            className={cx(
-              'group relative flex flex-col text-left p-5 rounded-2xl border transition-all duration-200 cursor-pointer',
-              'hover:shadow-md hover:-translate-y-0.5',
-              activeFilter === 'cgpa'
-                ? 'bg-gradient-to-br from-amber-50/80 to-yellow-50/50 dark:from-amber-950/40 dark:to-yellow-950/20 border-amber-500 shadow-md ring-2 ring-amber-500/30'
-                : 'bg-card border-border/70 hover:border-amber-300 dark:hover:border-amber-800'
-            )}
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xl font-bold">
-                🌟
-              </span>
-              <Badge tone={activeFilter === 'cgpa' ? 'amber' : 'slate'} size="sm">
-                {Math.round((summary.cgpaAbove8Count / (summary.totalMentees || 1)) * 100)}%
-              </Badge>
-            </div>
-            <div className="mt-4">
-              <div className="text-3xl font-extrabold tracking-tight text-foreground">
-                {summary.cgpaAbove8Count}
-                <span className="text-xs font-normal text-muted ml-1.5">/ {summary.totalMentees}</span>
-              </div>
-              <div className="text-sm font-semibold text-foreground mt-0.5 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                CGPA &gt; 8.0 Distinction
-              </div>
-              <p className="text-[11.5px] text-muted mt-1 leading-snug">
-                Consistently high academic performance across semesters
-              </p>
-            </div>
-            {activeFilter === 'cgpa' && (
-              <span className="mt-3 text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                ✓ Currently Shortlisting
-              </span>
-            )}
-          </button>
-        </div>
+        {/* Card 4: > 8 CGPA */}
+        <Card
+          as="button"
+          type="button"
+          interactive
+          onClick={() => setActiveFilter(activeFilter === 'cgpa' ? 'all' : 'cgpa')}
+          className={cx(
+            'flex flex-col justify-between p-4 sm:p-6 text-left transition-all',
+            activeFilter === 'cgpa'
+              ? 'ring-2 ring-brand-500 border-brand-500 bg-brand-50/20 dark:bg-brand-950/20'
+              : ''
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-[12px] font-medium text-muted sm:text-[12.5px]">
+              CGPA &gt; 8.0 Distinction
+            </span>
+            <Badge tone={activeFilter === 'cgpa' ? 'brand' : 'slate'} size="sm">
+              {cgpaPct}%
+            </Badge>
+          </div>
+          <div className="mt-3 flex items-baseline gap-1 sm:mt-4">
+            <span className="tnum font-display text-[28px] font-medium leading-none tracking-[-0.02em] text-ink sm:text-[34px]">
+              {summary.cgpaAbove8Count}
+            </span>
+            <span className="text-sm font-medium text-muted-soft">/ {summary.totalMentees}</span>
+          </div>
+          <div className="mt-2 text-[11px] leading-relaxed text-muted sm:mt-3 sm:text-[12px]">
+            {activeFilter === 'cgpa' ? 'Active shortlist filter' : 'Consistent academic distinction performance'}
+          </div>
+        </Card>
       </div>
 
       {/* SHORTLISTED ROSTER TABLE */}
-      <Card className="overflow-hidden border border-border/70 shadow-sm">
-        <div className="border-b border-border/60 bg-muted/20 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-foreground">
-                {filterLabels[activeFilter]}
-              </h3>
-              <Badge tone={activeFilter === 'all' ? 'slate' : 'indigo'}>
-                {shortlistedMentees.length} {shortlistedMentees.length === 1 ? 'Student' : 'Students'}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted mt-0.5">
-              {activeFilter === 'all'
-                ? 'Displaying all assigned mentees. Click an achievement card above to shortlist.'
-                : `Filtered by ${filterLabels[activeFilter].toLowerCase()}. Click any student to open full record book.`}
-            </p>
-          </div>
-
+      <SectionTable
+        title={filterTitles[activeFilter]}
+        subtitle={filterSubtitles[activeFilter]}
+        action={
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search shortlisted students…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-60 rounded-lg border border-border bg-background px-3 text-xs placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand-500"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1.5 text-xs text-muted hover:text-foreground"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+            {activeFilter !== 'all' && (
+              <Button size="xs" variant="ghost" onClick={() => setActiveFilter('all')}>
+                Show all mentees
+              </Button>
+            )}
+            <input
+              type="text"
+              placeholder="Filter by name or roll number…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 w-56 rounded-lg border border-border bg-card px-2.5 text-xs placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          {shortlistedMentees.length === 0 ? (
-            <div className="p-8">
-              <EmptyState
-                title="No students match this shortlist filter"
-                description="Try selecting a different filter or clearing search."
-                action={
-                  <Button size="sm" variant="secondary" onClick={() => { setActiveFilter('all'); setSearchQuery(''); }}>
-                    Show All Students
-                  </Button>
+        }
+      >
+        <DataTable
+          rows={shortlistedMentees}
+          rowKey={(m) => m.id}
+          onRowClick={(m) => onOpenMentee(m.id, 'growth')}
+          empty={
+            <EmptyState
+              title="No students match this criteria"
+              description="Try clearing search or picking another metric above."
+              action={
+                <Button size="sm" variant="secondary" onClick={() => { setActiveFilter('all'); setSearchQuery(''); }}>
+                  View All Mentees
+                </Button>
+              }
+            />
+          }
+          columns={[
+            {
+              key: 'student',
+              header: 'Student',
+              render: (m, i) => {
+                const initials = m.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase();
+                return (
+                  <div className="flex items-center gap-3">
+                    <Avatar initials={initials} seed={i} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink">{m.name}</p>
+                      <p className="tnum truncate text-[11.5px] text-muted">
+                        {m.rollNumber} · Year {m.year} ({m.section})
+                      </p>
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'cgpa',
+              header: 'CGPA',
+              align: 'right',
+              render: (m) => (
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="tnum font-medium text-ink">{m.cgpa.toFixed(1)}</span>
+                  {m.isHighCgpa && (
+                    <Badge tone="green" size="sm">
+                      &gt; 8.0
+                    </Badge>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'hackathons',
+              header: 'Hackathons',
+              render: (m) => {
+                if (!m.hasAttendedHackathon) {
+                  return <span className="text-[12px] text-muted">—</span>;
                 }
-              />
-            </div>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-border/60 bg-muted/40 font-semibold text-muted uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="px-4 py-3">Student</th>
-                  <th className="px-4 py-3">CGPA</th>
-                  <th className="px-4 py-3">Hackathons</th>
-                  <th className="px-4 py-3">Placement Readiness (4 Items)</th>
-                  <th className="px-4 py-3">Certificates</th>
-                  <th className="px-4 py-3">Projects</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {shortlistedMentees.map((m, i) => {
-                  const initials = m.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase();
+                return (
+                  <div>
+                    <Badge tone="indigo" size="sm">
+                      {m.hackathons.length} {m.hackathons.length === 1 ? 'Hackathon' : 'Hackathons'}
+                    </Badge>
+                    <p className="mt-0.5 truncate text-[11.5px] text-muted max-w-[200px]" title={m.hackathons[0]?.activity}>
+                      {m.hackathons[0]?.activity}
+                    </p>
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'placement',
+              header: 'Placement Readiness',
+              render: (m) => {
+                const { isComplete, missingItems, hasResume, hasGithub, hasLinkedin, hasCoding } = m.placementProfile;
+                const completedCount = [hasResume, hasGithub, hasLinkedin, hasCoding].filter(Boolean).length;
 
-                  const { hasResume, hasGithub, hasLinkedin, hasCoding, isComplete } = m.placementProfile;
-
+                if (isComplete) {
                   return (
-                    <tr
-                      key={m.id}
-                      className="group hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => onOpenMentee(m.id, 'growth')}
-                    >
-                      {/* Student Info */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar initials={initials} seed={i} size="sm" />
-                          <div className="min-w-0">
-                            <div className="font-semibold text-foreground group-hover:text-brand-600 transition-colors">
-                              {m.name}
-                            </div>
-                            <div className="text-[11px] text-muted">
-                              {m.rollNumber} · Year {m.year} ({m.section})
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* CGPA */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-sm text-foreground">{m.cgpa.toFixed(1)}</span>
-                          {m.isHighCgpa && (
-                            <Badge tone="green" size="sm">
-                              &gt; 8.0
-                            </Badge>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Hackathons */}
-                      <td className="px-4 py-3">
-                        {m.hasAttendedHackathon ? (
-                          <div className="space-y-1">
-                            <Badge tone="indigo" size="sm">
-                              🚀 {m.hackathons.length} {m.hackathons.length === 1 ? 'Hackathon' : 'Hackathons'}
-                            </Badge>
-                            <div className="text-[11px] text-muted truncate max-w-xs" title={m.hackathons.map((h) => h.activity).join(', ')}>
-                              {m.hackathons[0]?.activity}
-                              {m.hackathons.length > 1 && ` +${m.hackathons.length - 1} more`}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted text-[11px]">No hackathons</span>
-                        )}
-                      </td>
-
-                      {/* Placement Readiness */}
-                      <td className="px-4 py-3">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-1">
-                            <Badge tone={isComplete ? 'green' : 'amber'} size="sm">
-                              {isComplete ? '✓ Profile Complete' : `${[hasResume, hasGithub, hasLinkedin, hasCoding].filter(Boolean).length}/4 Complete`}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10.5px]">
-                            <span
-                              title="Resume"
-                              className={cx(
-                                'px-1.5 py-0.5 rounded font-mono',
-                                hasResume ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'
-                              )}
-                            >
-                              {hasResume ? '✓ Resume' : '✕ Resume'}
-                            </span>
-                            <span
-                              title="GitHub Profile"
-                              className={cx(
-                                'px-1.5 py-0.5 rounded font-mono',
-                                hasGithub ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'
-                              )}
-                            >
-                              {hasGithub ? '✓ GitHub' : '✕ GitHub'}
-                            </span>
-                            <span
-                              title="LinkedIn Profile"
-                              className={cx(
-                                'px-1.5 py-0.5 rounded font-mono',
-                                hasLinkedin ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'
-                              )}
-                            >
-                              {hasLinkedin ? '✓ LinkedIn' : '✕ LinkedIn'}
-                            </span>
-                            <span
-                              title="Coding Profile"
-                              className={cx(
-                                'px-1.5 py-0.5 rounded font-mono',
-                                hasCoding ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-500'
-                              )}
-                            >
-                              {hasCoding ? '✓ Coding' : '✕ Coding'}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Certifications */}
-                      <td className="px-4 py-3">
-                        <div className="space-y-1">
-                          <Badge tone={m.has5PlusCertifications ? 'blue' : 'slate'} size="sm">
-                            📜 {m.certificationsCount} Courses
-                          </Badge>
-                          {m.certifications.length > 0 && (
-                            <div className="text-[11px] text-muted truncate max-w-[180px]" title={m.certifications.map((c) => c.certification).join(', ')}>
-                              {m.certifications[0]?.certification}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Projects */}
-                      <td className="px-4 py-3">
-                        {m.projectsCount > 0 ? (
-                          <div className="space-y-0.5">
-                            <span className="font-medium text-foreground">{m.projectsCount} Project{m.projectsCount > 1 ? 's' : ''}</span>
-                            <div className="text-[11px] text-muted truncate max-w-[160px]" title={m.projects[0]?.title}>
-                              {m.projects[0]?.title}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-400 font-medium text-[11px]">No projects yet</span>
-                        )}
-                      </td>
-
-                      {/* Action */}
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <Button
-                          size="xs"
-                          variant="secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenMentee(m.id, 'profile');
-                          }}
-                        >
-                          Open Book →
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </Card>
-
-      {/* BOTTOM SECTION: Attention Needed Students */}
-      <div className="pt-4 border-t border-border/80">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-                <span>⚠️ Attention Needed Students</span>
-              </h2>
-              <Badge tone="rose">{summary.attentionNeededCount} Flagged</Badge>
-            </div>
-            <p className="text-xs text-muted mt-1">
-              Students identified with missing placement profiles, zero hackathons, incomplete projects, or low meeting attendance.
-            </p>
-          </div>
-
-          {/* Attention Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {[
-              { key: 'all', label: 'All Attention', count: summary.attentionNeededCount },
-              { key: 'incomplete-placement', label: 'Incomplete Placement', count: summary.incompletePlacementCount },
-              { key: 'no-hackathons', label: 'No Hackathons', count: summary.noHackathonsCount },
-              { key: 'inactive-meetings', label: 'Inactive Meetings', count: summary.inactiveMeetingsCount },
-              { key: 'no-projects', label: 'No Projects', count: summary.noProjectsCount },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setAttentionFilter(tab.key)}
-                className={cx(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5',
-                  attentionFilter === tab.key
-                    ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 font-semibold ring-1 ring-rose-500/30'
-                    : 'bg-muted/40 text-muted hover:bg-muted/80 hover:text-foreground'
-                )}
-              >
-                <span>{tab.label}</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-background/80 font-mono">
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Attention Students Grid / List */}
-        {attentionMentees.length === 0 ? (
-          <Card className="p-8 text-center border-dashed">
-            <p className="text-sm font-medium text-foreground">No students in this attention category</p>
-            <p className="text-xs text-muted mt-1">All students currently meet the required criteria.</p>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {attentionMentees.map((m, i) => {
-              const initials = m.name
-                .split(' ')
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase();
-
-              return (
-                <Card
-                  key={m.id}
-                  className="border border-border/70 hover:border-rose-300 dark:hover:border-rose-900 transition-all hover:shadow-sm"
-                >
-                  <CardBody className="p-4 space-y-3">
-                    {/* Header: Student Name + Roll Number */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar initials={initials} seed={i} size="sm" />
-                        <div>
-                          <div className="font-semibold text-xs text-foreground truncate max-w-[160px]">
-                            {m.name}
-                          </div>
-                          <div className="text-[11px] text-muted">
-                            {m.rollNumber} · CGPA {m.cgpa.toFixed(1)}
-                          </div>
-                        </div>
-                      </div>
-                      <Badge tone={m.attendance < 75 ? 'rose' : 'slate'} size="sm">
-                        {m.attendance}% Attn
+                    <div>
+                      <Badge tone="green" size="sm">
+                        Complete
                       </Badge>
+                      <p className="mt-0.5 text-[11.5px] text-muted">All 4 profiles verified</p>
                     </div>
+                  );
+                }
 
-                    {/* Attention Tags */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                        Intervention Needed:
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {m.attentionFlags.map((flag, idx) => (
-                          <Badge key={idx} tone={flag.tone} size="sm">
-                            {flag.label}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Specific Missing Placement details if any */}
-                    {!m.placementProfile.isComplete && (
-                      <div className="rounded-md bg-rose-50/60 dark:bg-rose-950/20 p-2 text-[11px] text-rose-700 dark:text-rose-300">
-                        <span className="font-medium">Missing Placement Profile:</span>{' '}
-                        {m.placementProfile.missingItems.join(', ')}
-                      </div>
+                return (
+                  <div>
+                    <Badge tone="amber" size="sm">
+                      {completedCount} of 4 Complete
+                    </Badge>
+                    <p className="mt-0.5 text-[11.5px] text-rose-600 dark:text-rose-400">
+                      Pending: {missingItems.join(', ')}
+                    </p>
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'certifications',
+              header: 'Certificates',
+              render: (m) => {
+                if (!m.certificationsCount) {
+                  return <span className="text-[12px] text-muted">—</span>;
+                }
+                return (
+                  <div>
+                    <Badge tone={m.has5PlusCertifications ? 'green' : 'slate'} size="sm">
+                      {m.certificationsCount} {m.certificationsCount === 1 ? 'Course' : 'Courses'}
+                    </Badge>
+                    {m.certifications[0] && (
+                      <p className="mt-0.5 truncate text-[11.5px] text-muted max-w-[170px]" title={m.certifications[0]?.certification}>
+                        {m.certifications[0]?.certification}
+                      </p>
                     )}
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'projects',
+              header: 'Projects',
+              render: (m) => {
+                if (!m.projectsCount) {
+                  return <span className="text-[12px] text-muted">No projects</span>;
+                }
+                return (
+                  <div>
+                    <span className="font-medium text-ink text-xs">
+                      {m.projectsCount} Project{m.projectsCount > 1 ? 's' : ''}
+                    </span>
+                    {m.projects[0] && (
+                      <p className="mt-0.5 truncate text-[11.5px] text-muted max-w-[160px]" title={m.projects[0]?.title}>
+                        {m.projects[0]?.title}
+                      </p>
+                    )}
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'action',
+              header: '',
+              align: 'right',
+              render: (m) => (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenMentee(m.id, 'growth');
+                  }}
+                >
+                  Open record
+                </Button>
+              ),
+            },
+          ]}
+        />
+      </SectionTable>
 
-                    {/* Quick Action Footer */}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => onOpenMentee(m.id, 'growth')}
-                        className="text-brand-600 dark:text-brand-400 hover:underline font-medium text-[11.5px]"
-                      >
-                        Open Workbook →
-                      </button>
-
-                      {onNavigateToMessages && (
-                        <Button
-                          size="xs"
-                          variant="secondary"
-                          onClick={() => onNavigateToMessages(m.id)}
-                          className="text-[11px]"
-                        >
-                          💬 Message
-                        </Button>
-                      )}
-                    </div>
-                  </CardBody>
-                </Card>
-              );
-            })}
+      {/* BOTTOM SECTION: Students Needing Attention */}
+      <SectionTable
+        title="Students Needing Attention"
+        subtitle="Mentees requiring mentor intervention for missing placement profiles, zero hackathons, or overdue meetings"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Tabs size="sm" items={ATTENTION_TABS} value={attentionFilter} onChange={setAttentionFilter} />
           </div>
-        )}
-      </div>
+        }
+      >
+        <DataTable
+          rows={attentionMentees}
+          rowKey={(m) => m.id}
+          onRowClick={(m) => onOpenMentee(m.id, 'growth')}
+          empty={
+            <EmptyState
+              title="No students flagged in this category"
+              description="All mentees meet the required criteria."
+              icon="✓"
+            />
+          }
+          columns={[
+            {
+              key: 'student',
+              header: 'Student',
+              render: (m, i) => {
+                const initials = m.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase();
+                return (
+                  <div className="flex items-center gap-3">
+                    <Avatar initials={initials} seed={i} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink">{m.name}</p>
+                      <p className="tnum truncate text-[11.5px] text-muted">
+                        {m.rollNumber} · Year {m.year} ({m.section})
+                      </p>
+                    </div>
+                  </div>
+                );
+              },
+            },
+            {
+              key: 'flags',
+              header: 'Intervention Required',
+              render: (m) => (
+                <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                  {m.attentionFlags.map((flag, idx) => (
+                    <Badge key={idx} tone={flag.tone} size="sm">
+                      {flag.label}
+                    </Badge>
+                  ))}
+                </div>
+              ),
+            },
+            {
+              key: 'standing',
+              header: 'Academic Standing',
+              render: (m) => (
+                <div className="text-xs">
+                  <span className="font-medium text-ink">CGPA {m.cgpa.toFixed(1)}</span>
+                  <span className="text-muted ml-2">· {m.attendance}% Attendance</span>
+                </div>
+              ),
+            },
+            {
+              key: 'action',
+              header: '',
+              align: 'right',
+              render: (m) => (
+                <div className="flex items-center justify-end gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenMentee(m.id, 'growth');
+                    }}
+                  >
+                    Open record
+                  </Button>
+                  {onNavigateToMessages && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateToMessages(m.id);
+                      }}
+                    >
+                      Message
+                    </Button>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
+      </SectionTable>
     </div>
   );
 }
