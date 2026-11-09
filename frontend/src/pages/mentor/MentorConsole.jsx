@@ -14,6 +14,7 @@ import { WatchList } from './sections/WatchList.jsx';
 import { ActionItemQueue } from './sections/ActionItemQueue.jsx';
 import { ParentLog } from './sections/ParentLog.jsx';
 import { Reports } from './sections/Reports.jsx';
+import { MenteeReport } from './sections/MenteeReport.jsx';
 import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
 import { Announcements } from './sections/Announcements.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
@@ -31,6 +32,7 @@ const TITLES = {
   messages: 'Messages',
   parents: 'Parent Interaction Log',
   reports: 'Term Reports',
+  'mentee-report': 'Mentee Analytical Report',
   timeline: 'Activity Timeline',
   announcements: 'Announcements',
 };
@@ -135,6 +137,7 @@ export default function MentorConsole() {
       label: 'Reports',
       items: [
         { key: 'reports', label: 'Term Reports' },
+        { key: 'mentee-report', label: 'Mentee Report' },
         { key: 'timeline', label: 'Activity Timeline' },
       ],
     },
@@ -258,6 +261,12 @@ export default function MentorConsole() {
           {section === 'parents' && <ParentLog />}
           {section === 'announcements' && <Announcements />}
           {section === 'reports' && <Reports />}
+          {section === 'mentee-report' && (
+            <MenteeReport
+              onOpenMentee={(id, tab) => openMentee(id, tab || 'profile')}
+              onNavigateToMessages={() => setSection('messages')}
+            />
+          )}
           {section === 'timeline' && <ActivityTimeline events={data.timeline} />}
         </div>
       </ErrorBoundary>

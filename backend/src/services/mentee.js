@@ -120,15 +120,19 @@ export function menteeToStudent(mentee) {
   const technicalPool = [
     { activity: 'Departmental Hackathon', role: 'Participant', achievement: 'Finalist' },
     { activity: 'KCT Codeathon 2025', role: 'Participant', achievement: 'Top 40' },
+    { activity: 'Smart India Hackathon', role: 'Team Lead', achievement: 'Internal Nominee' },
     { activity: 'Paper Presentation — IoT', role: 'Presenter', achievement: 'Second prize' },
   ];
+  const hasTech = mentee.attendance >= 75 && mentee.readinessDone >= 3;
   const participation = {
-    technical: technicalPool.slice(0, seed + 1).map((t, i) => ({
-      id: `${mentee.id}-tech-${i + 1}`,
-      date: ['Mar 2026', 'Sep 2025', 'Feb 2026'][i],
-      evidence: i === 0 ? [] : [],
-      ...t,
-    })),
+    technical: hasTech
+      ? technicalPool.slice(0, Math.min(technicalPool.length, (seed % 3) + 1)).map((t, i) => ({
+          id: `${mentee.id}-tech-${i + 1}`,
+          date: ['Mar 2026', 'Sep 2025', 'Feb 2026', 'Jan 2026'][i] || 'Feb 2026',
+          evidence: [],
+          ...t,
+        }))
+      : [],
     coCurricular:
       mentee.wellbeingConcerns > 1
         ? []
@@ -155,12 +159,17 @@ export function menteeToStudent(mentee) {
 
   /* Section 7 */
   const certPool = [
-    { certification: 'Data Structures', platform: 'NPTEL', completionDate: 'Dec 2025', evidence: [] },
-    { certification: 'Python for Everybody', platform: 'Coursera', completionDate: null, evidence: [] },
-    { certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', completionDate: null, evidence: [] },
+    { certification: 'Data Structures & Algorithms', platform: 'NPTEL', completionDate: 'Dec 2025', evidence: [] },
+    { certification: 'Python for Everybody', platform: 'Coursera', completionDate: 'Nov 2025', evidence: [] },
+    { certification: 'AWS Cloud Practitioner', platform: 'AWS Skill Builder', completionDate: 'Jan 2026', evidence: [] },
+    { certification: 'Full Stack Web Development', platform: 'Coursera', completionDate: 'Feb 2026', evidence: [] },
+    { certification: 'Machine Learning Specialization', platform: 'Coursera', completionDate: 'Mar 2026', evidence: [] },
+    { certification: 'Cisco CCNA: Introduction to Networks', platform: 'Cisco Networking Academy', completionDate: 'Apr 2026', evidence: [] },
+    { certification: 'Google Cloud Associate Cloud Engineer', platform: 'Google Cloud Skills Boost', completionDate: 'May 2026', evidence: [] },
   ];
+  const certCount = mentee.readinessDone >= 5 ? Math.min(certPool.length, 5 + (seed % 2)) : mentee.readinessDone >= 4 ? 4 : mentee.readinessDone >= 3 ? 2 : 1;
   const certifications = certPool
-    .slice(0, mentee.readinessDone >= 4 ? 3 : 2)
+    .slice(0, certCount)
     .map((c, i) => ({ id: `${mentee.id}-cert-${i + 1}`, ...c }));
 
   /* Section 8 — the first `readinessDone` items are complete. */
@@ -170,10 +179,45 @@ export function menteeToStudent(mentee) {
     note: i < mentee.readinessDone ? 'Verified by mentor' : i < mentee.readinessDone + 2 ? 'Underway' : 'Yet to begin',
   }));
 
+  const placementProfile = mentee.placementProfile ?? (
+    mentee.readinessDone >= 4
+      ? {
+          resume: { fileName: `${mentee.rollNumber}_Resume.pdf`, fileSize: 194560, uploadedAt: '2026-07-15' },
+          linkedinUrl: `https://linkedin.com/in/${mentee.name.toLowerCase().replace(/[^a-z]/g, '')}`,
+          githubUrl: `https://github.com/${mentee.name.toLowerCase().replace(/[^a-z]/g, '')}`,
+          codingPlatforms: [
+            { name: 'LeetCode', profileUrl: `https://leetcode.com/u/${mentee.rollNumber.toLowerCase()}` },
+            { name: 'CodeChef', profileUrl: `https://www.codechef.com/users/${mentee.rollNumber.toLowerCase()}` },
+          ],
+        }
+      : mentee.readinessDone === 3
+      ? {
+          resume: { fileName: `${mentee.rollNumber}_Resume.pdf`, fileSize: 182400, uploadedAt: '2026-07-20' },
+          linkedinUrl: `https://linkedin.com/in/${mentee.name.toLowerCase().replace(/[^a-z]/g, '')}`,
+          githubUrl: `https://github.com/${mentee.name.toLowerCase().replace(/[^a-z]/g, '')}`,
+          codingPlatforms: [],
+        }
+      : mentee.readinessDone === 2
+      ? {
+          resume: { fileName: `${mentee.rollNumber}_Resume_Draft.pdf`, fileSize: 154000, uploadedAt: '2026-07-10' },
+          linkedinUrl: `https://linkedin.com/in/${mentee.name.toLowerCase().replace(/[^a-z]/g, '')}`,
+          githubUrl: '',
+          codingPlatforms: [],
+        }
+      : {
+          resume: null,
+          linkedinUrl: '',
+          githubUrl: '',
+          codingPlatforms: [],
+        }
+  );
+
   /* Section 9 */
+  const hasProjects = !(mentee.standingArrears > 0 && mentee.readinessDone <= 2);
   const internshipAndProject = {
-    records:
-      mentee.year === 4 && mentee.readinessDone >= 3
+    records: !hasProjects
+      ? []
+      : mentee.year === 4 && mentee.readinessDone >= 3
         ? [
             {
               id: `${mentee.id}-ip-1`,
@@ -415,6 +459,7 @@ export function menteeToStudent(mentee) {
     participation,
     certifications,
     placementReadiness,
+    placementProfile,
     internshipAndProject,
     wellbeing,
     parentInteractions,
