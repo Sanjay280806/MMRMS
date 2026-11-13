@@ -287,7 +287,7 @@ export function menteeToStudent(mentee) {
     return {
       id: `${mentee.id}-mtg-${number}`,
       number,
-      date: ['22 Jul 2026', '05 Jul 2026', '14 Jun 2026', '12 Aug 2025'][i] ?? '12 Aug 2025',
+      date: (i === 0 && mentee.lastMeeting) ? mentee.lastMeeting : (['22 Jul 2026', '05 Jul 2026', '14 Jun 2026', '12 Aug 2025'][i] ?? '12 Aug 2025'),
       duration: '30 min',
       mode: i % 2 === 0 ? 'Online' : 'Offline',
       agenda: struggling

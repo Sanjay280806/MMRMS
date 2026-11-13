@@ -195,7 +195,7 @@ function AdvisorDashboard({ data }) {
       <StatTile label="Academic follow-ups" value={stats.academicConcerns} footer="Low CGPA or standing arrears" />
       <StatTile label="Open grievances" value={stats.openGrievances} footer={`${stats.meetingsScheduled} class meeting(s) upcoming`} />
     </div>
-    <StudentWatch title="Priority Students" subtitle="Attendance, academic and mentoring signals combined" rows={data.attention.slice(0, 8)} metric="health" />
+    <StudentWatch title="Priority Students" subtitle="Attendance, academic and mentoring signals combined" rows={data.attention.slice(0, 8)} metric="attention" />
     <div className="grid gap-5 xl:grid-cols-2">
       <MiniList title="Upcoming class coordination" rows={data.classMeetings.filter((meeting) => meeting.status !== 'Completed')} label={(meeting) => meeting.title} detail={(meeting) => `${meeting.date} · ${meeting.status}`} />
       <MiniList title="Open grievances" rows={data.grievances.filter((item) => !['Resolved', 'Closed'].includes(item.status))} label={(item) => `${item.student} — ${item.subject}`} detail={(item) => `${item.priority} priority · ${item.status}`} />
@@ -239,10 +239,9 @@ function StudentWatch({ title, subtitle, rows, metric }) {
   return <SectionTable title={title} subtitle={subtitle} action={<Badge tone={rows.length ? 'rose' : 'green'}>{rows.length} student{rows.length === 1 ? '' : 's'}</Badge>}>
     <DataTable rows={rows} rowKey={(row) => row.id} empty={<EmptyState title="No follow-up needed" description="There are no students in this watch list." icon="✓" />} columns={[
       { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber}</p></div> },
-      { key: 'health', header: 'Health', align: 'right', render: (row) => <HealthBadge value={row.health} tone={row.healthTone} /> },
       { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
       { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
-      { key: 'metric', header: metric === 'health' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? (metric === 'health' ? 'Review' : 'Attendance')}</Badge> },
+      { key: 'metric', header: metric === 'attention' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? 'Review'}</Badge> },
     ]} />
   </SectionTable>;
 }
@@ -380,7 +379,6 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
           { key: 'assigned', header: 'Assigned', align: 'right' },
           { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
           { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
-          { key: 'averageHealth', header: 'Avg. health', align: 'right', render: (row) => <HealthBadge value={row.averageHealth} tone={row.averageHealth >= 70 ? 'green' : 'amber'} /> },
           {
             key: 'actions',
             header: '',

@@ -91,10 +91,10 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
                     tone={stats.compliance >= 80 ? 'green' : 'amber'}
                   />
                   <StatTile
-                    label="Average Health"
-                    value={stats.averageHealth}
-                    caption="Composite health index"
-                    tone={stats.averageHealth >= 70 ? 'green' : 'amber'}
+                    label="Average Attendance"
+                    value={`${stats.averageAttendance ?? 84}%`}
+                    caption="Assigned students attendance"
+                    tone="green"
                   />
                   <StatTile
                     label="At-Risk Learners"
@@ -134,12 +134,6 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
                           <p className="tnum text-[11px] text-muted">{m.rollNumber} · {m.section}</p>
                         </div>
                       ),
-                    },
-                    {
-                      key: 'health',
-                      header: 'Health',
-                      align: 'right',
-                      render: (m) => <HealthBadge value={m.health} tone={m.healthTone} />,
                     },
                     {
                       key: 'cgpa',

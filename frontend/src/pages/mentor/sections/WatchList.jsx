@@ -47,7 +47,6 @@ export function WatchList({ section, title, subtitle, mentees, onOpen, metric, d
               return <Badge tone={value.tone}>{value.value}</Badge>;
             },
           },
-          ...(showHealth ? [{ key: 'health', header: 'Health', align: 'right', render: (m) => <HealthBadge value={m.health} tone={m.healthTone} /> }] : []),
           { key: 'detail', header: 'Detail', align: 'right', render: (m) => <span className="text-[12px] text-muted">{detail(m)}</span> },
           {
             key: 'open',

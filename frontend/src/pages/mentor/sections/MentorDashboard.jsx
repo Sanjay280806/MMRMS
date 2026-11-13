@@ -85,7 +85,7 @@ export function MentorDashboard({ data, onOpenMentee }) {
 
       <SectionTable
         title="Students Needing Attention"
-        subtitle="Ranked by health index · lowest first"
+        subtitle="Students with attendance shortfalls, overdue meetings, or standing arrears"
         action={<Badge tone={attention.length ? 'rose' : 'green'} size="md">{attention.length} flagged</Badge>}
       >
         <DataTable
@@ -115,7 +115,6 @@ export function MentorDashboard({ data, onOpenMentee }) {
                 </div>
               ),
             },
-            { key: 'health', header: 'Health', align: 'right', render: (m) => <HealthBadge value={m.health} tone={m.healthTone} /> },
             { key: 'cgpa', header: 'CGPA', align: 'right', render: (m) => <span className="tnum">{m.cgpa.toFixed(1)}</span> },
             {
               key: 'attendance',
