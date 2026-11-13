@@ -216,7 +216,7 @@ export default function MentorConsole() {
               mentees={data.attendanceWatch}
               onOpen={(id) => openMentee(id, 'academics')}
               showHealth={false}
-              metric={(m) => ({ label: 'Attendance', value: `${m.attendance}%`, tone: m.health < 50 ? 'rose' : 'amber' })}
+              metric={(m) => ({ label: 'Attendance', value: `${m.attendance}%`, tone: m.attendance < 65 ? 'rose' : 'amber' })}
               detail={(m) => `${m.shortageCount} subject${m.shortageCount === 1 ? '' : 's'} below requirement`}
               emptyTitle="No attendance shortfalls"
             />

@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { HttpError } from '../middleware/error.js';
 import {
   findMenteeById,
+  findMentorById,
   listAllMentees,
   listArchivedStaff,
   listEligibleFaculty,
@@ -14,10 +15,13 @@ import { summariseMentee } from '../services/mentor.js';
 import {
   buildHodOverview,
   getCohortsSummary,
+  getDepartmentMeetingMinutes,
+  getHodAllStudents,
   getHodAtRiskStudents,
   getHodComplianceMatrix,
   getHodMentorDetail,
   getHodMentors,
+  getLongPendingActionItems,
 } from '../services/hod.js';
 
 const router = Router();
@@ -117,10 +121,62 @@ router.get('/me/compliance', (_req, res) => {
   res.json(getHodComplianceMatrix());
 });
 
+router.get('/me/meeting-minutes', (_req, res) => {
+  res.json(getDepartmentMeetingMinutes());
+});
+
+router.get('/me/action-items', (_req, res) => {
+  res.json(getLongPendingActionItems());
+});
+
+router.get('/me/students', (_req, res) => {
+  res.json(getHodAllStudents());
+});
+
 router.get('/me/students/:studentId', (req, res, next) => {
-  const student = findMenteeById(req.params.studentId);
+  const { studentId } = req.params;
+  let student = findMenteeById(studentId);
+  if (!student) {
+    const mentees = listAllMentees();
+    student = mentees.find(
+      (m) =>
+        m.id?.toLowerCase() === studentId.toLowerCase() ||
+        m.rollNumber?.toLowerCase() === studentId.toLowerCase()
+    );
+  }
   if (!student) return next(new HttpError(404, 'Student not found'));
-  res.json(buildMenteeRecordBook(student));
+
+  const book = buildMenteeRecordBook(student);
+  const mentor = student.mentorId ? findMentorById(student.mentorId) : null;
+
+  // Enrich with normalized aliases for maximum client compatibility
+  res.json({
+    ...book,
+    profile: {
+      personal: {
+        name: student.name || book.identity?.name || 'Student Details',
+        rollNumber: student.rollNumber || book.identity?.rollNumber || '—',
+        programme: book.identity?.programme || 'B.E. Computer Science and Engineering',
+        batch: book.identity?.batch || student.section || '2024 BCS',
+        section: student.section || book.identity?.section || '—',
+        email: student.email || book.identity?.email || '—',
+        mobile: student.mobile || book.identity?.mobile || '—',
+      },
+      mentor: {
+        name: mentor?.name || student.mentorName || book.identity?.mentor?.name || '—',
+        email: mentor?.email || book.identity?.mentor?.email || '—',
+        cabin: mentor?.cabin || book.identity?.mentor?.cabin || '—',
+      },
+    },
+    academics: {
+      cgpa: book.sectionOne?.academicBackground?.currentCgpa ?? book.performance?.cgpa ?? student.gpa ?? '—',
+      standingArrears: book.sectionOne?.academicBackground?.standingArrears ?? student.standingArrears ?? 0,
+    },
+    attendance: {
+      ...book.attendance,
+      currentPercentage: book.attendance?.current ?? student.attendance ?? 0,
+    },
+  });
 });
 
 export default router;

@@ -360,7 +360,6 @@ export function MentorReassignmentTool({
                         <th className="p-3 text-right">Attendance</th>
                         <th className="p-3 text-right">CGPA</th>
                         <th className="p-3 text-right">Meetings</th>
-                        <th className="p-3 text-right">Health</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
@@ -395,11 +394,6 @@ export function MentorReassignmentTool({
                             </td>
                             <td className="p-3 text-right tnum font-medium">{s.cgpa?.toFixed(2)}</td>
                             <td className="p-3 text-right tnum">{s.meetingsHeld} / {s.meetingsDue}</td>
-                            <td className="p-3 text-right">
-                              <Badge tone={s.health < 60 ? 'rose' : s.health < 75 ? 'amber' : 'green'} size="xs">
-                                {s.health}/100
-                              </Badge>
-                            </td>
                           </tr>
                         );
                       })}
