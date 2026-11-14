@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Badge, HealthBadge } from '../ui/Badge.jsx';
+import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DataTable } from '../ui/DataTable.jsx';
@@ -166,7 +166,7 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
                       header: 'Status',
                       align: 'right',
                       render: (m) => (
-                        <Badge tone={m.flagTone ?? (m.health < 70 ? 'rose' : 'green')}>
+                        <Badge tone={m.flagTone ?? (m.attendanceBelowRequirement || m.standingArrears > 0 ? 'rose' : 'green')}>
                           {m.flagReason ?? 'On Track'}
                         </Badge>
                       ),

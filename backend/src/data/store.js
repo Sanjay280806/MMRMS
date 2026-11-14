@@ -537,6 +537,11 @@ export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-
       mentorUser.archivedReason = null;
     }
   }
+  // Recalculate mentee counts for all mentors
+  for (const m of mentors) {
+    m.menteeCount = mentees.filter((s) => s.mentorId === m.id).length;
+  }
+
   return {
     success: true,
     mentor: {
@@ -545,6 +550,7 @@ export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-
       staffCode: mentor.staffCode,
       archived: mentor.archived,
       status: mentor.status,
+      menteeCount: mentor.menteeCount,
     },
   };
 }
