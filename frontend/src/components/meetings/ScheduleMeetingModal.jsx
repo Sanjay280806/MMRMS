@@ -5,23 +5,8 @@ import { useResource } from '../../hooks/useResource.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
-import { ChipGroup, TextArea, TextField } from '../ui/Field.jsx';
+import { TextField } from '../ui/Field.jsx';
 import { AlertBanner } from '../auth/AlertBanner.jsx';
-
-const TOPIC_CATEGORIES = ['Academic', 'Attendance', 'Profile Upgradation', 'Career', 'Others'];
-const AGENDA_OPTIONS = [
-  'Academic Review',
-  'Attendance Review',
-  'Placement Preparation',
-  'Personal Discussion',
-  'Goal Progress',
-];
-const DURATION_OPTIONS = [
-  { label: '15 min', value: 15 },
-  { label: '30 min', value: 30 },
-  { label: '45 min', value: 45 },
-  { label: '60 min', value: 60 },
-];
 
 export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
   const today = new Date().toISOString().split('T')[0];
@@ -31,28 +16,12 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
   const [date, setDate] = useState(today);
   const [time, setTime] = useState('10:00');
   const [location, setLocation] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState(30);
-  const [category, setCategory] = useState('Academic');
-  const [agenda, setAgenda] = useState(['Academic Review']);
-  const [topicsDiscussed, setTopicsDiscussed] = useState('');
-  const [mentorSuggestions, setMentorSuggestions] = useState('');
+  const [objective, setObjective] = useState('');
   const [customMeetingUrl, setCustomMeetingUrl] = useState('');
-  const [actionTask, setActionTask] = useState('');
-  const [actionTargetDate, setActionTargetDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   const activeMentee = mentee || (roster?.mentees ?? []).find((m) => m.id === selectedMenteeId);
-
-  function toggleAgenda(item) {
-    if (agenda.includes(item)) {
-      if (agenda.length > 1) {
-        setAgenda(agenda.filter((a) => a !== item));
-      }
-    } else {
-      setAgenda([...agenda, item]);
-    }
-  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -64,47 +33,48 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
       return;
     }
 
+    if (!date?.trim()) {
+      setError('Meeting date is required.');
+      return;
+    }
+
+    if (!objective.trim()) {
+      setError('Please enter the one-line meeting objective.');
+      return;
+    }
+
     if (mode === 'Offline' && !location.trim()) {
-      setError('Meeting location is mandatory for offline meetings.');
+      setError('Meeting location / venue is mandatory for offline meetings.');
       return;
     }
 
     setSubmitting(true);
 
     const [sh, sm] = (time || '10:00').split(':').map(Number);
-    const totalMin = (sh || 0) * 60 + (sm || 0) + Number(durationMinutes || 30);
+    const totalMin = (sh || 0) * 60 + (sm || 0) + 30; // standard 30 min duration
     const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
     const endM = String(totalMin % 60).padStart(2, '0');
     const endTime = `${endH}:${endM}`;
 
-    const actionItems = actionTask.trim()
-      ? [
-          {
-            task: actionTask.trim(),
-            responsible: 'Student',
-            targetDate: actionTargetDate || date,
-            status: 'Pending',
-          },
-        ]
-      : [];
+    const cleanObjective = objective.trim();
 
     const payload = {
       date,
-      startTime: time,
+      startTime: time || '10:00',
       endTime,
-      durationMinutes,
+      durationMinutes: 30,
       mode,
       location: mode === 'Online' ? 'Microsoft Teams' : location.trim() || 'Campus',
-      category,
-      agenda,
-      topicsDiscussed: topicsDiscussed.trim() || `${category} Mentoring Session`,
-      mentorSuggestions: mentorSuggestions.trim() || 'Attend review and work on agreed points.',
+      category: 'Academic',
+      agenda: [cleanObjective],
+      agendaNotes: cleanObjective,
+      topicsDiscussed: cleanObjective,
+      mentorSuggestions: 'Scheduled session. Guidance and minutes will be recorded during review.',
       studentConcerns: 'None recorded.',
       supportRequired: 'None.',
       mentorSigned: true,
       studentSigned: false,
       customMeetingUrl: customMeetingUrl.trim() || undefined,
-      actionItems,
     };
 
     try {
@@ -130,13 +100,13 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
         if (e.target === e.currentTarget && !submitting) onClose();
       }}
     >
-      <Card className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden bg-white shadow-2xl">
+      <Card className="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden bg-white shadow-2xl rounded-2xl border border-line">
         <header className="border-b border-line bg-canvas/40 px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-indigo-600">
-                  Section 12 · Mentoring Session
+                  Mentoring Session
                 </span>
                 <Badge tone={mode === 'Online' ? 'indigo' : 'neutral'} size="sm">
                   {mode === 'Online' ? 'Microsoft Teams' : 'In-Person'}
@@ -151,7 +121,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                 </p>
               ) : (
                 <p className="mt-0.5 text-xs text-muted">
-                  Schedule an online or offline mentoring session with your mentee.
+                  Quickly schedule an online or offline mentoring session.
                 </p>
               )}
             </div>
@@ -170,6 +140,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             {error && <AlertBanner tone="rose" title={error} />}
 
+            {/* 1. Mentee Selection (if not pre-selected) */}
             {!mentee && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -191,7 +162,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
               </div>
             )}
 
-            {/* Mode Selector */}
+            {/* 2. Mode Selector */}
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Meeting Mode
@@ -209,7 +180,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
                   </svg>
-                  Online (Teams Automated)
+                  Online (Teams)
                 </button>
                 <button
                   type="button"
@@ -220,7 +191,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                       : 'border-line bg-white text-muted hover:border-line-strong'
                   }`}
                 >
-                  🏢 Offline (Cabin / In-Person)
+                  🏢 Offline (In-Person)
                 </button>
               </div>
 
@@ -230,13 +201,13 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                     <svg className="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
                     </svg>
-                    Microsoft Teams Online Meeting
+                    Microsoft Teams Online Session
                   </div>
                   <p className="text-[11.5px] text-indigo-700 leading-relaxed">
-                    MMRMS automatically schedules the meeting on your KCT Teams calendar. You can also paste an existing Teams room link below if you have a recurring link:
+                    Automatically schedules the meeting on your KCT Teams calendar. Optionally provide a custom room link:
                   </p>
                   <TextField
-                    placeholder="https://teams.microsoft.com/... (Leave empty for auto-generated)"
+                    placeholder="https://teams.microsoft.com/... (Optional)"
                     value={customMeetingUrl}
                     onChange={(e) => setCustomMeetingUrl(e.target.value)}
                   />
@@ -261,7 +232,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
               )}
             </div>
 
-            {/* Date & Time */}
+            {/* 3. Date & Time */}
             <div className="grid grid-cols-2 gap-3">
               <TextField
                 label="Date *"
@@ -271,104 +242,26 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                 required
               />
               <TextField
-                label="Time"
+                label="Time *"
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
+                required
               />
             </div>
 
-            {/* Duration */}
+            {/* 4. One-line Meeting Objective */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Duration
-              </label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {DURATION_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setDurationMinutes(opt.value)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      durationMinutes === opt.value
-                        ? 'bg-ink text-white shadow-xs'
-                        : 'border border-line bg-white text-muted hover:border-line-strong'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Category */}
-            <ChipGroup
-              label="Topic Category"
-              options={TOPIC_CATEGORIES}
-              value={category}
-              onChange={setCategory}
-            />
-
-            {/* Agenda Checklist */}
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-                Agenda Checklist
-              </label>
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {AGENDA_OPTIONS.map((item) => {
-                  const selected = agenda.includes(item);
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => toggleAgenda(item)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                        selected
-                          ? 'bg-indigo-600 text-white'
-                          : 'border border-line bg-white text-ink hover:bg-canvas'
-                      }`}
-                    >
-                      {selected ? '✓ ' : '+ '}
-                      {item}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Topics Discussed / Subject */}
-            <TextField
-              label="Meeting Subject / Objective *"
-              placeholder="e.g. Semester 5 Performance Review & Arrear Clearance"
-              value={topicsDiscussed}
-              onChange={(e) => setTopicsDiscussed(e.target.value)}
-            />
-
-            {/* Mentor Advice / Suggestions */}
-            <TextArea
-              label="Mentor Suggestions / Discussion Points"
-              placeholder="Advice given to student, targets discussed..."
-              rows={2}
-              value={mentorSuggestions}
-              onChange={(e) => setMentorSuggestions(e.target.value)}
-            />
-
-            {/* Action Item */}
-            <div className="rounded-xl border border-line bg-canvas/30 p-3.5 space-y-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                Follow-up Action Item (Optional)
-              </span>
               <TextField
-                placeholder="e.g. Submit attendance proof to department coordinator"
-                value={actionTask}
-                onChange={(e) => setActionTask(e.target.value)}
+                label="One-line Meeting Objective *"
+                placeholder="e.g. Semester 5 Performance Review & Career Mentoring"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                required
               />
-              <TextField
-                label="Target Date"
-                type="date"
-                value={actionTargetDate}
-                onChange={(e) => setActionTargetDate(e.target.value)}
-              />
+              <p className="mt-1 text-[11px] text-muted">
+                A brief one-line description of the purpose of this mentoring session.
+              </p>
             </div>
           </div>
 
@@ -376,8 +269,8 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
             <Button type="button" variant="ghost" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" size="md" loading={submitting}>
-              {mode === 'Online' ? '📅 Schedule & Generate Teams Link' : 'Save Meeting'}
+            <Button type="submit" size="sm" loading={submitting} className="rounded-xl px-4 py-2 font-semibold">
+              {mode === 'Online' ? '📅 Schedule Teams Meeting' : 'Schedule Meeting'}
             </Button>
           </footer>
         </form>
