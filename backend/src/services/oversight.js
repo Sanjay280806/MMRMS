@@ -71,8 +71,8 @@ export function buildStudentDirectory(query = {}, coordinator = null) {
   };
 }
 
-function mentorTracker(students) {
-  return listMentors().map((mentor) => {
+function mentorTracker(students, includeArchived = false) {
+  return listMentors(includeArchived).map((mentor) => {
     const assigned = students.filter((student) => student.id && listAllMentees().find((raw) => raw.id === student.id)?.mentorId === mentor.id);
     const meetingsHeld = assigned.reduce((sum, student) => sum + student.meetingsHeld, 0);
     const meetingsDue = assigned.reduce((sum, student) => sum + student.meetingsDue, 0);
@@ -81,13 +81,18 @@ function mentorTracker(students) {
       id: mentor.id,
       staffCode: mentor.staffCode,
       name: mentor.name,
+      designation: mentor.designation,
       initials: initials(mentor.name),
       assigned: assigned.length,
+      menteeCount: assigned.length,
       meetingsHeld,
       meetingsDue,
       compliance,
-      atRisk: assigned.filter((student) => student.health < 70).length,
-      averageHealth: mean(assigned.map((student) => student.health)),
+      atRisk: assigned.filter((student) => student.attendanceBelowRequirement || student.standingArrears > 0).length,
+      archived: Boolean(mentor.archived),
+      status: mentor.status || (mentor.archived ? 'Archived' : 'Active'),
+      archivedAt: mentor.archivedAt || null,
+      archivedReason: mentor.archivedReason || null,
     };
   });
 }
@@ -133,13 +138,14 @@ export function buildCoordinatorOverview(coordinator) {
       })
     : allStudents;
 
-  const mentors = mentorTracker(students);
+  const mentors = mentorTracker(students, true);
+  const activeMentors = mentors.filter((m) => !m.archived);
   const attendanceShortfalls = students.filter((student) => student.attendanceBelowRequirement);
-  const atRisk = students.filter((student) => student.health < 70);
+  const atRisk = students.filter((student) => student.attendanceBelowRequirement || student.standingArrears > 0);
   const events = listCoordinatorEvents();
   const odRequests = listOdRequests();
-  const totalDue = mentors.reduce((sum, mentor) => sum + mentor.meetingsDue, 0);
-  const totalHeld = mentors.reduce((sum, mentor) => sum + mentor.meetingsHeld, 0);
+  const totalDue = activeMentors.reduce((sum, mentor) => sum + mentor.meetingsDue, 0);
+  const totalHeld = activeMentors.reduce((sum, mentor) => sum + mentor.meetingsHeld, 0);
 
   return {
     institution: INSTITUTION,
@@ -151,7 +157,10 @@ export function buildCoordinatorOverview(coordinator) {
     },
     stats: {
       students: students.length,
-      mentors: mentors.length,
+      mentors: activeMentors.length,
+      activeMentors: activeMentors.length,
+      archivedMentors: mentors.filter((m) => m.archived).length,
+      totalMentors: mentors.length,
       averageAttendance: mean(students.map((student) => student.attendance)),
       atRisk: atRisk.length,
       mentorCompliance: totalDue ? Math.round((totalHeld / totalDue) * 100) : 0,
@@ -159,7 +168,7 @@ export function buildCoordinatorOverview(coordinator) {
       plannedEvents: events.filter((event) => event.status !== 'Completed').length,
     },
     mentors,
-    atRisk: atRisk.sort((a, b) => a.health - b.health),
+    atRisk: atRisk.sort((a, b) => a.attendance - b.attendance),
     attendanceWatch: attendanceShortfalls.sort((a, b) => a.attendance - b.attendance),
     events,
     odRequests: odRequests.map((request) => {

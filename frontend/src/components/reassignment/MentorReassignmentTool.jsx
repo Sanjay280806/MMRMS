@@ -162,12 +162,12 @@ export function MentorReassignmentTool({
     <div className="space-y-6 animate-fadeRise">
       {/* Header Banner */}
       <SectionCard
-        title="Mentor Reassignment & Succession Tool"
+        title="Mentor Reassignment & Succession"
         subtitle="Bulk-select and transfer mentees when faculty discontinue. All Section 12 meeting logs, goals, and history are seamlessly preserved."
         action={
           onCancel && (
             <Button size="xs" variant="secondary" onClick={onCancel}>
-              ✕ Close Tool
+              ✕ Close
             </Button>
           )
         }
@@ -187,11 +187,11 @@ export function MentorReassignmentTool({
             </p>
             {successInfo.departingMentor?.archived ? (
               <p className="mt-2 text-[12.5px] font-medium text-bad-ink">
-                Departing mentor account for {successInfo.departingMentor?.name} has been <span className="font-semibold underline">soft-deleted (archived)</span> as requested.
+                Departing mentor account for {successInfo.departingMentor?.name} has been <span className="font-semibold underline">archived</span> as requested.
               </p>
             ) : (
               <p className="mt-2 text-[12.5px] font-medium text-good-ink">
-                Departing mentor {successInfo.departingMentor?.name} remains <span className="font-semibold underline">Active</span> in the faculty directory with {successInfo.departingMentor?.menteeCount ?? 0} mentees (not soft-deleted).
+                Departing mentor {successInfo.departingMentor?.name} remains <span className="font-semibold underline">Active</span> in the faculty directory with {successInfo.departingMentor?.menteeCount ?? 0} mentees (not archived).
               </p>
             )}
 
@@ -407,10 +407,10 @@ export function MentorReassignmentTool({
             <div className="rounded-2xl border border-line bg-surface-subtle p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-[12.5px] font-bold text-ink">
-                  Soft Delete Option (Departing Mentor)
+                  Archive Option (Departing Mentor)
                 </span>
                 <Badge tone={archiveDepartingMentor ? 'rose' : 'slate'} size="xs">
-                  {archiveDepartingMentor ? 'Soft delete departing mentor' : 'Keep active (default)'}
+                  {archiveDepartingMentor ? 'Archive departing mentor' : 'Keep active (default)'}
                 </Badge>
               </div>
 
@@ -423,10 +423,10 @@ export function MentorReassignmentTool({
                 />
                 <div>
                   <span className="text-[13px] font-semibold text-ink block">
-                    Soft delete departing mentor account (Archive account)
+                    Archive departing mentor account
                   </span>
                   <span className="text-[11.5px] text-muted block leading-relaxed mt-0.5">
-                    <strong>Note:</strong> Not all mentors whose mentees are changed will be soft deleted. Only if you check this option will this departing mentor be soft deleted (archived). If unchecked, the mentor remains active in the faculty directory with 0 or remaining mentees.
+                    <strong>Note:</strong> Not all mentors whose mentees are changed will be archived. Only if you check this option will this departing mentor be archived. If unchecked, the mentor remains active in the faculty directory with 0 or remaining mentees.
                   </span>
                 </div>
               </label>
