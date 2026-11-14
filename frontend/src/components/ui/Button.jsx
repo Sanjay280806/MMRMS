@@ -8,6 +8,7 @@ const VARIANTS = {
 };
 
 const SIZES = {
+  xs: 'px-3 py-1.5 text-xs rounded-xl',
   sm: 'px-3.5 py-2 text-xs rounded-xl',
   md: 'px-4 py-2.5 text-[13px] rounded-field',
   lg: 'w-full px-4 py-3.5 text-sm rounded-xl',
@@ -26,7 +27,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={cx(VARIANTS[variant], SIZES[size], className)}
+      className={cx(VARIANTS[variant], SIZES[size] || SIZES.md, className)}
       {...rest}
     >
       {loading && <Spinner />}

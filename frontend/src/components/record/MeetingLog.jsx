@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { api } from '../../api/client.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DefinitionList } from '../ui/DefinitionList.jsx';
@@ -9,68 +8,11 @@ import { ProgressBar } from '../ui/ProgressBar.jsx';
 import { SectionCard } from '../ui/SectionCard.jsx';
 import { Button } from '../ui/Button.jsx';
 import { cx, tone as toneOf } from '../../lib/tone.js';
-
-/** Month abbreviation → 1-based number. Matches both short and full month names. */
-const MONTH_NUM = {
-  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
-  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
-  January: 1, February: 2, March: 3, April: 4, June: 6,
-  July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
-};
-
-/**
- * Robust date parser converting any date string (ISO YYYY-MM-DD, DD-MM-YYYY,
- * "22 Jul 2026", "22-Jul-2026", etc.) into a comparable integer YYYYMMDD.
- */
-function parseAnyDateToNumber(dateStr) {
-  if (!dateStr) return null;
-  const str = String(dateStr).trim();
-  if (!str) return null;
-
-  // 1. ISO format: YYYY-MM-DD or YYYY/MM/DD
-  const isoMatch = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-  if (isoMatch) {
-    const y = parseInt(isoMatch[1], 10);
-    const m = parseInt(isoMatch[2], 10);
-    const d = parseInt(isoMatch[3], 10);
-    return y * 10000 + m * 100 + d;
-  }
-
-  // 2. Day-Month-Year: DD-MM-YYYY or DD/MM/YYYY
-  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
-  if (dmyMatch) {
-    const d = parseInt(dmyMatch[1], 10);
-    const m = parseInt(dmyMatch[2], 10);
-    const y = parseInt(dmyMatch[3], 10);
-    return y * 10000 + m * 100 + d;
-  }
-
-  // 3. DD Mon YYYY (e.g. "22 Jul 2026", "22-Jul-2026")
-  const cleaned = str.replace(/[-/]/g, ' ');
-  const parts = cleaned.split(/\s+/);
-  if (parts.length === 3) {
-    let [dPart, mPart, yPart] = parts;
-    if (dPart.length === 4 && yPart.length <= 2) {
-      [yPart, mPart, dPart] = [dPart, mPart, yPart];
-    }
-    const monKey = mPart.charAt(0).toUpperCase() + mPart.slice(1).toLowerCase();
-    const monShort = monKey.slice(0, 3);
-    const m = MONTH_NUM[monKey] || MONTH_NUM[monShort];
-    const d = parseInt(dPart, 10);
-    const y = parseInt(yPart, 10);
-    if (m && Number.isFinite(d) && Number.isFinite(y)) {
-      return y * 10000 + m * 100 + d;
-    }
-  }
-
-  // 4. JS Date fallback
-  const parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) {
-    return parsed.getFullYear() * 10000 + (parsed.getMonth() + 1) * 100 + parsed.getDate();
-  }
-
-  return null;
-}
+import {
+  parseAnyDateToNumber,
+  downloadMeetingReport,
+  downloadConsolidatedReport,
+} from '../../lib/meetingReports.js';
 
 function parseMeetingDate(dateStr) {
   return parseAnyDateToNumber(dateStr);
@@ -81,631 +23,19 @@ function parseInputDate(isoStr) {
 }
 
 /**
- * Loads the KSI logo image from the public directory and converts it to a Data URL.
- * Falls back safely if loading fails.
- */
-function getKsiLogoDataUrl() {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        resolve({
-          dataUrl: canvas.toDataURL('image/jpeg'),
-          width: canvas.width,
-          height: canvas.height,
-        });
-      } catch (err) {
-        console.warn('[MeetingLog] Failed to convert logo canvas:', err);
-        resolve(null);
-      }
-    };
-    img.onerror = () => {
-      const fallbackImg = new Image();
-      fallbackImg.crossOrigin = 'Anonymous';
-      fallbackImg.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = fallbackImg.naturalWidth || fallbackImg.width;
-          canvas.height = fallbackImg.naturalHeight || fallbackImg.height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(fallbackImg, 0, 0);
-          resolve({
-            dataUrl: canvas.toDataURL('image/jpeg'),
-            width: canvas.width,
-            height: canvas.height,
-          });
-        } catch (e) {
-          resolve(null);
-        }
-      };
-      fallbackImg.onerror = () => resolve(null);
-      fallbackImg.src = '/KI%20KSI%20LOGO.jpg';
-    };
-    img.src = '/ksi-logo.jpg';
-  });
-}
-
-/**
- * Generates and triggers a PDF download for a single meeting record.
- * Renders the KSI logo at the top, meeting metadata, agenda, discussion,
- * action items, progress, goal progress, remarks, and signature status.
- *
- * @param {object} meeting - the decorated meeting object from the API
- * @param {string} menteeName - the mentee's full name for the report header
- */
-async function downloadMeetingReport(meeting, menteeName) {
-  const dateSlug = String(meeting.date ?? '').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
-  const filename = `MMRMS_Meeting_Report_${meeting.number}_${dateSlug}.pdf`;
-
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
-  let y = margin;
-
-  // 1. Header with KSI Logo
-  const logoInfo = await getKsiLogoDataUrl();
-  if (logoInfo && logoInfo.dataUrl) {
-    const logoWidth = 45;
-    const logoHeight = (logoInfo.height / logoInfo.width) * logoWidth;
-    doc.addImage(logoInfo.dataUrl, 'JPEG', margin, y, logoWidth, logoHeight);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(30, 41, 59);
-    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin + logoWidth + 6, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin + logoWidth + 6, y + 10);
-
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`MEETING REPORT — MEETING #${meeting.number}`, margin + logoWidth + 6, y + 16);
-
-    y += Math.max(logoHeight, 18) + 4;
-  } else {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(30, 41, 59);
-    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin, y + 5);
-    doc.setFontSize(9.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin, y + 10);
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`MEETING REPORT — MEETING #${meeting.number}`, margin, y + 16);
-    y += 22;
-  }
-
-  // Divider Line
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 5;
-
-  const addSectionHeading = (title) => {
-    if (y > 260) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(30, 41, 59);
-    doc.setFillColor(241, 245, 249);
-    doc.rect(margin, y, contentWidth, 6.5, 'F');
-    doc.text(title, margin + 3, y + 4.5);
-    y += 8.5;
-  };
-
-  // 2. Summary Table
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      1: { cellWidth: 53 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      3: { cellWidth: 53 },
-    },
-    body: [
-      ['Mentee Name', menteeName || '—', 'Meeting Number', String(meeting.number ?? '—')],
-      ['Meeting Date', String(meeting.date ?? '—'), 'Mode', String(meeting.mode ?? '—')],
-      ['Category', String(meeting.category ?? '—'), 'Duration', String(meeting.duration ?? '—')],
-      ['Next Review Date', String(meeting.nextReviewDate ?? '—'), 'Signed Status', meeting.signed ? 'Signed ✓' : 'Pending Signature'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 3. Agenda
-  addSectionHeading('1. Agenda & Scope');
-  const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
-    ? meeting.agenda.map(a => `• ${a}`).join('\n')
-    : '• No agenda items listed.';
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(51, 65, 85);
-  const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
-  doc.text(agendaLines, margin + 2, y);
-  y += agendaLines.length * 4 + 4;
-
-  // 4. Minutes of Meeting
-  addSectionHeading('2. Minutes of Meeting');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Topics Discussed', meeting.topicsDiscussed || '—'],
-      ['Student Concerns', meeting.studentConcerns || '—'],
-      ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
-      ['Support Required', meeting.supportRequired || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 5. Progress Since Last Meeting
-  addSectionHeading('3. Progress Since Last Meeting');
-  const prog = meeting.progressSinceLastMeeting || {};
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Achievements', prog.achievements || '—'],
-      ['Pending Tasks', prog.pendingTasks || '—'],
-      ['Improvement Observed', prog.improvementObserved || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 6. Action Items
-  addSectionHeading('4. Action Items');
-  const actionItems = meeting.actionItems || [];
-  if (actionItems.length > 0) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      columns: [
-        { header: '#', dataKey: 'idx' },
-        { header: 'Task', dataKey: 'task' },
-        { header: 'Responsible', dataKey: 'responsible' },
-        { header: 'Target Date', dataKey: 'targetDate' },
-        { header: 'Status', dataKey: 'status' },
-      ],
-      body: actionItems.map((item, idx) => ({
-        idx: idx + 1,
-        task: item.task || '—',
-        responsible: item.responsible || '—',
-        targetDate: item.targetDate || '—',
-        status: item.status || '—',
-      })),
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('No action items recorded for this meeting.', margin + 2, y);
-    y += 7;
-  }
-
-  // 7. SMART Goal Progress
-  addSectionHeading('5. SMART Goal Progress');
-  const goalProgress = meeting.goalProgress || [];
-  if (goalProgress.length > 0) {
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      columns: [
-        { header: '#', dataKey: 'idx' },
-        { header: 'Goal', dataKey: 'goal' },
-        { header: 'Current Status', dataKey: 'status' },
-        { header: 'Progress', dataKey: 'progress' },
-      ],
-      body: goalProgress.map((gp, idx) => ({
-        idx: idx + 1,
-        goal: gp.goal || gp.goalId || '—',
-        status: gp.currentStatus || '—',
-        progress: `${gp.progress ?? 0}%`,
-      })),
-    });
-    y = doc.lastAutoTable.finalY + 5;
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('No goal progress recorded for this meeting.', margin + 2, y);
-    y += 7;
-  }
-
-  // 8. Remarks & Review
-  addSectionHeading('6. Remarks & Review');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59], overflow: 'linebreak' },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: contentWidth - 42 },
-    },
-    body: [
-      ['Mentor Remarks', meeting.mentorRemarks || '—'],
-      ['Student Remarks', meeting.studentRemarks || '—'],
-      ['Next Review Date', meeting.nextReviewDate || '—'],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // 9. Signatures & Verification
-  addSectionHeading('7. Verification & Signatures');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      1: { cellWidth: (contentWidth - 84) / 2 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 42 },
-      3: { cellWidth: (contentWidth - 84) / 2 },
-    },
-    body: [
-      [
-        'Mentor Signature',
-        meeting.mentorSigned ? 'Signed ✓' : 'Pending Signature',
-        'Student Signature',
-        meeting.studentSigned ? 'Signed ✓' : 'Pending Signature',
-      ],
-    ],
-  });
-
-  // Footer on all pages
-  const totalPages = doc.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    doc.line(margin, 287, pageWidth - margin, 287);
-
-    doc.text('Kumaraguru School of Innovation — MMRMS Meeting Report', margin, 291);
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 291, { align: 'right' });
-  }
-
-  doc.save(filename);
-}
-
-/**
- * Generates and triggers a consolidated PDF download containing multiple meeting records.
- * Useful for reviewing all meetings or meetings within a selected date range.
- *
- * @param {Array<object>} meetingsList - array of meeting records
- * @param {string} menteeName - the mentee's full name
- * @param {string} filterRangeText - descriptive string of the active filter
- */
-async function downloadConsolidatedReport(meetingsList, menteeName, filterRangeText = '') {
-  if (!meetingsList || !meetingsList.length) return;
-
-  const menteeSlug = String(menteeName || 'Mentee').replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
-  const filename = `MMRMS_Consolidated_Meeting_Report_${menteeSlug}_${Date.now()}.pdf`;
-
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 14;
-  const contentWidth = pageWidth - margin * 2;
-  let y = margin;
-
-  const logoInfo = await getKsiLogoDataUrl();
-
-  const addSectionHeading = (title) => {
-    if (y > 255) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(30, 41, 59);
-    doc.setFillColor(241, 245, 249);
-    doc.rect(margin, y, contentWidth, 6.5, 'F');
-    doc.text(title, margin + 3, y + 4.5);
-    y += 8.5;
-  };
-
-  // 1. Header with KSI Logo
-  if (logoInfo && logoInfo.dataUrl) {
-    const logoWidth = 45;
-    const logoHeight = (logoInfo.height / logoInfo.width) * logoWidth;
-    doc.addImage(logoInfo.dataUrl, 'JPEG', margin, y, logoWidth, logoHeight);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(30, 41, 59);
-    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin + logoWidth + 6, y + 5);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin + logoWidth + 6, y + 10);
-
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text('CONSOLIDATED MENTORING MEETINGS REPORT', margin + logoWidth + 6, y + 16);
-
-    y += Math.max(logoHeight, 18) + 4;
-  } else {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(30, 41, 59);
-    doc.text('KUMARAGURU SCHOOL OF INNOVATION', margin, y + 5);
-    doc.setFontSize(9.5);
-    doc.setTextColor(100, 116, 139);
-    doc.text('MENTOR–MENTEE RELATIONSHIP MANAGEMENT SYSTEM', margin, y + 10);
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
-    doc.text('CONSOLIDATED MENTORING MEETINGS REPORT', margin, y + 16);
-    y += 22;
-  }
-
-  // Divider Line
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 5;
-
-  // Overview Table
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      1: { cellWidth: 53 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-      3: { cellWidth: 53 },
-    },
-    body: [
-      ['Mentee Name', menteeName || '—', 'Meetings Count', `${meetingsList.length} meeting(s)`],
-      [
-        'Report Period',
-        filterRangeText || 'All Recorded Meetings',
-        'Generated On',
-        new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      ],
-    ],
-  });
-  y = doc.lastAutoTable.finalY + 5;
-
-  // Summary Table of Included Meetings
-  addSectionHeading('Summary of Included Meetings');
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    theme: 'striped',
-    headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    columns: [
-      { header: '#', dataKey: 'number' },
-      { header: 'Date', dataKey: 'date' },
-      { header: 'Mode', dataKey: 'mode' },
-      { header: 'Duration', dataKey: 'duration' },
-      { header: 'Category', dataKey: 'category' },
-      { header: 'Agenda', dataKey: 'agenda' },
-      { header: 'Actions', dataKey: 'actions' },
-      { header: 'Status', dataKey: 'status' },
-    ],
-    body: meetingsList.map((m) => ({
-      number: `Mtg ${m.number}`,
-      date: m.date || '—',
-      mode: m.mode || '—',
-      duration: m.duration || '—',
-      category: m.category || '—',
-      agenda: (m.agenda || []).join(', ') || '—',
-      actions: m.actionSummary
-        ? `${m.actionSummary.closed}/${m.actionSummary.total}`
-        : `${(m.actionItems || []).length} items`,
-      status: m.signed ? 'Signed ✓' : 'Pending',
-    })),
-  });
-  y = doc.lastAutoTable.finalY + 6;
-
-  // Detailed Log for Each Meeting
-  for (let i = 0; i < meetingsList.length; i++) {
-    const meeting = meetingsList[i];
-
-    if (y > 230 || i > 0) {
-      doc.addPage();
-      y = margin;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`Meeting #${meeting.number} — ${meeting.date || 'Date not recorded'}`, margin, y + 4);
-    y += 7;
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59] },
-      columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 35 },
-        1: { cellWidth: 55 },
-        2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 35 },
-        3: { cellWidth: 57 },
-      },
-      body: [
-        ['Mode', String(meeting.mode ?? '—'), 'Duration', String(meeting.duration ?? '—')],
-        ['Category', String(meeting.category ?? '—'), 'Next Review Date', String(meeting.nextReviewDate ?? '—')],
-        ['Mentor Signed', meeting.mentorSigned ? 'Signed ✓' : 'Pending', 'Student Signed', meeting.studentSigned ? 'Signed ✓' : 'Pending'],
-      ],
-    });
-    y = doc.lastAutoTable.finalY + 4;
-
-    addSectionHeading(`Meeting #${meeting.number} — Agenda & Scope`);
-    const agendaList = Array.isArray(meeting.agenda) && meeting.agenda.length > 0
-      ? meeting.agenda.map((a) => `• ${a}`).join('\n')
-      : '• No agenda items listed.';
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(51, 65, 85);
-    const agendaLines = doc.splitTextToSize(agendaList, contentWidth - 4);
-    doc.text(agendaLines, margin + 2, y);
-    y += agendaLines.length * 3.8 + 4;
-
-    addSectionHeading(`Meeting #${meeting.number} — Minutes of Meeting`);
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
-      columnStyles: {
-        0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-        1: { cellWidth: contentWidth - 38 },
-      },
-      body: [
-        ['Topics Discussed', meeting.topicsDiscussed || '—'],
-        ['Student Concerns', meeting.studentConcerns || '—'],
-        ['Mentor Suggestions', meeting.mentorSuggestions || '—'],
-        ['Support Required', meeting.supportRequired || '—'],
-      ],
-    });
-    y = doc.lastAutoTable.finalY + 4;
-
-    const prog = meeting.progressSinceLastMeeting || {};
-    if (prog.achievements || prog.pendingTasks || prog.improvementObserved) {
-      addSectionHeading(`Meeting #${meeting.number} — Progress Since Last Meeting`);
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
-        columnStyles: {
-          0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-          1: { cellWidth: contentWidth - 38 },
-        },
-        body: [
-          ['Achievements', prog.achievements || '—'],
-          ['Pending Tasks', prog.pendingTasks || '—'],
-          ['Improvement Observed', prog.improvementObserved || '—'],
-        ],
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    }
-
-    const actionItems = meeting.actionItems || [];
-    if (actionItems.length > 0) {
-      addSectionHeading(`Meeting #${meeting.number} — Action Items (${actionItems.length})`);
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        theme: 'striped',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-        styles: { fontSize: 8, cellPadding: 2 },
-        columns: [
-          { header: '#', dataKey: 'idx' },
-          { header: 'Task', dataKey: 'task' },
-          { header: 'Responsible', dataKey: 'responsible' },
-          { header: 'Target Date', dataKey: 'targetDate' },
-          { header: 'Status', dataKey: 'status' },
-        ],
-        body: actionItems.map((item, idx) => ({
-          idx: idx + 1,
-          task: item.task || '—',
-          responsible: item.responsible || '—',
-          targetDate: item.targetDate || '—',
-          status: item.status || '—',
-        })),
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    }
-
-    if (meeting.mentorRemarks || meeting.studentRemarks) {
-      addSectionHeading(`Meeting #${meeting.number} — Remarks`);
-      autoTable(doc, {
-        startY: y,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 2, textColor: [30, 41, 59], overflow: 'linebreak' },
-        columnStyles: {
-          0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 38 },
-          1: { cellWidth: contentWidth - 38 },
-        },
-        body: [
-          ['Mentor Remarks', meeting.mentorRemarks || '—'],
-          ['Student Remarks', meeting.studentRemarks || '—'],
-        ],
-      });
-      y = doc.lastAutoTable.finalY + 5;
-    }
-  }
-
-  // Footer on all pages
-  const totalPages = doc.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.3);
-    doc.line(margin, 287, pageWidth - margin, 287);
-
-    doc.text('Kumaraguru School of Innovation — MMRMS Consolidated Meeting Report', margin, 291);
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, 291, { align: 'right' });
-  }
-
-  doc.save(filename);
-}
-
-/**
  * Section 12 — the Mentor Meeting Log. Each meeting renders as the printed
  * minutes: header, agenda, discussion, action items, progress, goal progress,
  * remarks, next review and the signature line.
  */
-export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction }) {
+export function MeetingLog({
+  meetings,
+  menteeName,
+  onUpdateAction,
+  savingAction,
+  canDownload = true,
+  isStudent = false,
+  onMeetingSigned,
+}) {
   const [openId, setOpenId] = useState(meetings.rows[0]?.id ?? null);
 
   // ── Date-range filter state ───────────────────────────────────────────────
@@ -864,7 +194,7 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
                   Clear
                 </Button>
               )}
-              {filteredRows.length > 0 && (
+              {canDownload && filteredRows.length > 0 && (
                 <Button
                   id="download-consolidated-report"
                   variant="primary"
@@ -919,6 +249,9 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
                   onToggle={() => setOpenId(openId === meeting.id ? null : meeting.id)}
                   onUpdateAction={onUpdateAction}
                   savingAction={savingAction}
+                  canDownload={canDownload}
+                  isStudent={isStudent}
+                  onMeetingSigned={onMeetingSigned}
                 />
               </li>
             ))}
@@ -929,8 +262,38 @@ export function MeetingLog({ meetings, menteeName, onUpdateAction, savingAction 
   );
 }
 
-function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, savingAction }) {
+function MeetingEntry({
+  meeting,
+  menteeName,
+  open,
+  onToggle,
+  onUpdateAction,
+  savingAction,
+  canDownload = true,
+  isStudent = false,
+  onMeetingSigned,
+}) {
   const [downloadError, setDownloadError] = useState(null);
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState(null);
+  const [studentSignedState, setStudentSignedState] = useState(Boolean(meeting.studentSigned));
+
+  async function handleSignMinutes(e) {
+    e.stopPropagation();
+    setSigning(true);
+    setSignError(null);
+    try {
+      await api(`/student/me/meetings/${meeting.id}/sign`, { method: 'POST' });
+      setStudentSignedState(true);
+      meeting.studentSigned = true;
+      meeting.signed = Boolean(meeting.mentorSigned);
+      onMeetingSigned?.(meeting.id);
+    } catch (err) {
+      setSignError(err.message || 'Failed to sign meeting minutes.');
+    } finally {
+      setSigning(false);
+    }
+  }
 
   async function handleDownload(e) {
     e.stopPropagation(); // prevent the card toggle from firing
@@ -943,6 +306,8 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
       console.error('[MeetingLog] download failed:', err);
     }
   }
+
+  const isFullySigned = Boolean(meeting.signed || (meeting.mentorSigned && studentSignedState));
 
   return (
     <Card as="article" className={cx('overflow-hidden', open && 'ring-1 ring-brand-200')}>
@@ -960,9 +325,19 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="tnum text-[13px] font-semibold text-ink">{meeting.date}</span>
+            {(meeting.startTime || meeting.endTime) && (
+              <span className="text-[12px] font-medium text-slate-700">
+                {meeting.startTime}{meeting.endTime ? ` – ${meeting.endTime}` : ''}
+              </span>
+            )}
             <Badge tone={meeting.modeTone}>{meeting.mode}</Badge>
             {meeting.category && <Badge tone="indigo">{meeting.category}</Badge>}
             <span className="text-[11.5px] text-muted">{meeting.duration}</span>
+            {meeting.mode === 'Offline' && meeting.location && (
+              <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">
+                📍 {meeting.location}
+              </span>
+            )}
             {(meeting.mode === 'Online' || meeting.teamsJoinUrl) && (
               <a
                 href={meeting.teamsJoinUrl || 'https://teams.microsoft.com'}
@@ -987,16 +362,24 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
               {meeting.actionSummary.closed}/{meeting.actionSummary.total} actions
             </Badge>
           )}
-          {meeting.signed && <Badge tone="green">Signed</Badge>}
-          <button
-            type="button"
-            id={`download-meeting-${meeting.id}`}
-            aria-label={`Download meeting report for meeting ${meeting.number}`}
-            onClick={handleDownload}
-            className="focus-ring rounded-md border border-line px-2 py-1 text-[10.5px] font-semibold text-muted transition hover:border-muted-soft hover:text-ink"
-          >
-            ↓ Download
-          </button>
+          {isFullySigned ? (
+            <Badge tone="green">Signed</Badge>
+          ) : studentSignedState ? (
+            <Badge tone="green">Student Signed</Badge>
+          ) : meeting.mentorSigned ? (
+            <Badge tone="amber">Pending Student Signature</Badge>
+          ) : null}
+          {canDownload && (
+            <button
+              type="button"
+              id={`download-meeting-${meeting.id}`}
+              aria-label={`Download meeting report for meeting ${meeting.number}`}
+              onClick={handleDownload}
+              className="focus-ring rounded-md border border-line px-2 py-1 text-[10.5px] font-semibold text-muted transition hover:border-muted-soft hover:text-ink"
+            >
+              ↓ Download
+            </button>
+          )}
           <span aria-hidden="true" className={cx('text-[10px] text-muted-soft transition', open && 'rotate-180')}>
             ▼
           </span>
@@ -1049,7 +432,7 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
             ]}
           />
 
-          <MeetingEvidence photoProofs={meeting.photoProofs} geotag={meeting.geotag} />
+          <MeetingEvidence photoProofs={meeting.photoProofs} geotag={meeting.geotag} location={meeting.location} mode={meeting.mode} />
 
           <ActionItems
             items={meeting.actionItems}
@@ -1078,6 +461,33 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
             <Remark label="Student Remarks" text={meeting.studentRemarks} tone="slate" />
           </div>
 
+          {isStudent && !studentSignedState && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="text-[13px] font-bold text-indigo-950 flex items-center gap-1.5">
+                    ✍ Review & Acknowledge Meeting Minutes
+                  </h4>
+                  <p className="text-[11.5px] text-indigo-800">
+                    Please review the discussion points and action items above, then provide your digital signature to confirm acknowledgement.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={signing}
+                  onClick={handleSignMinutes}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
+                >
+                  Sign & Acknowledge Minutes
+                </Button>
+              </div>
+              {signError && (
+                <p className="mt-2 text-xs font-semibold text-rose-600">{signError}</p>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
             <p className="text-[12px] text-muted">
               Next review date:{' '}
@@ -1085,7 +495,7 @@ function MeetingEntry({ meeting, menteeName, open, onToggle, onUpdateAction, sav
             </p>
             <div className="flex gap-2">
               <SignatureChip label="Mentor" signed={meeting.mentorSigned} />
-              <SignatureChip label="Student" signed={meeting.studentSigned} />
+              <SignatureChip label="Student" signed={studentSignedState} />
             </div>
           </div>
         </div>
@@ -1132,8 +542,8 @@ function AgendaChecklist({ agenda }) {
   );
 }
 
-function MeetingEvidence({ photoProofs = [], geotag }) {
-  if (!photoProofs.length && !geotag) return null;
+function MeetingEvidence({ photoProofs = [], geotag, location, mode }) {
+  if (!photoProofs.length && !geotag && !location) return null;
 
   const locationUrl = geotag
     ? `https://www.google.com/maps?q=${geotag.latitude},${geotag.longitude}`
@@ -1141,7 +551,12 @@ function MeetingEvidence({ photoProofs = [], geotag }) {
 
   return (
     <div className="rounded-xl border border-line bg-white p-4">
-      <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting Evidence</p>
+      <p className="text-[10.5px] font-semibold uppercase tracking-[.07em] text-muted-soft">Meeting Evidence & Venue</p>
+      {location && (
+        <p className="mt-1.5 text-[12.5px] text-ink font-medium">
+          📍 <span className="text-muted text-[11.5px] font-normal">{mode === 'Offline' ? 'Venue / Location:' : 'Platform:'}</span> {location}
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         {photoProofs.map((photo, index) => (
           <a

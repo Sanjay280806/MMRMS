@@ -641,7 +641,10 @@ export const STUDENT_PROFILE = {
       number: 4,
       date: '22 Jul 2026',
       duration: '30 min',
+      startTime: '10:00 AM',
+      endTime: '10:30 AM',
       mode: 'Online',
+      location: 'Microsoft Teams',
       agenda: ['Academic Review', 'Placement Preparation', 'Goal Progress'],
       topicsDiscussed:
         'Reviewed internship learnings at Zoho, the placement calendar for Aug 2026, and progress on the CGPA and attendance goals.',
@@ -677,7 +680,10 @@ export const STUDENT_PROFILE = {
       number: 3,
       date: '05 Jul 2026',
       duration: '45 min',
+      startTime: '02:00 PM',
+      endTime: '02:45 PM',
       mode: 'Offline',
+      location: 'Cabin 304, Academic Block A',
       agenda: ['Attendance Review', 'Academic Review', 'Personal Discussion'],
       topicsDiscussed:
         'Machine Learning attendance shortage, the recovery plan, and revision strategy for theory subjects.',
@@ -707,7 +713,10 @@ export const STUDENT_PROFILE = {
       number: 2,
       date: '14 Jun 2026',
       duration: '40 min',
+      startTime: '11:15 AM',
+      endTime: '11:55 AM',
       mode: 'Offline',
+      location: 'Seminar Hall 2',
       agenda: ['Goal Progress', 'Academic Review', 'Other'],
       topicsDiscussed:
         'Set SMART goals for the term: CGPA 8.5, attendance 85%, and a technical-writing habit.',
@@ -736,7 +745,10 @@ export const STUDENT_PROFILE = {
       number: 1,
       date: '12 Aug 2024',
       duration: '60 min',
+      startTime: '03:30 PM',
+      endTime: '04:30 PM',
       mode: 'Offline',
+      location: 'Department Library',
       agenda: ['Personal Discussion', 'Academic Review', 'Other'],
       topicsDiscussed:
         'First meeting. Completed Section 1 of the record book — background, aspirations, skills and self-assessment.',

@@ -5,7 +5,7 @@ import {
   SEMESTER_START_DATE,
 } from '../data/seed.js';
 import { dimensionList, healthIndex, scoreTone } from './health.js';
-import { computeDimensions, decorateGoals, formatBatch, initials, standingArrearCount } from './student.js';
+import { computeDimensions, decorateGoals, decorateMeetings, formatBatch, initials, standingArrearCount } from './student.js';
 import { menteeToStudent } from './mentee.js';
 import { listConcerns, listMentees, listMentors } from '../data/store.js';
 
@@ -291,3 +291,62 @@ export function mentorTimeline(mentor) {
     }));
   return [...attendanceEvents, ...meetingEvents].slice(0, 6);
 }
+
+const MONTH_MAP = {
+  Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
+  Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12,
+  January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+  July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
+};
+
+function parseDateVal(dateStr) {
+  if (!dateStr) return 0;
+  const s = String(dateStr).trim();
+  const iso = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (iso) return parseInt(iso[1], 10) * 10000 + parseInt(iso[2], 10) * 100 + parseInt(iso[3], 10);
+  const parts = s.replace(/[-/]/g, ' ').split(/\s+/);
+  if (parts.length === 3) {
+    const m = MONTH_MAP[parts[1]] || MONTH_MAP[parts[1]?.slice(0, 3)] || 0;
+    const d = parseInt(parts[0], 10) || 0;
+    const y = parseInt(parts[2], 10) || 0;
+    if (m && d && y) return y * 10000 + m * 100 + d;
+  }
+  const ts = new Date(s).getTime();
+  return isNaN(ts) ? 0 : ts;
+}
+
+/** Comprehensive list of all mentoring meetings conducted across all mentees of this mentor. */
+export function listMentorMeetings(mentor) {
+  const mentees = listMentees(mentor.id);
+  const allMeetings = [];
+
+  for (const mentee of mentees) {
+    const student = mentee.recordBook || menteeToStudent(mentee);
+    const decorated = decorateMeetings(student.meetings ?? [], student.goals ?? []);
+    for (const m of decorated) {
+      allMeetings.push({
+        ...m,
+        menteeId: mentee.id,
+        menteeName: mentee.name,
+        rollNumber: mentee.rollNumber || student.identity?.rollNumber,
+        batch: mentee.batch || formatBatch(student.identity?.batch),
+        department: mentee.department || mentor.department,
+        section: mentee.section || student.identity?.section,
+      });
+    }
+  }
+
+  allMeetings.sort((a, b) => {
+    const da = parseDateVal(a.date);
+    const db = parseDateVal(b.date);
+    if (db !== da) return db - da;
+    return (b.number ?? 0) - (a.number ?? 0);
+  });
+
+  return {
+    meetings: allMeetings,
+    total: allMeetings.length,
+    menteesCount: mentees.length,
+  };
+}
+

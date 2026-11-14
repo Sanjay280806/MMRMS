@@ -10,8 +10,13 @@ import { SectionTable } from '../../../components/ui/SectionCard.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { Tabs } from '../../../components/ui/Tabs.jsx';
 import { cx } from '../../../lib/tone.js';
+import {
+  downloadMenteeAnalyticsPdf,
+  downloadMenteeAnalyticsExcel,
+  downloadAttentionListPdf,
+} from '../../../lib/menteeAnalyticsReports.js';
 
-export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
+export function MenteeReport({ mentorName = 'Dr. Bharathi Priya', onOpenMentee, onNavigateToMessages }) {
   const { data, loading, error, reload } = useResource('/mentor/me/mentee-analytics');
 
   // Shortlisting state for top 4 analytics cards: 'all' | 'hackathons' | 'placement' | 'certifications' | 'cgpa'
@@ -20,6 +25,12 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
 
   // Attention needed category filter: 'all' | 'incomplete-placement' | 'no-hackathons' | 'inactive-meetings' | 'no-projects'
   const [attentionFilter, setAttentionFilter] = useState('all');
+
+  // Download loading states
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [downloadingAttentionPdf, setDownloadingAttentionPdf] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
 
   const summary = data?.summary || {
     totalMentees: 0,
@@ -138,6 +149,58 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
   const placementPct = Math.round((summary.placementCompleteCount / total) * 100);
   const certPct = Math.round((summary.certified5PlusCount / total) * 100);
   const cgpaPct = Math.round((summary.cgpaAbove8Count / total) * 100);
+
+  async function handleDownloadPdf() {
+    if (!shortlistedMentees.length) return;
+    setDownloadingPdf(true);
+    setDownloadError(null);
+    try {
+      await downloadMenteeAnalyticsPdf(shortlistedMentees, {
+        filterTitle: filterTitles[activeFilter],
+        filterSubtitle: filterSubtitles[activeFilter],
+        mentorName,
+        searchQuery,
+      });
+    } catch (err) {
+      console.error('[MenteeReport] PDF download failed:', err);
+      setDownloadError('Failed to generate mentee analytics PDF report. Please try again.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  function handleDownloadExcel() {
+    if (!shortlistedMentees.length) return;
+    setDownloadingExcel(true);
+    setDownloadError(null);
+    try {
+      downloadMenteeAnalyticsExcel(shortlistedMentees, {
+        filterTitle: filterTitles[activeFilter],
+        mentorName,
+      });
+    } catch (err) {
+      console.error('[MenteeReport] Excel download failed:', err);
+      setDownloadError('Failed to export mentee analytics to Excel. Please try again.');
+    } finally {
+      setDownloadingExcel(false);
+    }
+  }
+
+  async function handleDownloadAttentionPdf() {
+    if (!attentionMentees.length) return;
+    setDownloadingAttentionPdf(true);
+    try {
+      const activeTabObj = ATTENTION_TABS.find((t) => t.value === attentionFilter);
+      await downloadAttentionListPdf(attentionMentees, {
+        attentionFilterLabel: activeTabObj?.label || 'Flagged Students',
+        mentorName,
+      });
+    } catch (err) {
+      console.error('[MenteeReport] Attention PDF download failed:', err);
+    } finally {
+      setDownloadingAttentionPdf(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -273,13 +336,19 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
       </div>
 
       {/* SHORTLISTED ROSTER TABLE */}
+      {downloadError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-800">
+          ⚠️ {downloadError}
+        </div>
+      )}
+
       <SectionTable
         title={filterTitles[activeFilter]}
         subtitle={filterSubtitles[activeFilter]}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {activeFilter !== 'all' && (
-              <Button size="xs" variant="ghost" onClick={() => setActiveFilter('all')}>
+              <Button size="sm" variant="ghost" onClick={() => setActiveFilter('all')} className="rounded-xl text-xs">
                 Show all mentees
               </Button>
             )}
@@ -288,8 +357,49 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
               placeholder="Filter by name or roll number…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-56 rounded-lg border border-border bg-card px-2.5 text-xs placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="h-9 w-48 rounded-xl border border-line-strong bg-white px-3 text-xs text-ink placeholder:text-muted focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-2xs"
             />
+            {shortlistedMentees.length > 0 && (
+              <>
+                <Button
+                  id="download-mentees-excel"
+                  size="sm"
+                  variant="secondary"
+                  loading={downloadingExcel}
+                  onClick={handleDownloadExcel}
+                  title="Export filtered mentees to an Excel (.xlsx) spreadsheet"
+                  className="rounded-xl flex items-center gap-2 text-xs font-semibold shadow-2xs hover:shadow-xs"
+                >
+                  <svg className="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="8" y1="13" x2="16" y2="13" />
+                    <line x1="8" y1="17" x2="16" y2="17" />
+                  </svg>
+                  <span>Export Excel</span>
+                </Button>
+                <Button
+                  id="download-mentees-pdf"
+                  size="sm"
+                  variant="primary"
+                  loading={downloadingPdf}
+                  onClick={handleDownloadPdf}
+                  title="Download consolidated PDF report of filtered mentees"
+                  className="rounded-xl flex items-center gap-2 text-xs font-semibold shadow-raised hover:shadow-glow"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>
+                    {activeFilter !== 'all' || searchQuery.trim()
+                      ? `Download Report (${shortlistedMentees.length})`
+                      : 'Download Report (PDF)'}
+                  </span>
+                </Button>
+              </>
+            )}
           </div>
         }
       >
@@ -466,6 +576,24 @@ export function MenteeReport({ onOpenMentee, onNavigateToMessages }) {
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Tabs size="sm" items={ATTENTION_TABS} value={attentionFilter} onChange={setAttentionFilter} />
+            {attentionMentees.length > 0 && (
+              <Button
+                id="download-attention-pdf"
+                size="sm"
+                variant="secondary"
+                loading={downloadingAttentionPdf}
+                onClick={handleDownloadAttentionPdf}
+                title="Download attention & intervention report (PDF)"
+                className="rounded-xl flex items-center gap-2 text-xs font-semibold text-rose-700 hover:text-rose-800 hover:border-rose-300 shadow-2xs hover:shadow-xs"
+              >
+                <svg className="h-4 w-4 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Download Flagged List ({attentionMentees.length})</span>
+              </Button>
+            )}
           </div>
         }
       >

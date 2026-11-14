@@ -19,12 +19,15 @@ import { ActivityTimeline } from './sections/ActivityTimeline.jsx';
 import { Announcements } from './sections/Announcements.jsx';
 import { MenteeRecordBook } from './MenteeRecordBook.jsx';
 import { MessagesSection } from './sections/MessagesSection.jsx';
+import { MeetingsSection } from './sections/MeetingsSection.jsx';
+import { ScheduleMeetingModal } from '../../components/meetings/ScheduleMeetingModal.jsx';
 import { ChipGroup, TextArea, TextField } from '../../components/ui/Field.jsx';
 import { api } from '../../api/client.js';
 
 const TITLES = {
   dashboard: 'Mentor Dashboard',
   mentees: 'My Mentees',
+  meetings: 'Meeting Records & History',
   attendance: 'Attendance Watch',
   arrears: 'Arrear Watch',
   overdue: 'Overdue Meetings',
@@ -67,6 +70,7 @@ export default function MentorConsole() {
   const [menteeId, setMenteeId] = useState(null);
   const [menteeInitialTab, setMenteeInitialTab] = useState('profile');
   const [recordingMeeting, setRecordingMeeting] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const { data, loading, error, reload } = useResource('/mentor/me/overview');
 
   function openMentee(id, tab = 'profile') {
@@ -127,6 +131,7 @@ export default function MentorConsole() {
     {
       label: 'Mentoring',
       items: [
+        { key: 'meetings', label: 'Meetings', badge: stats.meetingsHeld },
         { key: 'actions', label: 'Action Items', badge: stats.openActionItems },
         { key: 'messages', label: 'Messages' },
         { key: 'parents', label: 'Parent Log' },
@@ -159,7 +164,22 @@ export default function MentorConsole() {
       title={menteeId ? 'Mentee Record Book' : TITLES[section]}
       subtitle={`${data.institution.recordBook} · ${data.institution.term} · ${stats.reviewCycle} review cycle`}
       greet={!menteeId && section === 'dashboard'}
-      actions={<Button size="sm" onClick={() => setRecordingMeeting(true)}>＋ Record a Meeting</Button>}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="border-[#464EB8]/30 bg-[#464EB8]/10 text-[#464EB8] hover:bg-[#464EB8]/20"
+            onClick={() => setShowScheduleModal(true)}
+          >
+            <svg className="mr-1.5 h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+            </svg>
+            Schedule a Meeting
+          </Button>
+          <Button size="sm" onClick={() => setRecordingMeeting(true)}>＋ Record a Meeting</Button>
+        </div>
+      }
       profile={
         <ProfileHeader
           initials={mentor.initials}
@@ -196,10 +216,27 @@ export default function MentorConsole() {
               onRecorded={() => {
                 setRecordingMeeting(false);
                 reload();
+                setSection('meetings');
+              }}
+            />
+          )}
+          {showScheduleModal && (
+            <ScheduleMeetingModal
+              mentee={null}
+              onClose={() => setShowScheduleModal(false)}
+              onScheduled={() => {
+                setShowScheduleModal(false);
+                reload();
               }}
             />
           )}
           {section === 'dashboard' && <MentorDashboard data={data} onOpenMentee={openMentee} />}
+          {section === 'meetings' && (
+            <MeetingsSection
+              onOpenMentee={openMentee}
+              onRecordMeeting={() => setRecordingMeeting(true)}
+            />
+          )}
 
           {section === 'mentees' &&
             (menteeId ? (
@@ -263,6 +300,7 @@ export default function MentorConsole() {
           {section === 'reports' && <Reports />}
           {section === 'mentee-report' && (
             <MenteeReport
+              mentorName={mentor?.name}
               onOpenMentee={(id, tab) => openMentee(id, tab || 'profile')}
               onNavigateToMessages={() => setSection('messages')}
             />
@@ -324,7 +362,10 @@ function MeetingComposer({ onClose, onRecorded }) {
   const todayDateStr = getTodayDateStr();
 
   const [date, setDate] = useState(getTodayDateStr());
+  const [startTime, setStartTime] = useState('10:00');
+  const [endTime, setEndTime] = useState('10:30');
   const [durationMinutes, setDurationMinutes] = useState(30);
+  const [location, setLocation] = useState('');
   const [mode, setMode] = useState('Offline');
   const [category, setCategory] = useState('Academic');
   const [agenda, setAgenda] = useState(['Academic Review']);
@@ -351,6 +392,27 @@ function MeetingComposer({ onClose, onRecorded }) {
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  function handleTimeChange(newStart, newEnd) {
+    if (newStart && newEnd) {
+      const [sh, sm] = newStart.split(':').map(Number);
+      const [eh, em] = newEnd.split(':').map(Number);
+      const diff = (eh * 60 + em) - (sh * 60 + sm);
+      if (diff > 0) setDurationMinutes(diff);
+    }
+  }
+
+  function handleDurationChange(mins) {
+    const m = Number(mins);
+    setDurationMinutes(m);
+    if (startTime && m > 0) {
+      const [sh, sm] = startTime.split(':').map(Number);
+      const totalMin = sh * 60 + sm + m;
+      const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+      const endM = String(totalMin % 60).padStart(2, '0');
+      setEndTime(`${endH}:${endM}`);
+    }
+  }
 
   const hasValidActionItem = actionItems.some((item) => item.task?.trim().length > 0);
 
@@ -396,16 +458,21 @@ function MeetingComposer({ onClose, onRecorded }) {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
         setGeotag({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude: lat,
+          longitude: lon,
           accuracy: position.coords.accuracy,
           capturedAt: new Date().toISOString(),
         });
+        if (!location.trim()) {
+          setLocation(`Kumaraguru Campus (${lat.toFixed(4)}° N, ${lon.toFixed(4)}° E)`);
+        }
         setLocating(false);
       },
       () => {
-        setError('We could not capture the location. Check your browser permission and try again.');
+        setError('We could not capture GPS location automatically. You can enter the venue / room location manually in the field.');
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
@@ -439,6 +506,11 @@ function MeetingComposer({ onClose, onRecorded }) {
       return;
     }
 
+    if (mode === 'Offline' && !location.trim() && !geotag) {
+      setError('Meeting location is mandatory for offline meetings. Please enter the venue or capture GPS location.');
+      return;
+    }
+
     if (nextReviewDate && nextReviewDate <= todayDateStr) {
       setError('Next review date must be a future date (cannot be today or a past date).');
       return;
@@ -449,8 +521,11 @@ function MeetingComposer({ onClose, onRecorded }) {
       const validActionItemsList = actionItems.filter((item) => item.task?.trim());
       const payload = {
         date,
+        startTime,
+        endTime,
         durationMinutes: Number(durationMinutes),
         mode,
+        location: mode === 'Online' ? 'Microsoft Teams' : (location.trim() || 'Campus'),
         category,
         agenda,
         agendaNotes,
@@ -720,20 +795,97 @@ function MeetingComposer({ onClose, onRecorded }) {
                   </div>
                 )}
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <TextField label="Meeting date" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
-                <ChipGroup label="Mode" options={MEETING_MODES} value={mode} onChange={setMode} />
+                <TextField
+                  label="Start time"
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => {
+                    const newStart = event.target.value;
+                    setStartTime(newStart);
+                    handleTimeChange(newStart, endTime);
+                  }}
+                  required
+                />
+                <TextField
+                  label="End time"
+                  type="time"
+                  value={endTime}
+                  onChange={(event) => {
+                    const newEnd = event.target.value;
+                    setEndTime(newEnd);
+                    handleTimeChange(startTime, newEnd);
+                  }}
+                  required
+                />
                 <TextField
                   label="Duration (minutes)"
                   type="number"
                   min="5"
                   max="240"
                   value={durationMinutes}
-                  onChange={(event) => setDurationMinutes(event.target.value)}
+                  onChange={(event) => handleDurationChange(event.target.value)}
                   required
                 />
               </div>
-              <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ChipGroup label="Mode" options={MEETING_MODES} value={mode} onChange={setMode} />
+                <ChipGroup label="Discussion category" options={MEETING_CATEGORIES} value={category} onChange={setCategory} />
+              </div>
+
+              {/* Location Input - Only asked for Offline */}
+              {mode === 'Offline' ? (
+                <div className="space-y-1.5 rounded-xl border border-line bg-canvas/30 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[12.5px] font-semibold text-muted-strong">
+                      Meeting Location / Venue <span className="text-bad-ink">*</span>
+                    </label>
+                    <span className="text-[11px] font-semibold text-bad-ink">
+                      * Mandatory for offline meetings
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Cabin 204, Seminar Hall 2, Academic Block A"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      required={mode === 'Offline'}
+                      className="flex-1 rounded-field border-[1.5px] border-line-strong bg-white px-3.5 py-2 text-[13px] text-ink shadow-2xs focus:border-brand-500 focus:outline-none"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      loading={locating}
+                      onClick={captureLocation}
+                      className="shrink-0 text-xs"
+                      title="Capture GPS location"
+                    >
+                      📍 Capture GPS
+                    </Button>
+                  </div>
+                  {geotag && (
+                    <p className="text-[11.5px] font-medium text-good-ink">
+                      ✓ GPS Location captured ({geotag.latitude.toFixed(4)}°, {geotag.longitude.toFixed(4)}°, accuracy {Math.round(geotag.accuracy)}m)
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-xs text-indigo-900">
+                  <svg className="h-4 w-4 shrink-0 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
+                  </svg>
+                  <div>
+                    <span className="font-semibold text-indigo-950">Platform: Microsoft Teams.</span>
+                    <span className="ml-1 text-indigo-800">
+                      Online meetings default to Microsoft Teams. Meeting venue or location is not required.
+                    </span>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="space-y-3 border-t border-line pt-4">
@@ -997,20 +1149,20 @@ function MeetingComposer({ onClose, onRecorded }) {
                   <p className="mt-1 text-[11.5px] font-semibold text-bad-ink">{reviewDateError}</p>
                 )}
               </div>
-              <div className="space-y-2 rounded-xl border border-line bg-canvas/50 p-3.5 text-[12px] text-muted-strong">
+              <div className="space-y-2.5 rounded-xl border border-line bg-canvas/50 p-3.5 text-[12px] text-muted-strong">
                 <label className="flex items-start gap-2.5">
                   <input className="mt-0.5" type="checkbox" checked={mentorSigned} onChange={(event) => setMentorSigned(event.target.checked)} required />
-                  <span><strong className="font-semibold text-ink">Mentor signature</strong> — I confirm these meeting minutes.</span>
+                  <span><strong className="font-semibold text-ink">Mentor signature</strong> — I confirm and sign these meeting minutes.</span>
                 </label>
-                <label className="flex items-start gap-2.5">
-                  <input className="mt-0.5" type="checkbox" checked={studentSigned} onChange={(event) => setStudentSigned(event.target.checked)} />
-                  <span><strong className="font-semibold text-ink">Student signature</strong> — the student has reviewed and acknowledged these minutes.</span>
-                </label>
+                <div className="flex items-center gap-2 rounded-lg bg-indigo-50/70 px-3 py-2 text-[11.5px] text-indigo-800">
+                  <span className="text-sm">ℹ️</span>
+                  <span><strong>Student signature:</strong> Mentees will review and digitally sign/acknowledge these minutes from their student dashboard.</span>
+                </div>
               </div>
             </section>
 
-            <div className="grid gap-4 rounded-xl border border-line bg-canvas/50 p-4 sm:grid-cols-2">
-              <label className="text-[12.5px] font-semibold text-muted-strong">
+            <div className="rounded-xl border border-line bg-canvas/50 p-4">
+              <label className="block text-[12.5px] font-semibold text-muted-strong">
                 Photo proofs (optional)
                 <input
                   className="mt-1.5 block w-full text-[12px] text-muted"
@@ -1023,22 +1175,9 @@ function MeetingComposer({ onClose, onRecorded }) {
                   Up to four JPG, PNG, or WEBP photos, 1 MB each.
                 </span>
               </label>
-              <div>
-                <p className="text-[12.5px] font-semibold text-muted-strong">Meeting location (optional)</p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <Button type="button" size="sm" variant="secondary" loading={locating} onClick={captureLocation}>
-                    Capture location
-                  </Button>
-                  {geotag && (
-                    <span className="text-[11.5px] font-medium text-good-ink">
-                      Location saved (accuracy {Math.round(geotag.accuracy)} m)
-                    </span>
-                  )}
-                </div>
-              </div>
               {photoProofs.length > 0 && (
-                <p className="text-[11.5px] text-good-ink sm:col-span-2">
-                  {photoProofs.length} photo proof{photoProofs.length === 1 ? '' : 's'} ready to save.
+                <p className="mt-2 text-[11.5px] text-good-ink">
+                  ✓ {photoProofs.length} photo proof{photoProofs.length === 1 ? '' : 's'} ready to save.
                 </p>
               )}
             </div>
