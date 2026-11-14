@@ -337,12 +337,12 @@ export function MentorAssignmentTool({
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="rounded-field border border-line-strong bg-white px-3 py-2 text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              className="rounded-xl border border-line-strong bg-white px-3 py-2 text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             >
-              <option value="all">All Sections</option>
+              <option value="all">All Batches</option>
               {distinctSections.map((sec) => (
                 <option key={sec} value={sec}>
-                  Section: {sec}
+                  Batch: {sec}
                 </option>
               ))}
             </select>
@@ -381,10 +381,8 @@ export function MentorAssignmentTool({
                   </th>
                   <th className="px-4 py-3 font-semibold">Roll Number</th>
                   <th className="px-4 py-3 font-semibold">Student Name</th>
-                  <th className="px-4 py-3 font-semibold">Section</th>
+                  <th className="px-4 py-3 font-semibold">Batch</th>
                   <th className="px-4 py-3 font-semibold">Current Mentor</th>
-                  <th className="px-4 py-3 font-semibold text-right">CGPA</th>
-                  <th className="px-4 py-3 font-semibold text-right">Attendance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/60">

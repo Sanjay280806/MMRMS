@@ -511,6 +511,63 @@ export function assignStudentsToMentor({ mentorId, menteeIds = [] }) {
   };
 }
 
+export function unassignStudentFromMentor({ mentorId, studentId }) {
+  if (!mentorId) throw new Error('mentorId is required');
+  if (!studentId) throw new Error('studentId is required');
+
+  const mentor = mentors.find((m) => m.id === mentorId);
+  if (!mentor) throw new Error(`Mentor "${mentorId}" not found`);
+
+  const mentee = mentees.find((m) => m.id === studentId || m.rollNumber === studentId);
+  if (!mentee) throw new Error(`Student "${studentId}" not found`);
+
+  mentee.mentorTransferHistory ??= [];
+  mentee.mentorTransferHistory.unshift({
+    id: nextId('tr'),
+    fromMentorId: mentor.id,
+    fromMentorName: mentor.name,
+    toMentorId: null,
+    toMentorName: 'Unassigned',
+    transferredAt: new Date().toISOString(),
+    reason: 'Removed from Mentor by Coordinator',
+  });
+
+  mentee.mentorId = null;
+  mentee.mentorName = 'Unassigned';
+  mentee.staffCode = '—';
+
+  if (mentee.recordBook) {
+    mentee.recordBook.mentorId = null;
+    if (mentee.recordBook.identity) {
+      mentee.recordBook.identity.mentor = 'Unassigned';
+    }
+  }
+
+  const studentProfile = students.get(mentee.id);
+  if (studentProfile) {
+    studentProfile.mentorId = null;
+    if (studentProfile.profile) {
+      studentProfile.profile.mentor = null;
+    }
+    if (studentProfile.identity) {
+      studentProfile.identity.mentor = 'Unassigned';
+    }
+    studentProfile.mentorTransferHistory = mentee.mentorTransferHistory;
+  }
+
+  for (const m of mentors) {
+    m.menteeCount = mentees.filter((s) => s.mentorId === m.id).length;
+  }
+
+  return {
+    success: true,
+    mentorId: mentor.id,
+    studentId: mentee.id,
+    studentName: mentee.name,
+    remainingMenteesCount: mentor.menteeCount,
+  };
+}
+
 export function setMentorSoftDelete(mentorId, softDelete = true, reason = 'Soft-deleted by Mentor Coordinator') {
   const mentor = mentors.find((m) => m.id === mentorId);
   if (!mentor) throw new Error(`Mentor "${mentorId}" not found`);

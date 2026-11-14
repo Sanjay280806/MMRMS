@@ -14,6 +14,7 @@ import {
   listMentors,
   listUploadHistory,
   assignStudentsToMentor,
+  unassignStudentFromMentor,
   reassignMentor,
   setMentorSoftDelete,
   updateOdRequestStatus,
@@ -150,6 +151,23 @@ router.post('/me/mentors/:mentorId/soft-delete', (req, res, next) => {
   const { softDelete = true, reason } = req.body ?? {};
   try {
     const result = setMentorSoftDelete(req.params.mentorId, Boolean(softDelete), reason);
+    res.json(result);
+  } catch (err) {
+    next(new HttpError(400, err.message));
+  }
+});
+
+router.post('/me/mentors/:mentorId/unassign-student', (req, res, next) => {
+  currentCoordinator(req);
+  const { studentId } = req.body ?? {};
+  if (!studentId) {
+    return next(new HttpError(400, 'Student ID is required'));
+  }
+  try {
+    const result = unassignStudentFromMentor({
+      mentorId: req.params.mentorId,
+      studentId,
+    });
     res.json(result);
   } catch (err) {
     next(new HttpError(400, err.message));
