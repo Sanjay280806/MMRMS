@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Badge, HealthBadge } from '../ui/Badge.jsx';
+import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
 import { DataTable } from '../ui/DataTable.jsx';
@@ -135,22 +135,7 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
                         </div>
                       ),
                     },
-                    {
-                      key: 'cgpa',
-                      header: 'CGPA',
-                      align: 'right',
-                      render: (m) => <span className="tnum font-medium">{m.cgpa.toFixed(1)}</span>,
-                    },
-                    {
-                      key: 'attendance',
-                      header: 'Attendance',
-                      align: 'right',
-                      render: (m) => (
-                        <span className={`tnum ${m.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}`}>
-                          {m.attendance}%
-                        </span>
-                      ),
-                    },
+
                     {
                       key: 'reviews',
                       header: 'Reviews Held',
@@ -166,7 +151,7 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
                       header: 'Status',
                       align: 'right',
                       render: (m) => (
-                        <Badge tone={m.flagTone ?? (m.health < 70 ? 'rose' : 'green')}>
+                        <Badge tone={m.flagTone ?? (m.attendanceBelowRequirement || m.standingArrears > 0 ? 'rose' : 'green')}>
                           {m.flagReason ?? 'On Track'}
                         </Badge>
                       ),
@@ -180,7 +165,7 @@ export function MentorDashboardModal({ mentorId, onClose, onOpenMentee }) {
 
         <footer className="flex items-center justify-end border-t border-line bg-canvas/30 px-6 py-3.5">
           <Button type="button" variant="secondary" size="sm" onClick={onClose}>
-            Close Oversight View
+            Close
           </Button>
         </footer>
       </Card>

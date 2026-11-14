@@ -172,7 +172,7 @@ export function MentorAssignmentTool({
       <div className="rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/80 via-white to-purple-50/40 p-6 shadow-card">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-[18px] font-bold text-ink">Mentor Assignment Tool</h3>
+            <h3 className="text-[18px] font-bold text-ink">Mentor Assignment</h3>
             <p className="mt-1 text-[13px] text-muted">
               Allocate and assign students to faculty mentors. Select a mentor, choose students using filters, and confirm allocation.
             </p>
@@ -429,12 +429,7 @@ export function MentorAssignmentTool({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-ink">
-                        {student.cgpa ? student.cgpa.toFixed(1) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-ink">
-                        {student.attendance ? `${student.attendance}%` : '—'}
-                      </td>
+
                     </tr>
                   );
                 })}
