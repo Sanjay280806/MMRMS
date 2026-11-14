@@ -174,23 +174,27 @@
   /* ── Buttons ──────────────────────────────────────────────────── */
 
   .btn-base {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed rounded-xl;
   }
 
   .btn-primary {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-brand-gradient text-white shadow-raised hover:-translate-y-0.5 hover:bg-brand-gradient-hover hover:shadow-glow active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-brand-gradient text-white shadow-raised hover:-translate-y-0.5 hover:bg-brand-gradient-hover hover:shadow-glow active:translate-y-0 disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 rounded-xl;
   }
 
   .btn-secondary {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed border border-line-strong bg-white text-ink shadow-inner hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-pop active:translate-y-0 disabled:text-muted-soft disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed border border-line-strong bg-white text-ink shadow-inner hover:-translate-y-0.5 hover:border-brand-300 hover:bg-brand-50/50 hover:shadow-pop active:translate-y-0 disabled:text-muted-soft disabled:hover:translate-y-0 rounded-xl;
   }
 
   .btn-ghost {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed text-muted hover:text-brand-500 disabled:text-muted-soft;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed text-muted hover:text-brand-500 disabled:text-muted-soft rounded-xl;
   }
 
   .btn-dark {
-    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-ink text-white shadow-pop hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-0 disabled:bg-muted-soft disabled:hover:translate-y-0;
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-ink text-white shadow-pop hover:-translate-y-0.5 hover:bg-ink-soft active:translate-y-0 disabled:bg-muted-soft disabled:hover:translate-y-0 rounded-xl;
+  }
+
+  .btn-danger {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-2 focus-visible:ring-rose-500/40 focus-visible:ring-offset-2 inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 disabled:cursor-not-allowed bg-bad-ink text-white shadow-sm hover:-translate-y-0.5 hover:bg-bad active:translate-y-0 disabled:opacity-50 rounded-xl;
   }
 
   /* ── Cards & surfaces ─────────────────────────────────────────── */

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, getToken } from '../../api/client.js';
 import { ConsoleLayout } from '../../components/layout/ConsoleLayout.jsx';
 import { ProfileHeader } from '../../components/profile/ProfileHeader.jsx';
-import { Badge, HealthBadge } from '../../components/ui/Badge.jsx';
+import { Badge } from '../../components/ui/Badge.jsx';
 import { Button } from '../../components/ui/Button.jsx';
 import { DataTable } from '../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
@@ -22,8 +22,8 @@ const titles = {
     academics: 'Academic & Discipline Watch', operations: 'Class Coordination', mentors: 'Mentor Coordination',
   },
   coordinator: {
-    dashboard: 'Mentor Coordinator Dashboard', students: 'Student Dataset',
-    upload: 'Excel / ERP Data Upload', mentors: 'Mentor & Advisor Tracker', assignment: 'Mentor Assignment Tool', reassignment: 'Mentor Reassignment Tool',
+    dashboard: 'Mentor Coordinator Dashboard', mentors: 'Mentor Tracker',
+    upload: 'Excel / ERP Data Upload', assignment: 'Mentor Assignment', reassignment: 'Mentor Reassignment',
     audit: 'Audit & Accreditation Readiness',
   },
 };
@@ -85,8 +85,8 @@ function OversightConsole({ role }) {
       { label: 'Coordination', items: [{ key: 'operations', label: 'Meetings & Grievances', badge: stats.openGrievances, badgeTone: 'rose' }, { key: 'mentors', label: 'Mentor Coordination' }] },
     ]
     : [
-      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'students', label: 'Student Dataset', badge: stats.students }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'mentors', label: 'Mentor Tracker' }, { key: 'assignment', label: 'Mentor Assignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'reassignment', label: 'Mentor Reassignment', badge: 'Tool', badgeTone: 'indigo' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }] },
+      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'assignment', label: 'Mentor Assignment' }, { key: 'reassignment', label: 'Mentor Reassignment' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
   function navigate(next) {
@@ -168,12 +168,10 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
 
   return (
     <>
-      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {(section === 'dashboard' || section === 'mentors') && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
-      {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
-      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
-      {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
-      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
+      {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
+      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
       {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
 
       {inspectingMentorId && (
@@ -214,7 +212,7 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
         <div>
           <h4 className="text-[14px] font-semibold text-ink">MyCamu ERP & Excel Data Synchronisation</h4>
           <p className="text-[12px] text-muted">
-            Batch data management: Upload student enrollment rosters, attendance reports, and academic internal marks.
+            Batch data management: Upload student enrollment lists, attendance reports, and academic internal marks.
           </p>
         </div>
       </div>
@@ -228,9 +226,8 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
       </div>
     </div>
 
-<div className="grid gap-5 xl:grid-cols-2">
-      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
-      <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
+<div className="mt-5">
+      <MentorTracker rows={data.mentors} onNavigate={onNavigate} onInspectMentor={onInspectMentor} onReload={onReload} />
     </div>
   </>;
 }
@@ -269,11 +266,11 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
         method: 'POST',
         body: {
           softDelete: shouldSoftDelete,
-          reason: shouldSoftDelete ? 'Soft-deleted by Mentor Coordinator' : 'Restored by Mentor Coordinator',
+          reason: shouldSoftDelete ? 'Archived by Mentor Coordinator' : 'Restored by Mentor Coordinator',
         },
       });
       setConfirmDeleteId(null);
-      setStatusMessage(`${mentor.name} was successfully ${shouldSoftDelete ? 'soft-deleted' : 'restored'}.`);
+      setStatusMessage(`${mentor.name} was successfully ${shouldSoftDelete ? 'archived' : 'restored'}.`);
       if (onReload) onReload();
     } catch (err) {
       setStatusMessage(`Error: ${err.message || 'Operation failed'}`);
@@ -294,15 +291,15 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
   return (
     <SectionTable
       title="Mentor Tracker"
-      subtitle="Assigned learners, mentoring compliance, and faculty status"
+      subtitle={`${filteredRows.length} faculty (${activeCount} active, ${archivedCount} archived) · ${filteredRows.reduce((sum, r) => sum + (r.assigned || 0), 0)} students assigned`}
       action={
         <div className="flex flex-wrap items-center gap-2">
           {!compact && (
-            <div className="flex items-center rounded-lg border border-line bg-surface-subtle p-0.5 text-[11px]">
+            <div className="flex items-center rounded-xl border border-line bg-surface-subtle p-0.5 text-[11px]">
               <button
                 type="button"
                 onClick={() => setFilter('all')}
-                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
                   filter === 'all' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
                 }`}
               >
@@ -311,7 +308,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
               <button
                 type="button"
                 onClick={() => setFilter('active')}
-                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
                   filter === 'active' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
                 }`}
               >
@@ -320,21 +317,21 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
               <button
                 type="button"
                 onClick={() => setFilter('archived')}
-                className={`rounded px-2.5 py-1 font-medium transition-colors ${
+                className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
                   filter === 'archived' ? 'bg-white shadow-xs text-bad-ink font-semibold' : 'text-muted hover:text-ink'
                 }`}
               >
-                Soft-Deleted ({archivedCount})
+                Archived ({archivedCount})
               </button>
             </div>
           )}
           {!compact && onNavigate && (
             <div className="flex items-center gap-2">
-              <Button size="xs" onClick={() => onNavigate('assignment')}>
+              <Button size="sm" onClick={() => onNavigate('assignment')}>
                 ＋ Mentor Assignment
               </Button>
-              <Button size="xs" variant="secondary" onClick={() => onNavigate('reassignment')}>
-                ⚡ Mentor Reassignment Tool
+              <Button size="sm" onClick={() => onNavigate('reassignment')}>
+                ⚡ Mentor Reassignment
               </Button>
             </div>
           )}
@@ -360,7 +357,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="font-semibold text-brand-700 hover:underline">{row.name}</p>
-                  {row.archived && <Badge tone="rose" size="xs">Soft-Deleted</Badge>}
+                  {row.archived && <Badge tone="rose" size="xs">Archived</Badge>}
                 </div>
                 <p className="text-[11.5px] text-muted">{row.staffCode} · {row.designation}</p>
               </div>
@@ -372,11 +369,11 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
             align: 'center',
             render: (row) => (
               <Badge tone={row.archived ? 'rose' : 'green'} size="xs">
-                {row.archived ? 'Soft-Deleted' : 'Active'}
+                {row.archived ? 'Archived' : 'Active'}
               </Badge>
             ),
           },
-          { key: 'assigned', header: 'Assigned', align: 'right' },
+          { key: 'assigned', header: 'Assigned Students', align: 'right', render: (row) => <span className="font-semibold text-ink">{row.assigned ?? 0}</span> },
           { key: 'compliance', header: 'Compliance', align: 'right', render: (row) => <Badge tone={row.compliance >= 80 ? 'green' : 'amber'}>{row.compliance}%</Badge> },
           { key: 'atRisk', header: compact ? 'At risk' : 'At-risk students', align: 'right', render: (row) => <span className={row.atRisk ? 'font-semibold text-bad-ink' : ''}>{row.atRisk}</span> },
           {
@@ -394,7 +391,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
                 </Button>
                 {confirmDeleteId === row.id ? (
                   <div className="flex items-center gap-1 rounded-lg bg-bad-surface/60 p-1 border border-bad-line">
-                    <span className="text-[11px] font-bold text-bad-ink px-1">Soft Delete?</span>
+                    <span className="text-[11px] font-bold text-bad-ink px-1">Archive?</span>
                     <Button
                       size="xs"
                       variant="danger"
@@ -428,7 +425,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
                       disabled={actionLoadingId === row.id}
                       onClick={() => setConfirmDeleteId(row.id)}
                     >
-                      Soft Delete
+                      Archive
                     </Button>
                   )
                 )}
@@ -464,7 +461,7 @@ function StudentDirectory({ role, onNavigate }) {
                 📊 Export Excel
               </Button>
               {onNavigate && (
-                <Button size="sm" onClick={() => onNavigate('upload')} title="Upload new student roster or marks from Excel">
+                <Button size="sm" onClick={() => onNavigate('upload')} title="Upload new student list or marks from Excel">
                   ⚡ Upload Excel
                 </Button>
               )}

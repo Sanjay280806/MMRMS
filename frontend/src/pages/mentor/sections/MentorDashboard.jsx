@@ -1,5 +1,5 @@
 import { Avatar } from '../../../components/ui/Avatar.jsx';
-import { Badge, HealthBadge } from '../../../components/ui/Badge.jsx';
+import { Badge } from '../../../components/ui/Badge.jsx';
 import { Button } from '../../../components/ui/Button.jsx';
 import { DataTable } from '../../../components/ui/DataTable.jsx';
 import { EmptyState } from '../../../components/ui/EmptyState.jsx';
@@ -8,7 +8,7 @@ import { StatTile } from '../../../components/ui/StatTile.jsx';
 
 /** The mentor's landing view: portfolio counts, then who needs attention. */
 export function MentorDashboard({ data, onOpenMentee }) {
-  const { stats, attention, cohortHealth, initialInteractionAlerts } = data;
+  const { stats, attention, initialInteractionAlerts } = data;
 
   return (
     <div className="space-y-4 sm:space-y-5">

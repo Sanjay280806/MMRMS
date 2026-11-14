@@ -5,10 +5,11 @@ const VARIANTS = {
   secondary: 'btn-secondary',
   ghost: 'btn-ghost',
   dark: 'btn-dark',
+  danger: 'btn-danger',
 };
 
 const SIZES = {
-  xs: 'px-3 py-1.5 text-xs rounded-xl',
+  xs: 'px-2.5 py-1 text-xs rounded-xl',
   sm: 'px-3.5 py-2 text-xs rounded-xl',
   md: 'px-4 py-2.5 text-[13px] rounded-field',
   lg: 'w-full px-4 py-3.5 text-sm rounded-xl',

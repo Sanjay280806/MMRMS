@@ -326,7 +326,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
               <Badge tone="indigo">Mentor Coordinator</Badge>
             </div>
             <p className="mt-1 text-[13px] text-muted">
-              Import student master rosters, attendance data, or academic marks from MyCamu ERP (.xlsx, .xls, .csv).
+              Import student enrollment lists, attendance data, or academic marks from MyCamu ERP (.xlsx, .xls, .csv).
               Automatic column mapping, dry-run validation, and live updates to the year dashboard.
             </p>
           </div>
@@ -422,7 +422,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
                   : 'bg-white text-muted border border-line hover:text-ink'
               }`}
             >
-              🎓 Student Master Roster (Student Enrollment)
+              🎓 Student Enrollment List
             </button>
             <button
               type="button"
@@ -654,7 +654,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
                     <h4 className="text-[14px] font-semibold text-ink">Dry-Run Pre-validation Results</h4>
                     {validationResult.mode === 'faculty' ? (
                       <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-[11px] font-semibold text-purple-800">
-                        Faculty & Mentor Roster
+                        Faculty & Mentor Directory
                       </span>
                     ) : validationResult.isCourseWise && (
                       <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800">
@@ -667,7 +667,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
                     <div className="rounded-lg border border-purple-200 bg-purple-50/80 p-3.5 flex items-start gap-3">
                       <span className="text-base text-purple-600">👨‍🏫</span>
                       <div className="text-[12.5px] text-purple-900 leading-snug">
-                        <strong className="font-semibold">Faculty & Mentor Directory Roster Recognized:</strong>{' '}
+                        <strong className="font-semibold">Faculty & Mentor Directory Recognized:</strong>{' '}
                         Found <strong>{validationResult.totalRows}</strong> faculty professors across academic titles (Professors, Associate Professors, Assistant Professors) ready to be onboarded as mentors.
                       </div>
                     </div>
@@ -815,7 +815,7 @@ export function ExcelUploadSection({ onUploadSuccess, onNavigate }) {
                 header: 'Type',
                 render: (r) => (
                   <Badge tone={r.mode === 'attendance' ? 'amber' : 'indigo'}>
-                    {r.mode === 'attendance' ? 'Attendance Dump' : 'Master Roster'}
+                    {r.mode === 'attendance' ? 'Attendance Dump' : 'Student Enrollment List'}
                   </Badge>
                 ),
               },
