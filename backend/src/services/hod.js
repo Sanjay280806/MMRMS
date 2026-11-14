@@ -51,7 +51,7 @@ function isMeetingInCurrentCycle(dateStr) {
 /**
  * Analyzes meetings, frequency compliance, and action items for an individual mentee.
  */
-function analyzeMenteeMeetings(rawMentee) {
+export function analyzeMenteeMeetings(rawMentee) {
   const student = menteeToStudent(rawMentee);
   const meetings = student.meetings || [];
   const currentCycleMeetings = meetings.filter((m) => isMeetingInCurrentCycle(m.date));

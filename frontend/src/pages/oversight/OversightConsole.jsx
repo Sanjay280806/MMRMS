@@ -15,6 +15,7 @@ import { ExcelUploadSection } from './ExcelUploadSection.jsx';
 import { MentorReassignmentTool } from '../../components/reassignment/MentorReassignmentTool.jsx';
 import { MentorAssignmentTool } from '../../components/assignment/MentorAssignmentTool.jsx';
 import { MentorDashboardModal } from '../../components/oversight/MentorDashboardModal.jsx';
+import { downloadConsolidatedReport } from '../../lib/meetingReports.js';
 
 const titles = {
   advisor: {
@@ -22,11 +23,83 @@ const titles = {
     academics: 'Academic & Discipline Watch', operations: 'Class Coordination', mentors: 'Mentor Coordination',
   },
   coordinator: {
-    dashboard: 'Mentor Coordinator Dashboard', mentors: 'Mentor Tracker',
+    dashboard: 'Mentor Coordinator Dashboard', reports: 'Meeting Reports & Archive', mentors: 'Mentor Tracker',
     upload: 'Excel / ERP Data Upload', assignment: 'Mentor Assignment', reassignment: 'Mentor Reassignment',
     audit: 'Audit & Accreditation Readiness',
   },
 };
+
+// Clean CSV export helper
+function downloadCsv(data, filename) {
+  if (!data || !data.length) return;
+  const headers = Object.keys(data[0]);
+  const csvRows = [
+    headers.join(','),
+    ...data.map((row) =>
+      headers
+        .map((header) => {
+          const val = row[header] ?? '';
+          const escaped = String(val).replace(/"/g, '""');
+          return `"${escaped}"`;
+        })
+        .join(',')
+    ),
+  ];
+  const blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function exportMeetingMinutesCsv(meetings, filenamePrefix = 'MMRMS_Meeting_Minutes') {
+  if (!meetings || !meetings.length) return;
+  const rows = meetings.map((m) => ({
+    'Review No': m.meetingNumber,
+    'Date': m.date,
+    'Mode': m.mode || 'Offline',
+    'Duration': m.duration || '30 min',
+    'Mentor Name': m.mentorName,
+    'Mentor Staff Code': m.mentorStaffCode,
+    'Student Name': m.studentName,
+    'Roll Number': m.rollNumber,
+    'Batch': m.cohort || '2024 BCS',
+    'Attendance %': m.attendance,
+    'CGPA': m.cgpa,
+    'Topics Discussed': m.topicsDiscussed,
+    'Student Concerns': m.studentConcerns,
+    'Mentor Guidance': m.mentorSuggestions,
+    'Support Required': m.supportRequired,
+    'Pending Tasks': m.actionItemsText,
+    'Mentor Signed': m.mentorSigned ? 'Yes' : 'No',
+    'Student Signed': m.studentSigned ? 'Yes' : 'No',
+    'Next Review Date': m.nextReviewDate,
+  }));
+  downloadCsv(rows, `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+function exportMentorComplianceCsv(mentors, filenamePrefix = 'MMRMS_Faculty_Mentor_Compliance') {
+  if (!mentors || !mentors.length) return;
+  const rows = mentors.map((m) => ({
+    'Staff Code': m.staffCode,
+    'Mentor Name': m.name,
+    'Department': m.department || 'CSE',
+    'Cabin': m.cabin || 'CSE Block',
+    'Assigned Students': m.assignedMentees ?? m.menteeCount ?? m.assigned ?? 0,
+    'Monthly Target Meetings (2 per student)': m.monthlyTarget ?? (((m.assignedMentees ?? m.menteeCount ?? m.assigned ?? 0) * 2)),
+    'Monthly Meetings Conducted': m.monthlyHeld ?? 0,
+    'Students Below Target (< 2 meetings)': m.menteesBelowTarget ?? 0,
+    'Monthly Compliance %': `${m.monthlyCompliancePct ?? 100}%`,
+    'Total Meetings Held': m.meetingsHeld ?? 0,
+    'Last Review Date': m.lastMeetingDate ?? 'None',
+    'Days Since Last Meeting': m.daysSinceLastMeeting ?? 0,
+    'Status': m.isInactive ? 'Inactive (>30 days)' : m.meetsMonthlyTarget ? 'Compliant' : 'Behind Schedule (<2 mtgs/mo)',
+  }));
+  downloadCsv(rows, `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`);
+}
 
 const statusTone = (status) => {
   if (['Completed', 'Resolved', 'Approved'].includes(status)) return 'green';
@@ -85,8 +158,22 @@ function OversightConsole({ role }) {
       { label: 'Coordination', items: [{ key: 'operations', label: 'Meetings & Grievances', badge: stats.openGrievances, badgeTone: 'rose' }, { key: 'mentors', label: 'Mentor Coordination' }] },
     ]
     : [
-      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }] },
-      { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'assignment', label: 'Mentor Assignment' }, { key: 'reassignment', label: 'Mentor Reassignment' }, { key: 'audit', label: 'Audit & Accreditation' }] },
+      {
+        label: 'Overview',
+        items: [
+          { key: 'dashboard', label: 'Dashboard' },
+          { key: 'reports', label: 'Meeting Reports' },
+        ],
+      },
+      {
+        label: 'Data & Operations',
+        items: [
+          { key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' },
+          { key: 'assignment', label: 'Mentor Assignment' },
+          { key: 'reassignment', label: 'Mentor Reassignment' },
+          { key: 'audit', label: 'Audit & Accreditation' },
+        ],
+      },
     ];
 
   function navigate(next) {
@@ -168,7 +255,21 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
 
   return (
     <>
-      {(section === 'dashboard' || section === 'mentors') && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {(section === 'dashboard' || section === 'mentors') && (
+        <CoordinatorDashboard
+          data={data}
+          onNavigate={navigate}
+          onInspectMentor={setInspectingMentorId}
+          onReload={reload}
+        />
+      )}
+      {section === 'reports' && (
+        <MeetingReportsSection
+          data={data}
+          onInspectMentor={setInspectingMentorId}
+          onReload={reload}
+        />
+      )}
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
       {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
       {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
@@ -178,82 +279,175 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
         <MentorDashboardModal
           mentorId={inspectingMentorId}
           onClose={() => setInspectingMentorId(null)}
+          onReload={reload}
         />
       )}
     </>
   );
 }
 
-function AdvisorDashboard({ data }) {
-  const { stats } = data;
-  return <>
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      <StatTile label="Class strength" value={stats.enrolled} footer="2024 BCS student dataset" />
-      <StatTile label="Average attendance" value={stats.averageAttendance} suffix="%" footer={`${stats.attendanceShortfalls} students below 75%`} />
-      <StatTile label="Academic follow-ups" value={stats.academicConcerns} footer="Low CGPA or standing arrears" />
-      <StatTile label="Open grievances" value={stats.openGrievances} footer={`${stats.meetingsScheduled} class meeting(s) upcoming`} />
-    </div>
-    <StudentWatch title="Priority Students" subtitle="Attendance, academic and mentoring signals combined" rows={data.attention.slice(0, 8)} metric="attention" />
-    <div className="grid gap-5 xl:grid-cols-2">
-      <MiniList title="Upcoming class coordination" rows={data.classMeetings.filter((meeting) => meeting.status !== 'Completed')} label={(meeting) => meeting.title} detail={(meeting) => `${meeting.date} · ${meeting.status}`} />
-      <MiniList title="Open grievances" rows={data.grievances.filter((item) => !['Resolved', 'Closed'].includes(item.status))} label={(item) => `${item.student} — ${item.subject}`} detail={(item) => `${item.priority} priority · ${item.status}`} />
-    </div>
-  </>;
-}
-
 function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
-  return <>
-    {/* Batch Data Management & Quick Sync Action Card */}
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50/70 via-white to-purple-50/50 p-5 shadow-card">
-      <div className="flex items-center gap-3.5">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-white shadow-sm text-xl">
-          📊
-        </span>
-        <div>
-          <h4 className="text-[14px] font-semibold text-ink">MyCamu ERP & Excel Data Synchronisation</h4>
-          <p className="text-[12px] text-muted">
-            Batch data management: Upload student enrollment lists, attendance reports, and academic internal marks.
-          </p>
+  const mentors = data.mentors || [];
+  const inactiveMentors = data.inactiveMentors || [];
+  const belowTargetMentors = data.belowTargetMentors || [];
+  const monthlyCompliance = data.monthlyCompliance || {};
+  const allMeetingMinutes = data.allMeetingMinutes || [];
+
+  return (
+    <div className="space-y-6">
+      {/* Alert Card: Monthly Meeting Tracker (matching HOD logic and coordinator spec) */}
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600">
+                Monthly Meeting Tracker
+              </span>
+              <Badge tone="indigo" size="sm">Rule: At Least 2 Meetings / Month</Badge>
+            </div>
+            <h3 className="text-base font-semibold text-ink mt-0.5">
+              Faculty Meeting Progress & Activity
+            </h3>
+            <p className="text-[12.5px] text-muted">
+              Each mentor should conduct at least two meetings per mentee each month. Mentors who need to schedule sessions are listed below.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => exportMentorComplianceCsv(mentors)}
+              className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink shadow-xs transition hover:bg-gray-50 focus:outline-none"
+            >
+              Download Mentor Report (CSV)
+            </button>
+            <button
+              type="button"
+              onClick={() => exportMeetingMinutesCsv(allMeetingMinutes)}
+              className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink shadow-xs transition hover:bg-gray-50 focus:outline-none"
+            >
+              Download Minutes (CSV)
+            </button>
+          </div>
+        </div>
+
+        {/* Attention Cards */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* Inactive Faculty Alert */}
+          <div
+            className={`rounded-xl border p-4 transition-all ${
+              inactiveMentors.length > 0
+                ? 'border-bad-border bg-bad-surface/40 text-ink'
+                : 'border-gray-200/80 bg-white text-ink'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">
+                {inactiveMentors.length > 0
+                  ? `Inactive Mentors (${inactiveMentors.length})`
+                  : 'Faculty Activity Normal'}
+              </h4>
+              <Badge tone={inactiveMentors.length > 0 ? 'rose' : 'green'}>
+                {inactiveMentors.length > 0 ? 'Over 30 Days Without Meeting' : 'Active'}
+              </Badge>
+            </div>
+
+            {inactiveMentors.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                <p className="text-[12px] text-bad-ink">
+                  The following faculty mentors have not conducted any meetings in the past 30 days:
+                </p>
+                <div className="divide-y divide-bad-border/40 rounded-xl bg-white p-2 text-[12px] border border-bad-border/40">
+                  {inactiveMentors.map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => onInspectMentor?.(m.id)}
+                      className="flex cursor-pointer items-center justify-between py-1.5 hover:text-brand-600 transition-colors"
+                    >
+                      <div>
+                        <span className="font-semibold">{m.name}</span>
+                        <span className="ml-2 text-muted text-[11px]">{m.staffCode} · {m.cabin || 'CSE Block'}</span>
+                      </div>
+                      <span className="font-semibold text-bad-ink">
+                        {m.lastMeetingDate ? `${m.daysSinceLastMeeting} days ago` : '0 Meetings'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-[12px] text-muted">
+                All faculty mentors have conducted mentoring meetings within the past 30 days.
+              </p>
+            )}
+          </div>
+
+          {/* Monthly 2-Meeting Target Deficit */}
+          <div
+            className={`rounded-xl border p-4 transition-all ${
+              belowTargetMentors.length > 0
+                ? 'border-amber-200 bg-amber-50/40 text-ink'
+                : 'border-gray-200/80 bg-white text-ink'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">
+                {belowTargetMentors.length > 0
+                  ? `Mentors Behind Schedule (${belowTargetMentors.length})`
+                  : 'Monthly Target Met'}
+              </h4>
+              <Badge tone={belowTargetMentors.length > 0 ? 'amber' : 'green'}>
+                {monthlyCompliance.studentsBelowTarget || 0} Students &lt; 2 Meetings
+              </Badge>
+            </div>
+
+            {belowTargetMentors.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                <p className="text-[12px] text-amber-900">
+                  Faculty mentors with students who have had fewer than 2 meetings this month:
+                </p>
+                <div className="divide-y divide-amber-200/50 rounded-xl bg-white p-2 text-[12px] border border-amber-200/60">
+                  {belowTargetMentors.slice(0, 4).map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => onInspectMentor?.(m.id)}
+                      className="flex cursor-pointer items-center justify-between py-1.5 hover:text-brand-600 transition-colors"
+                    >
+                      <div>
+                        <span className="font-semibold">{m.name}</span>
+                        <span className="ml-2 text-muted text-[11px]">{m.staffCode}</span>
+                      </div>
+                      <span className="font-semibold text-amber-900">
+                        {m.menteesBelowTarget} mentee{m.menteesBelowTarget === 1 ? '' : 's'} behind
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-[12px] text-muted">
+                All faculty mentors are on track with their monthly meeting requirements.
+              </p>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={downloadDatasetExport}>
-          Export Dataset (.xlsx)
-        </Button>
-        <Button size="sm" onClick={() => onNavigate?.('upload')}>
-          ⚡ Upload Excel / CSV
-        </Button>
-      </div>
+
+      {/* Mentor Tracker with Batch Filter */}
+      <MentorTracker
+        rows={mentors}
+        batches={data.batches || ['All Batches', '2024 BCS']}
+        onNavigate={onNavigate}
+        onInspectMentor={onInspectMentor}
+        onReload={onReload}
+      />
     </div>
-
-<div className="mt-5">
-      <MentorTracker rows={data.mentors} onNavigate={onNavigate} onInspectMentor={onInspectMentor} onReload={onReload} />
-    </div>
-  </>;
+  );
 }
 
-function StudentWatch({ title, subtitle, rows, metric }) {
-  return <SectionTable title={title} subtitle={subtitle} action={<Badge tone={rows.length ? 'rose' : 'green'}>{rows.length} student{rows.length === 1 ? '' : 's'}</Badge>}>
-    <DataTable rows={rows} rowKey={(row) => row.id} empty={<EmptyState title="No follow-up needed" description="There are no students in this watch list." icon="✓" />} columns={[
-      { key: 'student', header: 'Student', render: (row) => <div><p className="font-medium">{row.name}</p><p className="tnum text-[11.5px] text-muted">{row.rollNumber}</p></div> },
-      { key: 'cgpa', header: 'CGPA', align: 'right', render: (row) => row.cgpa.toFixed(1) },
-      { key: 'attendance', header: 'Attendance', align: 'right', render: (row) => <span className={row.attendanceBelowRequirement ? 'font-semibold text-bad-ink' : ''}>{row.attendance}%</span> },
-      { key: 'metric', header: metric === 'attention' ? 'Follow-up' : 'Status', align: 'right', render: (row) => <Badge tone={row.flagTone ?? (row.attendanceBelowRequirement ? 'rose' : 'amber')}>{row.flagReason ?? 'Review'}</Badge> },
-    ]} />
-  </SectionTable>;
-}
-
-function AcademicAndDiscipline({ data }) {
-  return <>
-    <StudentWatch title="Academic Follow-up" subtitle="CGPA below 7.0 or standing arrears" rows={data.academicWatch} metric="academic" />
-    <SectionCard title="Discipline Register" subtitle="A transparent log for class-advisor follow-up">
-      <EmptyState title="No discipline incidents recorded" description="This class currently has no discipline entries. New entries can be introduced through the grievance workflow when needed." icon="✓" />
-    </SectionCard>
-  </>;
-}
-
-function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor, onReload }) {
+function MentorTracker({ rows = [], batches = ['All Batches', '2024 BCS'], compact = false, onNavigate, onInspectMentor, onReload }) {
   const [filter, setFilter] = useState('all');
+  const [batchFilter, setBatchFilter] = useState('All Batches');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [statusMessage, setStatusMessage] = useState(null);
@@ -279,10 +473,15 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
     }
   }
 
-  const activeCount = rows.filter((r) => !r.archived).length;
-  const archivedCount = rows.filter((r) => r.archived).length;
+  const batchFilteredRows = rows.filter((r) => {
+    if (batchFilter === 'All Batches') return true;
+    return r.batches?.includes(batchFilter) || r.section === batchFilter;
+  });
 
-  const filteredRows = rows.filter((r) => {
+  const activeCount = batchFilteredRows.filter((r) => !r.archived).length;
+  const archivedCount = batchFilteredRows.filter((r) => r.archived).length;
+
+  const filteredRows = batchFilteredRows.filter((r) => {
     if (filter === 'active') return !r.archived;
     if (filter === 'archived') return r.archived;
     return true;
@@ -294,6 +493,19 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
       subtitle={`${filteredRows.length} faculty (${activeCount} active, ${archivedCount} archived) · ${filteredRows.reduce((sum, r) => sum + (r.assigned || 0), 0)} students assigned`}
       action={
         <div className="flex flex-wrap items-center gap-2">
+          {/* Batch Selector Dropdown above Mentor Tracker */}
+          {!compact && batches.length > 0 && (
+            <select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+              className="rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            >
+              {batches.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </select>
+          )}
+
           {!compact && (
             <div className="flex items-center rounded-xl border border-line bg-surface-subtle p-0.5 text-[11px]">
               <button
@@ -303,7 +515,7 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
                   filter === 'all' ? 'bg-white shadow-xs text-ink font-semibold' : 'text-muted hover:text-ink'
                 }`}
               >
-                All ({rows.length})
+                All ({batchFilteredRows.length})
               </button>
               <button
                 type="button"
@@ -435,6 +647,254 @@ function MentorTracker({ rows = [], compact = false, onNavigate, onInspectMentor
         ]}
       />
     </SectionTable>
+  );
+}
+
+function MeetingReportsSection({ data, onInspectMentor, onReload }) {
+  const batches = data.batches || ['All Batches', '2024 BCS'];
+  const [selectedBatch, setSelectedBatch] = useState(batches[0] || 'All Batches');
+  const [selectedMentorId, setSelectedMentorId] = useState('');
+  const [downloadingStudentId, setDownloadingStudentId] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  const mentors = data.mentors || [];
+  const allMeetingMinutes = data.allMeetingMinutes || [];
+
+  // Filter mentors based on batch
+  const filteredMentors = mentors.filter((m) => {
+    if (selectedBatch === 'All Batches') return true;
+    return m.batches?.includes(selectedBatch) || m.section === selectedBatch;
+  });
+
+  // Filter meeting minutes based on batch
+  const filteredMinutes = allMeetingMinutes.filter((m) => {
+    if (selectedBatch === 'All Batches') return true;
+    return m.cohort === selectedBatch || m.cohort?.includes(selectedBatch);
+  });
+
+  // Effective selected mentor
+  const selectedMentor = filteredMentors.find((m) => m.id === selectedMentorId) || filteredMentors[0] || null;
+
+  // Minutes for selected mentor
+  const selectedMentorMinutes = selectedMentor
+    ? filteredMinutes.filter((m) => m.mentorId === selectedMentor.id || m.mentorStaffCode === selectedMentor.staffCode)
+    : [];
+
+  // Unique students under selected mentor
+  const mentorStudentsMap = new Map();
+  for (const m of selectedMentorMinutes) {
+    if (!mentorStudentsMap.has(m.studentId)) {
+      mentorStudentsMap.set(m.studentId, {
+        id: m.studentId,
+        name: m.studentName,
+        rollNumber: m.rollNumber,
+        cohort: m.cohort,
+        meetingsHeld: 0,
+      });
+    }
+    mentorStudentsMap.get(m.studentId).meetingsHeld += 1;
+  }
+  const mentorStudents = Array.from(mentorStudentsMap.values());
+
+  const handleDownloadStudentPdf = async (student) => {
+    setDownloadingStudentId(student.id);
+    setStatusMessage(null);
+    try {
+      const studentM = selectedMentorMinutes.filter((m) => m.studentId === student.id || m.rollNumber === student.rollNumber);
+      if (!studentM || studentM.length === 0) {
+        setStatusMessage(`No recorded meeting sessions found for ${student.name}.`);
+        return;
+      }
+      await downloadConsolidatedReport(studentM, {
+        menteeName: student.name,
+        mentorName: selectedMentor.name,
+        filterRangeText: `Batch: ${selectedBatch}`,
+        isMentorWide: false,
+      });
+      setStatusMessage(`Report downloaded for ${student.name}.`);
+    } catch (err) {
+      setStatusMessage(`Error: ${err.message || 'Failed to generate PDF'}`);
+    } finally {
+      setDownloadingStudentId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Batch Header & Consolidated Download */}
+      <div className="rounded-2xl border border-line bg-white p-5 shadow-card space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-gray-100 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-ink">
+              Meetings Report
+            </h3>
+            <p className="text-[12.5px] text-muted">
+              Generate batch-level CSV consolidated minutes, mentor-level meeting logs, or individual student PDF reports.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0 flex-nowrap overflow-x-auto">
+            {/* Batch Selector */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs font-semibold text-muted">Batch:</span>
+              <select
+                value={selectedBatch}
+                onChange={(e) => {
+                  setSelectedBatch(e.target.value);
+                  setSelectedMentorId('');
+                }}
+                className="rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              >
+                {batches.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Batch Level Downloads in same row */}
+            <button
+              type="button"
+              onClick={() => exportMeetingMinutesCsv(filteredMinutes, `MMRMS_${selectedBatch.replace(/\s+/g, '_')}_Minutes`)}
+              disabled={filteredMinutes.length === 0}
+              className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink shadow-xs transition hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              Download Minutes (CSV)
+            </button>
+            <button
+              type="button"
+              onClick={() => exportMentorComplianceCsv(filteredMentors, `MMRMS_${selectedBatch.replace(/\s+/g, '_')}_Compliance`)}
+              disabled={filteredMentors.length === 0}
+              className="rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink shadow-xs transition hover:bg-gray-50 disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              Download Mentor Report (CSV)
+            </button>
+          </div>
+        </div>
+
+        {statusMessage && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3 text-xs font-medium text-brand-900 flex justify-between items-center">
+            <span>{statusMessage}</span>
+            <button type="button" onClick={() => setStatusMessage(null)} className="text-muted hover:text-ink">✕</button>
+          </div>
+        )}
+
+        {/* Mentor Selector Cards */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-strong mb-3">
+            Select Faculty Mentor ({filteredMentors.length} in {selectedBatch})
+          </h4>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {filteredMentors.map((m) => {
+              const isSelected = selectedMentor?.id === m.id;
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setSelectedMentorId(m.id)}
+                  className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                    isSelected
+                      ? 'border-brand-500 bg-brand-50/40 shadow-xs ring-2 ring-brand-500/20'
+                      : 'border-line bg-white hover:border-brand-300 hover:bg-canvas/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-xs text-ink">{m.name}</p>
+                      <p className="text-[11px] text-muted">{m.staffCode} · {m.cabin || 'CSE Block'}</p>
+                    </div>
+                    {isSelected && <Badge tone="indigo" size="xs">Selected</Badge>}
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between text-[11px]">
+                    <span className="text-muted">Students: <strong className="text-ink">{m.assignedMentees ?? m.assigned ?? 0}</strong></span>
+                    <span className="text-muted">Meetings: <strong className="text-ink">{m.meetingsHeld ?? 0}</strong></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Selected Mentor Details & Student List */}
+      {selectedMentor && (
+        <div className="rounded-2xl border border-line bg-white p-5 shadow-card space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-brand-600">
+                  Mentor Meeting Records
+                </span>
+                <Badge tone="indigo" size="sm">{selectedMentor.staffCode}</Badge>
+              </div>
+              <h3 className="text-base font-bold text-ink mt-0.5">
+                {selectedMentor.name} · Assigned Students & Reviews
+              </h3>
+              <p className="text-[12.5px] text-muted">
+                {selectedMentorMinutes.length} total review logs recorded for this mentor.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => exportMeetingMinutesCsv(selectedMentorMinutes, `MMRMS_${selectedMentor.name.replace(/\s+/g, '_')}_Meeting_Records`)}
+                disabled={selectedMentorMinutes.length === 0}
+              >
+                Download Mentor Meeting Records (CSV)
+              </Button>
+            </div>
+          </div>
+
+          {/* Student Table */}
+          <div className="rounded-xl border border-line overflow-hidden">
+            <div className="bg-canvas/50 px-4 py-2.5 border-b border-line flex items-center justify-between text-xs">
+              <span className="font-semibold text-muted-strong">
+                Students Assigned to {selectedMentor.name} ({mentorStudents.length})
+              </span>
+              <span className="text-muted">Click Download PDF to export individual meeting history</span>
+            </div>
+
+            {mentorStudents.length === 0 ? (
+              <div className="p-8 text-center text-muted text-xs">
+                No students or meeting records found for this mentor in the selected batch.
+              </div>
+            ) : (
+              <table className="w-full text-left text-[12.5px]">
+                <thead className="border-b border-line bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="px-4 py-3">Student Name</th>
+                    <th className="px-4 py-3">Roll Number</th>
+                    <th className="px-4 py-3">Batch</th>
+                    <th className="px-4 py-3 text-right">Reviews Held</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line/60">
+                  {mentorStudents.map((s) => (
+                    <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-ink">{s.name}</td>
+                      <td className="px-4 py-3 font-mono text-muted text-[11.5px]">{s.rollNumber}</td>
+                      <td className="px-4 py-3 text-muted">{s.cohort}</td>
+                      <td className="px-4 py-3 text-right tnum font-semibold text-ink">{s.meetingsHeld}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          loading={downloadingStudentId === s.id}
+                          disabled={downloadingStudentId !== null}
+                          onClick={() => handleDownloadStudentPdf(s)}
+                        >
+                          Download Meeting Report (PDF)
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

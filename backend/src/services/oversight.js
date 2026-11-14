@@ -10,6 +10,7 @@ import {
 import { healthIndex } from './health.js';
 import { summariseMentee } from './mentor.js';
 import { initials } from './student.js';
+import { getDepartmentMeetingMinutes, analyzeMenteeMeetings } from './hod.js';
 
 const mean = (values) =>
   values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
@@ -147,6 +148,72 @@ export function buildCoordinatorOverview(coordinator) {
   const totalDue = activeMentors.reduce((sum, mentor) => sum + mentor.meetingsDue, 0);
   const totalHeld = activeMentors.reduce((sum, mentor) => sum + mentor.meetingsHeld, 0);
 
+  const allMeetingMinutes = getDepartmentMeetingMinutes();
+  const allRawMentees = listAllMentees();
+  const allStudentAnalyses = allRawMentees.map(analyzeMenteeMeetings);
+  const studentsMeetingTarget = allStudentAnalyses.filter((s) => s.meetsMonthlyTarget).length;
+  const studentsBelowTarget = allStudentAnalyses.filter((s) => !s.meetsMonthlyTarget).length;
+
+  const enrichedMentors = mentors.map((m) => {
+    const rawForMentor = allRawMentees.filter((s) => s.mentorId === m.id);
+    const analysesForMentor = rawForMentor.map(analyzeMenteeMeetings);
+    const monthlyHeld = analysesForMentor.reduce((sum, s) => sum + s.meetingsThisMonth, 0);
+    const menteesBelowTarget = analysesForMentor.filter((s) => !s.meetsMonthlyTarget).length;
+    const meetsMonthlyTarget = rawForMentor.length === 0 || menteesBelowTarget === 0;
+    const monthlyCompliancePct = rawForMentor.length
+      ? Math.round(((rawForMentor.length - menteesBelowTarget) / rawForMentor.length) * 100)
+      : 100;
+
+    const validDates = analysesForMentor
+      .map((s) => s.lastMeetingDate)
+      .filter(Boolean)
+      .map((d) => new Date(d))
+      .filter((d) => !isNaN(d.getTime()));
+
+    const mostRecentMeetingDate = validDates.length
+      ? new Date(Math.max(...validDates.map((d) => d.getTime()))).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : null;
+
+    const daysSinceLastMeeting = mostRecentMeetingDate
+      ? Math.max(0, Math.floor((new Date('2026-08-01') - new Date(mostRecentMeetingDate)) / (1000 * 60 * 60 * 24)))
+      : (rawForMentor.length > 0 ? 99 : 0);
+
+    const isInactive = rawForMentor.length > 0 && (daysSinceLastMeeting > 30 || monthlyHeld === 0);
+
+    return {
+      ...m,
+      assignedMentees: rawForMentor.length,
+      monthlyTarget: rawForMentor.length * 2,
+      monthlyHeld,
+      menteesBelowTarget,
+      meetsMonthlyTarget,
+      monthlyCompliancePct,
+      lastMeetingDate: mostRecentMeetingDate || 'None recorded',
+      daysSinceLastMeeting,
+      isInactive,
+      batches: ['2024 BCS'],
+    };
+  });
+
+  const belowTargetMentors = enrichedMentors.filter((m) => !m.archived && m.menteesBelowTarget > 0);
+  const inactiveMentors = enrichedMentors.filter((m) => !m.archived && m.isInactive);
+
+  const monthlyCompliance = {
+    targetPerMentee: 2,
+    totalStudents: allStudentAnalyses.length,
+    studentsMeetingTarget,
+    studentsBelowTarget,
+    studentCompliancePct: allStudentAnalyses.length
+      ? Math.round((studentsMeetingTarget / allStudentAnalyses.length) * 100)
+      : 100,
+  };
+
+  const batches = ['All Batches', ...new Set(students.map((s) => s.section).filter(Boolean))];
+
   return {
     institution: INSTITUTION,
     coordinator: {
@@ -167,7 +234,12 @@ export function buildCoordinatorOverview(coordinator) {
       pendingOd: odRequests.filter((request) => request.status === 'Pending').length,
       plannedEvents: events.filter((event) => event.status !== 'Completed').length,
     },
-    mentors,
+    mentors: enrichedMentors,
+    inactiveMentors,
+    belowTargetMentors,
+    monthlyCompliance,
+    allMeetingMinutes,
+    batches,
     atRisk: atRisk.sort((a, b) => a.attendance - b.attendance),
     attendanceWatch: attendanceShortfalls.sort((a, b) => a.attendance - b.attendance),
     events,

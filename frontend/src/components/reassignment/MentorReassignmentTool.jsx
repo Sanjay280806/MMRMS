@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api/client.js';
 import { Button } from '../ui/Button.jsx';
 import { Badge } from '../ui/Badge.jsx';
 import { Avatar } from '../ui/Avatar.jsx';
-import { SelectField, TextField } from '../ui/Field.jsx';
+import { SelectField } from '../ui/Field.jsx';
 import { SectionCard } from '../ui/SectionCard.jsx';
 import { EmptyState } from '../ui/EmptyState.jsx';
 
@@ -19,8 +19,7 @@ export function MentorReassignmentTool({
   const [mentees, setMentees] = useState([]);
   const [selectedMenteeIds, setSelectedMenteeIds] = useState(new Set());
   const [loadingMentees, setLoadingMentees] = useState(false);
-  const [archiveDepartingMentor, setArchiveDepartingMentor] = useState(false);
-  const [reason, setReason] = useState('Mentor Discontinued / Faculty Succession');
+  const [batchFilter, setBatchFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -32,7 +31,6 @@ export function MentorReassignmentTool({
     api(endpoint)
       .then((res) => {
         const list = role === 'hod' ? res : res.mentors || [];
-        // Only active mentors for reassignment
         const active = list.filter((m) => !m.archived);
         setMentors(active);
 
@@ -63,7 +61,6 @@ export function MentorReassignmentTool({
       .then((res) => {
         const menteeList = res.mentees || [];
         setMentees(menteeList);
-        // By default, select all mentees of departing mentor for bulk reassignment
         setSelectedMenteeIds(new Set(menteeList.map((m) => m.id)));
       })
       .catch(() => {
@@ -86,15 +83,27 @@ export function MentorReassignmentTool({
   const departingMentor = mentors.find((m) => m.id === departingMentorId);
   const targetMentor = mentors.find((m) => m.id === targetMentorId);
 
-  const filteredMentees = mentees.filter((m) => {
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    return (
-      m.name?.toLowerCase().includes(q) ||
-      m.rollNumber?.toLowerCase().includes(q) ||
-      m.section?.toLowerCase().includes(q)
-    );
-  });
+  // Batches in current mentees
+  const distinctBatches = useMemo(() => {
+    const set = new Set();
+    mentees.forEach((m) => {
+      if (m.section) set.add(m.section);
+    });
+    return Array.from(set);
+  }, [mentees]);
+
+  const filteredMentees = useMemo(() => {
+    return mentees.filter((m) => {
+      if (batchFilter !== 'all' && m.section !== batchFilter) return false;
+      if (!searchTerm) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        m.name?.toLowerCase().includes(q) ||
+        m.rollNumber?.toLowerCase().includes(q) ||
+        m.section?.toLowerCase().includes(q)
+      );
+    });
+  }, [mentees, batchFilter, searchTerm]);
 
   function toggleMentee(id) {
     setSelectedMenteeIds((prev) => {
@@ -107,7 +116,7 @@ export function MentorReassignmentTool({
 
   function handleSelectAll(select) {
     if (select) {
-      setSelectedMenteeIds(new Set(mentees.map((m) => m.id)));
+      setSelectedMenteeIds(new Set(filteredMentees.map((m) => m.id)));
     } else {
       setSelectedMenteeIds(new Set());
     }
@@ -142,8 +151,8 @@ export function MentorReassignmentTool({
           departingMentorId,
           targetMentorId,
           menteeIds: Array.from(selectedMenteeIds),
-          archiveDepartingMentor,
-          reason,
+          archiveDepartingMentor: false,
+          reason: 'Mentor Reassignment by Coordinator',
         },
       });
 
@@ -160,17 +169,9 @@ export function MentorReassignmentTool({
 
   return (
     <div className="space-y-6 animate-fadeRise">
-      {/* Header Banner */}
       <SectionCard
-        title="Mentor Reassignment & Succession"
-        subtitle="Bulk-select and transfer mentees when faculty discontinue. All Section 12 meeting logs, goals, and history are seamlessly preserved."
-        action={
-          onCancel && (
-            <Button size="xs" variant="secondary" onClick={onCancel}>
-              ✕ Close
-            </Button>
-          )
-        }
+        title="Mentor Reassignment"
+        subtitle="Transfer students between mentors while keeping all meeting logs and history preserved."
       >
         {successInfo ? (
           <div className="rounded-2xl border border-good-line bg-good-surface/30 p-6 text-center animate-badgePop">
@@ -181,19 +182,10 @@ export function MentorReassignmentTool({
               Mentor Reassignment Successfully Executed!
             </h3>
             <p className="mt-1 text-[13px] text-muted-strong">
-              Reassigned <strong>{successInfo.transferredCount}</strong> mentees from{' '}
+              Reassigned <strong>{successInfo.transferredCount}</strong> students from{' '}
               <strong>{successInfo.departingMentor?.name}</strong> to{' '}
               <strong>{successInfo.targetMentor?.name}</strong>.
             </p>
-            {successInfo.departingMentor?.archived ? (
-              <p className="mt-2 text-[12.5px] font-medium text-bad-ink">
-                Departing mentor account for {successInfo.departingMentor?.name} has been <span className="font-semibold underline">archived</span> as requested.
-              </p>
-            ) : (
-              <p className="mt-2 text-[12.5px] font-medium text-good-ink">
-                Departing mentor {successInfo.departingMentor?.name} remains <span className="font-semibold underline">Active</span> in the faculty directory with {successInfo.departingMentor?.menteeCount ?? 0} mentees (not archived).
-              </p>
-            )}
 
             <div className="mt-5 flex justify-center gap-3">
               <Button
@@ -223,80 +215,76 @@ export function MentorReassignmentTool({
               </div>
             )}
 
-            {/* Step 1 & Step 3 Mentor Pickers */}
+            {/* Simplified Departing & Target Mentor Cards */}
             <div className="grid gap-5 md:grid-cols-2">
-              {/* Departing Mentor */}
+              {/* Departing Mentor Card */}
               <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                    Step 1 · Departing Mentor
+                    Departing Mentor
                   </span>
-                  <Badge tone="amber">Departing Faculty</Badge>
+                  <Badge tone="amber">Departing</Badge>
                 </div>
 
                 <SelectField
                   label="Select Departing Mentor"
                   value={departingMentorId}
                   onChange={(e) => setDepartingMentorId(e.target.value)}
-                  hint="Faculty member who is discontinuing or being relieved of mentoring"
                 >
                   {mentors.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name} ({m.staffCode}) — {m.assignedMentees || m.menteeCount || 0} mentees
+                      {m.name} ({m.staffCode}) — {m.assignedMentees || m.menteeCount || 0} students
                     </option>
                   ))}
                 </SelectField>
 
                 {departingMentor && (
-                  <div className="rounded-xl bg-white p-3 border border-amber-200/80 text-[12px] space-y-1">
-                    <div className="flex justify-between font-semibold text-ink">
+                  <div className="rounded-xl bg-white p-3 border border-amber-200/80 text-[12.5px]">
+                    <div className="flex items-center justify-between font-semibold text-ink">
                       <span>{departingMentor.name}</span>
-                      <span className="font-mono text-muted">{departingMentor.staffCode}</span>
+                      <span className="font-mono text-muted text-xs">{departingMentor.staffCode}</span>
                     </div>
-                    <p className="text-muted">{departingMentor.email} · {departingMentor.cabin || 'CSE Block'}</p>
-                    <div className="pt-1 flex items-center justify-between text-amber-900 font-medium">
-                      <span>Mentees to Reassign:</span>
-                      <span className="text-sm font-bold">{mentees.length} students</span>
+                    <div className="mt-1 flex items-center justify-between text-amber-900 font-medium">
+                      <span>Assigned Students:</span>
+                      <span className="text-sm font-bold">{mentees.length}</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Target New Mentor */}
+              {/* Target New Mentor Card */}
               <div className="rounded-2xl border border-good-line bg-good-surface/30 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-good-ink">
-                    Step 2 · Target New Mentor
+                    Target Mentor
                   </span>
-                  <Badge tone="green">Successor Faculty</Badge>
+                  <Badge tone="green">Target</Badge>
                 </div>
 
                 <SelectField
-                  label="Select Target New Mentor"
+                  label="Select Target Mentor"
                   value={targetMentorId}
                   onChange={(e) => setTargetMentorId(e.target.value)}
-                  hint="Active faculty member who will take over the selected mentees"
                 >
                   {mentors
                     .filter((m) => m.id !== departingMentorId)
                     .map((m) => (
                       <option key={m.id} value={m.id}>
-                        {m.name} ({m.staffCode}) — Currently {m.assignedMentees || m.menteeCount || 0} mentees
+                        {m.name} ({m.staffCode}) — {m.assignedMentees || m.menteeCount || 0} students
                       </option>
                     ))}
                 </SelectField>
 
                 {targetMentor && (
-                  <div className="rounded-xl bg-white p-3 border border-good-line/60 text-[12px] space-y-1">
-                    <div className="flex justify-between font-semibold text-ink">
+                  <div className="rounded-xl bg-white p-3 border border-good-line/60 text-[12.5px]">
+                    <div className="flex items-center justify-between font-semibold text-ink">
                       <span>{targetMentor.name}</span>
-                      <span className="font-mono text-muted">{targetMentor.staffCode}</span>
+                      <span className="font-mono text-muted text-xs">{targetMentor.staffCode}</span>
                     </div>
-                    <p className="text-muted">{targetMentor.email} · {targetMentor.cabin || 'CSE Block'}</p>
-                    <div className="pt-1 flex items-center justify-between text-good-ink font-medium">
-                      <span>Projected Load After Transfer:</span>
+                    <div className="mt-1 flex items-center justify-between text-good-ink font-medium">
+                      <span>Current Students:</span>
                       <span className="text-sm font-bold">
-                        {(targetMentor.assignedMentees || targetMentor.menteeCount || 0) + selectedMenteeIds.size} mentees
+                        {targetMentor.assignedMentees || targetMentor.menteeCount || 0}
                       </span>
                     </div>
                   </div>
@@ -304,65 +292,76 @@ export function MentorReassignmentTool({
               </div>
             </div>
 
-            {/* Mentees Bulk Selection Table */}
+            {/* Mentees Transfer Table with Batch Dropdown & Sticky Header */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-ink text-[14px]">
-                    Select Mentees to Transfer ({selectedMenteeIds.size} of {mentees.length} selected)
-                  </h4>
-                  <p className="text-[11.5px] text-muted">
-                    Bulk-select all students or fine-tune individual mentee assignments
-                  </p>
-                </div>
                 <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-ink text-[14px]">
+                    Select Students to Transfer ({selectedMenteeIds.size} of {filteredMentees.length} selected)
+                  </h4>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Batch Dropdown Filter */}
+                  {distinctBatches.length > 0 && (
+                    <select
+                      value={batchFilter}
+                      onChange={(e) => setBatchFilter(e.target.value)}
+                      className="rounded-xl border border-line-strong bg-white px-3 py-1.5 text-[12px] text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    >
+                      <option value="all">All Batches</option>
+                      {distinctBatches.map((b) => (
+                        <option key={b} value={b}>Batch: {b}</option>
+                      ))}
+                    </select>
+                  )}
+
                   <Button
                     size="xs"
                     variant="secondary"
-                    onClick={() => handleSelectAll(selectedMenteeIds.size < mentees.length)}
+                    onClick={() => handleSelectAll(selectedMenteeIds.size < filteredMentees.length)}
                   >
-                    {selectedMenteeIds.size === mentees.length ? 'Deselect All' : 'Select All Mentees'}
+                    {selectedMenteeIds.size === filteredMentees.length ? 'Deselect All' : 'Select All'}
                   </Button>
+
                   <input
                     type="text"
-                    placeholder="Search mentees…"
+                    placeholder="Search students…"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="rounded-lg border border-line px-3 py-1 text-[12px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="rounded-xl border border-line px-3 py-1.5 text-[12px] focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>
               </div>
 
               {loadingMentees ? (
-                <div className="p-8 text-center text-muted">Loading assigned mentees…</div>
-              ) : mentees.length === 0 ? (
+                <div className="p-8 text-center text-muted">Loading assigned students…</div>
+              ) : filteredMentees.length === 0 ? (
                 <EmptyState
-                  title="No Mentees Assigned"
-                  description="The selected mentor does not currently have any mentees assigned."
+                  title="No Students Found"
+                  description="No students match the selected batch or search filter."
                   icon="ⓘ"
                 />
               ) : (
-                <div className="max-h-72 overflow-y-auto rounded-2xl border border-line bg-surface">
-                  <table className="w-full text-left text-[12.5px]">
-                    <thead className="sticky top-0 border-b border-line bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-muted-soft">
+                <div className="max-h-72 overflow-y-auto rounded-xl border border-line bg-white shadow-xs">
+                  <table className="w-full text-left text-[12.5px] border-collapse">
+                    <thead className="sticky top-0 z-10 border-b border-line bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-muted shadow-xs">
                       <tr>
-                        <th className="p-3 w-10 text-center">
+                        <th className="w-12 px-4 py-3 text-center">
                           <input
                             type="checkbox"
-                            checked={selectedMenteeIds.size === mentees.length && mentees.length > 0}
+                            checked={filteredMentees.length > 0 && filteredMentees.every((m) => selectedMenteeIds.has(m.id))}
                             onChange={(e) => handleSelectAll(e.target.checked)}
-                            className="rounded border-line"
+                            className="rounded border-line text-brand-600 focus:ring-brand-500"
                           />
                         </th>
-                        <th className="p-3">Student Name</th>
-                        <th className="p-3">Roll No</th>
-                        <th className="p-3">Cohort</th>
-                        <th className="p-3 text-right">Attendance</th>
-                        <th className="p-3 text-right">CGPA</th>
-                        <th className="p-3 text-right">Meetings</th>
+                        <th className="px-4 py-3 font-semibold">Student Name</th>
+                        <th className="px-4 py-3 font-semibold">Roll Number</th>
+                        <th className="px-4 py-3 font-semibold">Batch</th>
+                        <th className="px-4 py-3 font-semibold text-right">Reviews Held</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-line">
+                    <tbody className="divide-y divide-line/60">
                       {filteredMentees.map((s, idx) => {
                         const isSelected = selectedMenteeIds.has(s.id);
                         return (
@@ -370,10 +369,10 @@ export function MentorReassignmentTool({
                             key={s.id}
                             onClick={() => toggleMentee(s.id)}
                             className={`cursor-pointer transition-colors ${
-                              isSelected ? 'bg-brand-50/50 hover:bg-brand-50' : 'hover:bg-surface-subtle'
+                              isSelected ? 'bg-brand-50/50 hover:bg-brand-50' : 'hover:bg-slate-50/70'
                             }`}
                           >
-                            <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
@@ -381,14 +380,13 @@ export function MentorReassignmentTool({
                                 className="rounded border-line text-brand-600 focus:ring-brand-500"
                               />
                             </td>
-                            <td className="p-3 font-semibold text-ink flex items-center gap-2">
+                            <td className="px-4 py-3 font-semibold text-ink flex items-center gap-2">
                               <Avatar initials={s.initials} seed={idx} size="xs" />
                               {s.name}
                             </td>
-                            <td className="p-3 font-mono text-muted text-[11.5px]">{s.rollNumber}</td>
-                            <td className="p-3 text-muted">{s.section}</td>
-
-                            <td className="p-3 text-right tnum">{s.meetingsHeld} / {s.meetingsDue}</td>
+                            <td className="px-4 py-3 font-mono text-muted text-[11.5px]">{s.rollNumber}</td>
+                            <td className="px-4 py-3 text-muted">{s.section}</td>
+                            <td className="px-4 py-3 text-right tnum">{s.meetingsHeld} / {s.meetingsDue}</td>
                           </tr>
                         );
                       })}
@@ -398,43 +396,7 @@ export function MentorReassignmentTool({
               )}
             </div>
 
-            {/* Options: Archiving and Reason */}
-            <div className="rounded-2xl border border-line bg-surface-subtle p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[12.5px] font-bold text-ink">
-                  Archive Option (Departing Mentor)
-                </span>
-                <Badge tone={archiveDepartingMentor ? 'rose' : 'slate'} size="xs">
-                  {archiveDepartingMentor ? 'Archive departing mentor' : 'Keep active (default)'}
-                </Badge>
-              </div>
-
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={archiveDepartingMentor}
-                  onChange={(e) => setArchiveDepartingMentor(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-line text-brand-600 focus:ring-brand-500"
-                />
-                <div>
-                  <span className="text-[13px] font-semibold text-ink block">
-                    Archive departing mentor account
-                  </span>
-                  <span className="text-[11.5px] text-muted block leading-relaxed mt-0.5">
-                    <strong>Note:</strong> Not all mentors whose mentees are changed will be archived. Only if you check this option will this departing mentor be archived. If unchecked, the mentor remains active in the faculty directory with 0 or remaining mentees.
-                  </span>
-                </div>
-              </label>
-
-              <TextField
-                label="Reassignment Justification / Succession Reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Faculty resignation, study leave, departmental load balancing…"
-              />
-            </div>
-
-            {/* Submission Button */}
+            {/* Submission Action Bar */}
             <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
               {onCancel && (
                 <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>
@@ -448,8 +410,8 @@ export function MentorReassignmentTool({
                 disabled={submitting || selectedMenteeIds.size === 0 || !targetMentorId}
               >
                 {submitting
-                  ? 'Reassigning Mentees…'
-                  : `Reassign ${selectedMenteeIds.size} Mentees to ${targetMentor?.name || 'New Mentor'}`}
+                  ? 'Reassigning Students…'
+                  : `Transfer ${selectedMenteeIds.size} Student(s) to ${targetMentor?.name || 'Target Mentor'}`}
               </Button>
             </div>
           </div>
