@@ -21,6 +21,7 @@ import {
   buildMentorOverview,
   buildParentLog,
   buildReports,
+  listMentorMeetings,
   mentorTimeline,
   summariseMentee,
 } from '../services/mentor.js';
@@ -480,6 +481,9 @@ router.post('/me/mentees/:menteeId/meetings', async (req, res, next) => {
     studentSigned,
     photoProofs,
     geotag,
+    startTime,
+    endTime,
+    location,
   } = req.body ?? {};
 
   if (!date?.trim()) {
@@ -538,6 +542,9 @@ router.post('/me/mentees/:menteeId/meetings', async (req, res, next) => {
   if (geotag && (!Number.isFinite(geotag.latitude) || !Number.isFinite(geotag.longitude))) {
     return next(new HttpError(400, 'The meeting location is invalid'));
   }
+  if (mode === 'Offline' && !location?.trim() && !geotag) {
+    return next(new HttpError(400, 'Meeting location is mandatory for offline meetings'));
+  }
 
   let teamsJoinUrl = req.body?.customMeetingUrl?.trim() || null;
   if (mode === 'Online' && !teamsJoinUrl) {
@@ -569,8 +576,12 @@ router.post('/me/mentees/:menteeId/meetings', async (req, res, next) => {
   const meeting = addMentorMeeting(mentee.id, {
     teamsJoinUrl,
     date: date.trim(),
+    startTime: startTime?.trim() || '',
+    endTime: endTime?.trim() || '',
     duration: `${durationMinutes} min`,
+    durationMinutes,
     mode,
+    location: location?.trim() || (mode === 'Offline' ? (geotag ? `Lat ${geotag.latitude}, Long ${geotag.longitude}` : 'Campus') : 'Microsoft Teams'),
     topicsDiscussed: topicsDiscussed.trim(),
     category,
     agenda,
@@ -652,10 +663,21 @@ router.post('/me/meetings/batch', (req, res, next) => {
     studentSigned,
     photoProofs,
     geotag,
+    startTime,
+    endTime,
+    location,
   } = meetingData;
 
-  if (!date?.trim() || !topicsDiscussed?.trim()) {
-    return next(new HttpError(400, 'Meeting date and topics discussed are required'));
+  let meetingDate = date?.trim();
+  if (!meetingDate) {
+    meetingDate = new Date().toISOString().split('T')[0];
+  }
+  if (!topicsDiscussed?.trim()) {
+    return next(new HttpError(400, 'Topics discussed is required'));
+  }
+
+  if (mode === 'Offline' && !location?.trim() && !geotag) {
+    return next(new HttpError(400, 'Meeting location is mandatory for offline meetings'));
   }
 
   const validActionItems = (actionItems ?? []).filter((item) => item?.task?.trim());
@@ -677,9 +699,13 @@ router.post('/me/meetings/batch', (req, res, next) => {
     if (!mentee || mentee.mentorId !== mentor.id) continue;
     const meeting = addMentorMeeting(mentee.id, {
       teamsJoinUrl: mode === 'Online' ? (req.user?.email ? `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(req.user.email)}` : 'https://teams.microsoft.com') : null,
-      date: date.trim(),
+      date: meetingDate,
+      startTime: startTime?.trim() || '',
+      endTime: endTime?.trim() || '',
       duration: `${durationMinutes} min`,
+      durationMinutes,
       mode,
+      location: location?.trim() || (mode === 'Offline' ? (geotag ? `Lat ${geotag.latitude}, Long ${geotag.longitude}` : 'Campus') : 'Microsoft Teams'),
       topicsDiscussed: topicsDiscussed.trim(),
       category,
       agenda,
@@ -724,6 +750,10 @@ router.post('/me/meetings/batch', (req, res, next) => {
   }
 
   res.status(201).json({ count: createdMeetings.length, meetings: createdMeetings });
+});
+
+router.get('/me/meetings', (req, res) => {
+  res.json(listMentorMeetings(currentMentor(req)));
 });
 
 router.get('/me/goals', (req, res) => {

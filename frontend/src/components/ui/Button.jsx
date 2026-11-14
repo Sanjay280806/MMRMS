@@ -28,7 +28,7 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={cx(VARIANTS[variant] || VARIANTS.primary, SIZES[size] || 'rounded-xl', className)}
+      className={cx(VARIANTS[variant], SIZES[size] || SIZES.md, className)}
       {...rest}
     >
       {loading && <Spinner />}

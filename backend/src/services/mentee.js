@@ -289,7 +289,10 @@ export function menteeToStudent(mentee) {
       number,
       date: (i === 0 && mentee.lastMeeting) ? mentee.lastMeeting : (['22 Jul 2026', '05 Jul 2026', '14 Jun 2026', '12 Aug 2025'][i] ?? '12 Aug 2025'),
       duration: '30 min',
+      startTime: i % 2 === 0 ? '10:00 AM' : '02:30 PM',
+      endTime: i % 2 === 0 ? '10:30 AM' : '03:00 PM',
       mode: i % 2 === 0 ? 'Online' : 'Offline',
+      location: i % 2 === 0 ? 'Microsoft Teams' : 'Cabin 304, Academic Block A',
       agenda: struggling
         ? ['Academic Review', 'Attendance Review', 'Goal Progress']
         : ['Academic Review', 'Placement Preparation', 'Goal Progress'],

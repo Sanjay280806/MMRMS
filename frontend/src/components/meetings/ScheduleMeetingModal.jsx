@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../../api/client.js';
+import { useResource } from '../../hooks/useResource.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Card } from '../ui/Card.jsx';
@@ -24,9 +25,12 @@ const DURATION_OPTIONS = [
 
 export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
   const today = new Date().toISOString().split('T')[0];
+  const { data: roster } = useResource(mentee ? '' : '/mentor/me/mentees?limit=100', { enabled: !mentee });
+  const [selectedMenteeId, setSelectedMenteeId] = useState(mentee?.id || '');
   const [mode, setMode] = useState('Online');
   const [date, setDate] = useState(today);
   const [time, setTime] = useState('10:00');
+  const [location, setLocation] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [category, setCategory] = useState('Academic');
   const [agenda, setAgenda] = useState(['Academic Review']);
@@ -38,7 +42,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  if (!mentee) return null;
+  const activeMentee = mentee || (roster?.mentees ?? []).find((m) => m.id === selectedMenteeId);
 
   function toggleAgenda(item) {
     if (agenda.includes(item)) {
@@ -52,8 +56,26 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+
+    const targetMenteeId = mentee?.id || selectedMenteeId;
+    if (!targetMenteeId) {
+      setError('Please select a student for this meeting.');
+      return;
+    }
+
+    if (mode === 'Offline' && !location.trim()) {
+      setError('Meeting location is mandatory for offline meetings.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    const [sh, sm] = (time || '10:00').split(':').map(Number);
+    const totalMin = (sh || 0) * 60 + (sm || 0) + Number(durationMinutes || 30);
+    const endH = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
+    const endM = String(totalMin % 60).padStart(2, '0');
+    const endTime = `${endH}:${endM}`;
 
     const actionItems = actionTask.trim()
       ? [
@@ -68,8 +90,11 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
 
     const payload = {
       date,
+      startTime: time,
+      endTime,
       durationMinutes,
       mode,
+      location: mode === 'Online' ? 'Microsoft Teams' : location.trim() || 'Campus',
       category,
       agenda,
       topicsDiscussed: topicsDiscussed.trim() || `${category} Mentoring Session`,
@@ -83,7 +108,7 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
     };
 
     try {
-      const res = await api(`/mentor/me/mentees/${mentee.id}/meetings`, {
+      const res = await api(`/mentor/me/mentees/${targetMenteeId}/meetings`, {
         method: 'POST',
         body: payload,
       });
@@ -118,11 +143,17 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                 </Badge>
               </div>
               <h2 className="mt-1 text-base font-bold text-ink sm:text-lg">
-                Schedule Meeting with {mentee.name}
+                {activeMentee ? `Schedule Meeting with ${activeMentee.name}` : 'Schedule Mentoring Session'}
               </h2>
-              <p className="mt-0.5 text-xs text-muted">
-                Roll No: <strong className="text-ink">{mentee.rollNumber || mentee.id}</strong>
-              </p>
+              {activeMentee ? (
+                <p className="mt-0.5 text-xs text-muted">
+                  Roll No: <strong className="text-ink">{activeMentee.rollNumber || activeMentee.id}</strong>
+                </p>
+              ) : (
+                <p className="mt-0.5 text-xs text-muted">
+                  Schedule an online or offline mentoring session with your mentee.
+                </p>
+              )}
             </div>
             <button
               type="button"
@@ -138,6 +169,27 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
             {error && <AlertBanner tone="rose" title={error} />}
+
+            {!mentee && (
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Select Student <span className="text-bad-ink">*</span>
+                </label>
+                <select
+                  value={selectedMenteeId}
+                  onChange={(e) => setSelectedMenteeId(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-xs font-medium text-ink focus-ring"
+                  required
+                >
+                  <option value="">-- Choose Mentee --</option>
+                  {(roster?.mentees ?? []).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.rollNumber || m.id}) {m.department ? `· ${m.department}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Mode Selector */}
             <div>
@@ -187,6 +239,23 @@ export function ScheduleMeetingModal({ mentee, onClose, onScheduled }) {
                     placeholder="https://teams.microsoft.com/... (Leave empty for auto-generated)"
                     value={customMeetingUrl}
                     onChange={(e) => setCustomMeetingUrl(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {mode === 'Offline' && (
+                <div className="mt-3 rounded-xl border border-line bg-canvas/40 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-ink font-semibold">
+                      Meeting Location / Venue <span className="text-bad-ink">*</span>
+                    </span>
+                    <span className="text-[11px] font-semibold text-bad-ink">Mandatory for offline</span>
+                  </div>
+                  <TextField
+                    placeholder="e.g. Cabin 204, Seminar Hall 2, Academic Block A"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    required={mode === 'Offline'}
                   />
                 </div>
               )}

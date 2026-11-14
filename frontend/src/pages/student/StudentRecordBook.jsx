@@ -291,6 +291,9 @@ export default function StudentRecordBook() {
             <MeetingLog
               meetings={data.meetings}
               savingAction={saving}
+              canDownload={false}
+              isStudent={true}
+              onMeetingSigned={reload}
               onUpdateAction={(actionId, status) =>
                 mutate(actionId, () =>
                   api(`/student/me/action-items/${actionId}`, { method: 'PATCH', body: { status } }),

@@ -16,6 +16,7 @@ import {
   getStudentMessages,
   listConcerns,
   getPlacementProfile,
+  signMeetingAsStudent,
   updateActionItem,
   updatePlacementProfile,
   updateReadiness,
@@ -139,9 +140,19 @@ router.post('/me/activities', (req, res, next) => {
       area,
       customArea: area === 'Others' ? body.customArea.trim() : null,
       activityName: body.activityName.trim(),
+      semester: body.semester?.trim() || null,
+      place: body.place?.trim() || null,
+      platform: body.platform?.trim() || null,
+      company: body.company?.trim() || null,
+      location: body.location?.trim() || null,
+      duration: body.duration?.trim() || null,
+      startDate: body.startDate?.trim() || null,
+      endDate: body.endDate?.trim() || null,
+      college: body.college?.trim() || null,
+      artCategory: body.artCategory?.trim() || null,
       description: body.description?.trim() || null,
       achievement: body.achievement?.trim() || null,
-      date: body.date?.trim() || null,
+      date: body.date?.trim() || body.startDate?.trim() || null,
       evidence,
     }),
   );
@@ -304,6 +315,13 @@ router.post('/me/goals/:goalId/acknowledge', (req, res, next) => {
   const goal = acknowledgeGoal(student.id, req.params.goalId);
   if (!goal) return next(new HttpError(404, `No goal ${req.params.goalId}`));
   res.json(goal);
+});
+
+router.post('/me/meetings/:meetingId/sign', (req, res, next) => {
+  const student = currentStudent(req);
+  const meeting = signMeetingAsStudent(student.id, req.params.meetingId);
+  if (!meeting) return next(new HttpError(404, `No meeting ${req.params.meetingId}`));
+  res.json(meeting);
 });
 
 /* ── support between meetings ───────────────────────────────────────────── */

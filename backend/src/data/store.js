@@ -1100,7 +1100,10 @@ export function addMentorMeeting(menteeId, entry) {
     id: nextId('mtg'),
     number,
     duration: '30 min',
+    startTime: '',
+    endTime: '',
     mode: 'Offline',
+    location: '',
     agenda: ['Academic Review'],
     studentConcerns: 'None recorded.',
     mentorSuggestions: 'Continue the agreed action plan.',
@@ -1310,6 +1313,46 @@ export function acknowledgeGoal(studentId, goalId) {
   if (!goal) return null;
   goal.acknowledged = true;
   return goal;
+}
+
+/** Section 12 — student reviewing and signing meeting minutes. */
+export function signMeetingAsStudent(studentId, meetingId) {
+  const student = students.get(studentId) || findMenteeById(studentId);
+  if (!student) return null;
+
+  let meeting = null;
+  for (const m of student.meetings ?? []) {
+    if (m.id === meetingId) {
+      meeting = m;
+      break;
+    }
+  }
+  if (!meeting && student.recordBook?.meetings) {
+    for (const m of student.recordBook.meetings) {
+      if (m.id === meetingId) {
+        meeting = m;
+        break;
+      }
+    }
+  }
+  if (!meeting) {
+    for (const mentee of mentees) {
+      const found = (mentee.meetingLogs ?? []).find((m) => m.id === meetingId)
+        || (mentee.recordBook?.meetings ?? []).find((m) => m.id === meetingId);
+      if (found) {
+        meeting = found;
+        break;
+      }
+    }
+  }
+
+  if (meeting) {
+    meeting.studentSigned = true;
+    meeting.signed = meeting.mentorSigned === true;
+    meeting.studentSignedAt = new Date().toISOString();
+  }
+
+  return meeting;
 }
 
 /** Support request raised between meetings. */

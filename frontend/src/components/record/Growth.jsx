@@ -28,7 +28,6 @@ function areaBadgeTone(area) {
     Certification: 'green',
     Internship: 'brand',
     Workshop: 'amber',
-    Events: 'slate',
     'Paper Presentation': 'indigo',
     Arts: 'rose',
     Others: 'slate',
@@ -67,25 +66,79 @@ export function ActivitiesAndAchievements({ activities = [] }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={areaBadgeTone(record.area)}>{label}</Badge>
+                      {record.semester && (
+                        <span className="inline-flex items-center rounded-md bg-canvas/80 px-2 py-0.5 text-[11px] font-semibold text-muted-strong border border-line">
+                          {record.semester}
+                        </span>
+                      )}
+                      {record.artCategory && (
+                        <Badge tone="rose" size="sm">
+                          {record.artCategory}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-2 text-[14px] font-semibold text-ink">{title}</p>
-                    <dl className="mt-2 space-y-1 text-[12.5px] text-muted">
-                      {record.description && (
+                    <dl className="mt-2 grid gap-1.5 text-[12.5px] text-muted sm:grid-cols-2">
+                      {record.place && (
                         <div>
-                          <span className="text-muted-soft">Description: </span>
-                          <span className="text-muted-strong">{record.description}</span>
+                          <span className="text-muted-soft">Location / Venue: </span>
+                          <span className="text-muted-strong font-medium">📍 {record.place}</span>
+                        </div>
+                      )}
+                      {record.platform && (
+                        <div>
+                          <span className="text-muted-soft">Platform / Org: </span>
+                          <span className="text-muted-strong font-medium">🌐 {record.platform}</span>
+                        </div>
+                      )}
+                      {record.company && (
+                        <div>
+                          <span className="text-muted-soft">Company: </span>
+                          <span className="text-muted-strong font-medium">🏢 {record.company}</span>
+                        </div>
+                      )}
+                      {record.location && (
+                        <div>
+                          <span className="text-muted-soft">Company Location: </span>
+                          <span className="text-muted-strong font-medium">📍 {record.location}</span>
+                        </div>
+                      )}
+                      {record.college && (
+                        <div>
+                          <span className="text-muted-soft">College / Conference: </span>
+                          <span className="text-muted-strong font-medium">🏛️ {record.college}</span>
+                        </div>
+                      )}
+                      {record.duration && (
+                        <div>
+                          <span className="text-muted-soft">Duration: </span>
+                          <span className="text-muted-strong font-medium">⏱️ {record.duration}</span>
+                        </div>
+                      )}
+                      {(record.startDate || record.endDate) && (
+                        <div>
+                          <span className="text-muted-soft">Dates: </span>
+                          <span className="tnum text-muted-strong font-medium">
+                            🗓️ {record.startDate || ''} {record.endDate ? `to ${record.endDate}` : ''}
+                          </span>
                         </div>
                       )}
                       {record.achievement && (
-                        <div>
-                          <span className="text-muted-soft">Achievement: </span>
-                          <span className="text-muted-strong">{record.achievement}</span>
+                        <div className="sm:col-span-2">
+                          <span className="text-muted-soft">Achievement / Award: </span>
+                          <span className="text-good-ink font-semibold">🏆 {record.achievement}</span>
                         </div>
                       )}
-                      {record.date && (
+                      {record.date && !record.startDate && (
                         <div>
                           <span className="text-muted-soft">Date: </span>
                           <span className="tnum font-medium text-muted-strong">{record.date}</span>
+                        </div>
+                      )}
+                      {record.description && (
+                        <div className="sm:col-span-2">
+                          <span className="text-muted-soft">Description: </span>
+                          <span className="text-muted-strong">{record.description}</span>
                         </div>
                       )}
                     </dl>

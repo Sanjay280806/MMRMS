@@ -207,18 +207,6 @@ export function MenteeRecordBook({ menteeId, onBack, initialTab = 'profile' }) {
 
       {tab === 'meetings' && (
         <div className="space-y-5">
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              onClick={() => setShowScheduleModal(true)}
-              className="bg-[#464EB8] hover:bg-[#3b429f] text-white flex items-center gap-2 shadow-xs"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.5 7.5h-5v5h5v-5zm0-4.5h-5a2.5 2.5 0 0 0-2.5 2.5v12a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V5.5A2.5 2.5 0 0 0 19.5 3zM9.5 5.5h-5a2.5 2.5 0 0 0-2.5 2.5v8a2.5 2.5 0 0 0 2.5 2.5h5a2.5 2.5 0 0 0 2.5-2.5V8A2.5 2.5 0 0 0 9.5 5.5z" />
-              </svg>
-              + Schedule Meeting
-            </Button>
-          </div>
           <MeetingLog meetings={data.meetings} menteeName={data.identity.name} />
         </div>
       )}
