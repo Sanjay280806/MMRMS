@@ -387,12 +387,7 @@ export function MentorReassignmentTool({
                             </td>
                             <td className="p-3 font-mono text-muted text-[11.5px]">{s.rollNumber}</td>
                             <td className="p-3 text-muted">{s.section}</td>
-                            <td className="p-3 text-right tnum">
-                              <span className={s.attendance < 75 ? 'font-semibold text-bad-ink' : 'text-ink'}>
-                                {s.attendance}%
-                              </span>
-                            </td>
-                            <td className="p-3 text-right tnum font-medium">{s.cgpa?.toFixed(2)}</td>
+
                             <td className="p-3 text-right tnum">{s.meetingsHeld} / {s.meetingsDue}</td>
                           </tr>
                         );

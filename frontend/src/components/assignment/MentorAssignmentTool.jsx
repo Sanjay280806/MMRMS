@@ -429,12 +429,7 @@ export function MentorAssignmentTool({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-ink">
-                        {student.cgpa ? student.cgpa.toFixed(1) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-ink">
-                        {student.attendance ? `${student.attendance}%` : '—'}
-                      </td>
+
                     </tr>
                   );
                 })}

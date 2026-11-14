@@ -85,7 +85,7 @@ function OversightConsole({ role }) {
       { label: 'Coordination', items: [{ key: 'operations', label: 'Meetings & Grievances', badge: stats.openGrievances, badgeTone: 'rose' }, { key: 'mentors', label: 'Mentor Coordination' }] },
     ]
     : [
-      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }, { key: 'mentors', label: 'Mentor Tracker' }] },
+      { label: 'Overview', items: [{ key: 'dashboard', label: 'Dashboard' }] },
       { label: 'Data & Operations', items: [{ key: 'upload', label: 'Excel Data Import', badge: 'ERP', badgeTone: 'indigo' }, { key: 'assignment', label: 'Mentor Assignment' }, { key: 'reassignment', label: 'Mentor Reassignment' }, { key: 'audit', label: 'Audit & Accreditation' }] },
     ];
 
@@ -168,12 +168,10 @@ function CoordinatorSections({ section, data, reload, composer, setComposer, nav
 
   return (
     <>
-      {section === 'dashboard' && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
+      {(section === 'dashboard' || section === 'mentors') && <CoordinatorDashboard data={data} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
       {section === 'upload' && <ExcelUploadSection onUploadSuccess={reload} onNavigate={navigate} />}
-      {section === 'students' && <StudentDirectory role="coordinator" onNavigate={navigate} />}
-      {section === 'mentors' && <MentorTracker rows={data.mentors} onNavigate={navigate} onInspectMentor={setInspectingMentorId} onReload={reload} />}
-      {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
-      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('mentors')} />}
+      {section === 'assignment' && <MentorAssignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
+      {section === 'reassignment' && <MentorReassignmentTool role="coordinator" onSuccess={reload} onCancel={() => navigate('dashboard')} />}
       {section === 'audit' && <AuditPanel rows={data.audit} tracker={data.academicTracker} />}
 
       {inspectingMentorId && (
@@ -228,9 +226,8 @@ function CoordinatorDashboard({ data, onNavigate, onInspectMentor, onReload }) {
       </div>
     </div>
 
-<div className="grid gap-5 xl:grid-cols-2">
-      <MentorTracker rows={data.mentors} compact onInspectMentor={onInspectMentor} onReload={onReload} />
-      <MiniList title="Year calendar" rows={data.events} label={(event) => event.title} detail={(event) => `${event.date} · ${event.type} · ${event.status}`} />
+<div className="mt-5">
+      <MentorTracker rows={data.mentors} onNavigate={onNavigate} onInspectMentor={onInspectMentor} onReload={onReload} />
     </div>
   </>;
 }
